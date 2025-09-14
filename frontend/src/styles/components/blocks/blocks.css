@@ -1,0 +1,16 @@
+.block {
+    position: absolute;
+    overflow: scroll;
+    background-color: #213547;
+}
+
+.glass-element {
+    position: absolute;
+    overflow: scroll;
+    background-color: rgba(255, 255, 255, 0.2); /* White with 20% opacity */
+    backdrop-filter: blur(10px); /* Adjust the blur radius as needed */
+    -webkit-backdrop-filter: blur(10px); /* For broader browser support */
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
