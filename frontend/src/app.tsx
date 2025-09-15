@@ -3,8 +3,8 @@ import {HomeScreen} from "./screens/HomeScreen.tsx";
 import {
     Router,
 } from 'preact-router';
-import {SideBarUI} from "./components/UI/SideBarUI.tsx";
 import {BotInteracctionScreen} from "./screens/BotInteracctionScreen.tsx";
+import {WorkspaceScreen} from "./screens/WorkspaceScreen.tsx";
 
 
 export function App() {
@@ -12,7 +12,7 @@ export function App() {
     return (
         <Router>
             <HomeScreen path="/"/>
-            <SideBarUI path="/help"/>
+            <WorkspaceScreen path="/workspace/:id"/>
             <BotInteracctionScreen path="/bot/:id"/>
         </Router>
     )

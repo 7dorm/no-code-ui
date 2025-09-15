@@ -6,4 +6,8 @@ export abstract class BaseScreen extends Component{
         super(props, context);
     }
 
+    saveLayout(state: any) {
+        console.log("getCurrentState", state);
+    }
+
 }

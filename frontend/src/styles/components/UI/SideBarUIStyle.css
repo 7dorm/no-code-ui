@@ -12,6 +12,8 @@
 
 .side-bar {
     position: absolute;
+    overflow: clip;
+    z-index: 999;
 }
 .side-bar.dragging {
     cursor: grabbing;
