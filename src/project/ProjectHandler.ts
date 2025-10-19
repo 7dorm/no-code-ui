@@ -11,7 +11,7 @@ const STORAGE_KEY = 'pvw_redo_v1';
 
 let state: ProjectData = {
   elements: [],
-  files: {'main.txt':'// start'}, 
+  files: {'main.txt':'// start'},
   mode: 'visual'
 };
 
@@ -29,7 +29,6 @@ export const ProjectHandler = {
   },
   createEmpty(): ProjectData {
     state = {elements:[], files:{'main.txt':'// start'}, mode:'visual'};
-    save();
     return state;
   },
   subscribe(cb: Listener){
