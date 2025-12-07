@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "jsx": "react-jsx",
     "target": "ES2020",
     "module": "CommonJS",
     "moduleResolution": "node",
@@ -18,7 +19,7 @@
   },
   "include": [
     "./**/*.ts"
-, "backend/tsconfig.jsin", "backend/test_project/src/components/Header.tsx"  ],
+, "test_project/src/components/Header.tsx"  ],
   "exclude": [
     "node_modules",
     "dist"

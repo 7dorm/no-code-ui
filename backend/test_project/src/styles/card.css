@@ -1,0 +1,27 @@
+.card {
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 16px;
+  width: 200px;
+  background: white;
+}
+
+.card-title {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.card-text {
+  font-size: 14px;
+  color: #666;
+}
+
+.card-button {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}

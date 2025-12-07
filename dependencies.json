@@ -1,0 +1,217 @@
+{
+  "name": "src",
+  "path": "../../App/my_client/frontend/src",
+  "type": "dir",
+  "children": [
+    {
+      "name": "App.css",
+      "path": "..\\..\\App\\my_client\\frontend\\src\\App.css",
+      "type": "file"
+    },
+    {
+      "name": "App.tsx",
+      "path": "..\\..\\App\\my_client\\frontend\\src\\App.tsx",
+      "type": "file"
+    },
+    {
+      "name": "assets",
+      "path": "..\\..\\App\\my_client\\frontend\\src\\assets",
+      "type": "dir",
+      "children": [
+        {
+          "name": "fonts",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\assets\\fonts",
+          "type": "dir",
+          "children": [
+            {
+              "name": "nunito-v16-latin-regular.woff2",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\assets\\fonts\\nunito-v16-latin-regular.woff2",
+              "type": "file"
+            },
+            {
+              "name": "OFL.txt",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\assets\\fonts\\OFL.txt",
+              "type": "file"
+            }
+          ]
+        },
+        {
+          "name": "images",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\assets\\images",
+          "type": "dir",
+          "children": [
+            {
+              "name": "logo-universal.png",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\assets\\images\\logo-universal.png",
+              "type": "file"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "components",
+      "path": "..\\..\\App\\my_client\\frontend\\src\\components",
+      "type": "dir",
+      "children": [
+        {
+          "name": "AddEvent",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\AddEvent",
+          "type": "dir",
+          "children": [
+            {
+              "name": "AddEvent.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\AddEvent\\AddEvent.tsx",
+              "type": "file"
+            },
+            {
+              "name": "ColorButton.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\AddEvent\\ColorButton.tsx",
+              "type": "file"
+            },
+            {
+              "name": "ColorSelect.css",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\AddEvent\\ColorSelect.css",
+              "type": "file"
+            },
+            {
+              "name": "ColorSelect.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\AddEvent\\ColorSelect.tsx",
+              "type": "file"
+            },
+            {
+              "name": "ev.css",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\AddEvent\\ev.css",
+              "type": "file"
+            }
+          ]
+        },
+        {
+          "name": "Calendar",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Calendar",
+          "type": "dir",
+          "children": [
+            {
+              "name": "Calendar.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Calendar\\Calendar.tsx",
+              "type": "file"
+            },
+            {
+              "name": "day.css",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Calendar\\day.css",
+              "type": "file"
+            },
+            {
+              "name": "day.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Calendar\\day.tsx",
+              "type": "file"
+            }
+          ]
+        },
+        {
+          "name": "event.tsx",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\event.tsx",
+          "type": "file"
+        },
+        {
+          "name": "login",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\login",
+          "type": "dir",
+          "children": [
+            {
+              "name": "login.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\login\\login.tsx",
+              "type": "file"
+            }
+          ]
+        },
+        {
+          "name": "menu.tsx",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\menu.tsx",
+          "type": "file"
+        },
+        {
+          "name": "panel",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\panel",
+          "type": "dir",
+          "children": [
+            {
+              "name": "panel.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\panel\\panel.tsx",
+              "type": "file"
+            }
+          ]
+        },
+        {
+          "name": "Tabler",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler",
+          "type": "dir",
+          "children": [
+            {
+              "name": "EditTable.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler\\EditTable.tsx",
+              "type": "file"
+            },
+            {
+              "name": "RenderType.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler\\RenderType.tsx",
+              "type": "file"
+            },
+            {
+              "name": "subtask",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler\\subtask",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "STEditor.tsx",
+                  "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler\\subtask\\STEditor.tsx",
+                  "type": "file"
+                },
+                {
+                  "name": "subtasks.tsx",
+                  "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler\\subtask\\subtasks.tsx",
+                  "type": "file"
+                }
+              ]
+            },
+            {
+              "name": "Table.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler\\Table.tsx",
+              "type": "file"
+            },
+            {
+              "name": "Tabler.tsx",
+              "path": "..\\..\\App\\my_client\\frontend\\src\\components\\Tabler\\Tabler.tsx",
+              "type": "file"
+            }
+          ]
+        },
+        {
+          "name": "WebCrumbs.css",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\WebCrumbs.css",
+          "type": "file"
+        },
+        {
+          "name": "WebCrumbs.tsx",
+          "path": "..\\..\\App\\my_client\\frontend\\src\\components\\WebCrumbs.tsx",
+          "type": "file"
+        }
+      ]
+    },
+    {
+      "name": "main.tsx",
+      "path": "..\\..\\App\\my_client\\frontend\\src\\main.tsx",
+      "type": "file"
+    },
+    {
+      "name": "style.css",
+      "path": "..\\..\\App\\my_client\\frontend\\src\\style.css",
+      "type": "file"
+    },
+    {
+      "name": "vite-env.d.ts",
+      "path": "..\\..\\App\\my_client\\frontend\\src\\vite-env.d.ts",
+      "type": "file"
+    }
+  ]
+}
