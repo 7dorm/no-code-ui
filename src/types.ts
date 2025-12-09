@@ -9,3 +9,20 @@ export type ElementData = {
   h: number;
   props?: Record<string, any>;
 };
+
+// Типы для отслеживания изменений блоков
+export type BlockChangeAction = 'move' | 'resize' | 'update' | 'delete' | 'create';
+
+export type BlockChanges = {
+  position?: { x: number; y: number };
+  dimensions?: { w: number; h: number };
+  style?: Record<string, any>;
+  props?: Record<string, any>;
+  deleted?: boolean;
+};
+
+export type BlockInteractionResult = {
+  elementId: string;
+  action: BlockChangeAction;
+  changes: BlockChanges;
+};
