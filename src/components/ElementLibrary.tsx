@@ -8,7 +8,7 @@ export function ElementLibrary(){
     <div>
       <h4>Element Library</h4>
       {items.map(kind=>(
-        <div className="library-item" onClick={()=>add(kind)}>
+        <div className="library-item" key={kind} onClick={()=>add(kind)}>
           <div style={{width:40,height:28,background:'rgba(255,255,255,0.02)',display:'flex',alignItems:'center',justifyContent:'center'}}>{kind}</div>
           <div style={{flex:1}}>{kind}</div>
         </div>

@@ -6,6 +6,12 @@ html,body,#app{height:100%;margin:0;font-family:Inter, system-ui, -apple-system,
 .workspace{flex:1;position:relative;overflow:hidden;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent)}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:6px 8px;border-radius:8px;cursor:pointer;color:inherit}
-.element{position:absolute;border-radius:6px;padding:6px;box-sizing:border-box;transition:transform 160ms ease, width 160ms ease, height 160ms ease, opacity 160ms}
+.element{position:absolute;border-radius:6px;padding:6px;box-sizing:border-box}
 .handle{position:absolute;width:10px;height:10px;background:var(--accent);right:-5px;bottom:-5px;border-radius:50%}
+.draggable-element{position:absolute;box-sizing:border-box}
+.draggable-element:hover .resize-handle{opacity:1}
+.resize-handle{opacity:0;transition:opacity 0.2s ease;z-index:10}
+.resize-handle:hover{opacity:1!important;background-color:rgba(100, 150, 255, 1)!important}
+.element-main{cursor:grab}
+.element-main:active{cursor:grabbing}
 .library-item{display:flex;gap:8px;align-items:center;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.02);cursor:pointer;margin-bottom:6px}
