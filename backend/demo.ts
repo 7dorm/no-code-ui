@@ -3,7 +3,7 @@ import { VisualEngine } from './src/engine/Engine';
 import * as path from 'path';
 import * as fs from 'fs';
 const PROJECT_PATH = path.resolve(__dirname, '../test_project'); 
-
+console.log(PROJECT_PATH)
 async function main() {
   console.log('Парсим проект:', PROJECT_PATH);
   const engine = new VisualEngine(PROJECT_PATH);

@@ -22,13 +22,53 @@ export class VisualEngine {
   cssStyles = new Map<string, VisualBlock>();
   private projectRoot: string;
 
-  constructor(projectRoot: string) {
-    this.projectRoot = path.resolve(projectRoot);
+constructor(projectRoot: string) {
+  this.projectRoot = path.resolve(projectRoot);
+
+  const tsConfigPath = this.findConfigUpwards(
+    this.projectRoot,
+    ['tsconfig.json', 'package.json']
+  );
+
+  if (tsConfigPath) {
     this.project = new Project({
-      tsConfigFilePath: path.join(this.projectRoot, 'tsconfig.json'),
+      tsConfigFilePath: tsConfigPath,
+      skipAddingFilesFromTsConfig: true,
+    });
+  } else {
+    // fallback — если вообще нет конфигов
+    this.project = new Project({
+      compilerOptions: {
+        allowJs: true,
+        jsx: 2, // React JSX
+      },
       skipAddingFilesFromTsConfig: true,
     });
   }
+}
+
+private findConfigUpwards(
+  startDir: string,
+  fileNames: string[]
+): string | null {
+  let current = startDir;
+
+  while (true) {
+    for (const name of fileNames) {
+      const candidate = path.join(current, name);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  return null;
+}
+
 
   async loadProject(): Promise<ProjectTree> {
     this.blocks.clear();
@@ -340,7 +380,6 @@ private resolveCssTree(blockId: string, inheritedCssMap: Map<string, VisualBlock
       for (const cls of classes) {
         const cssBlock = localCssMap.get(cls);
         if (cls === "main-header")
-        console.log(localCssMap)
         if (cssBlock) {
           if (!child.uses.includes(cssBlock.id)) child.uses.push(cssBlock.id);
           if (!cssBlock.usedIn.includes(child.id)) cssBlock.usedIn.push(child.id);
@@ -352,11 +391,6 @@ private resolveCssTree(blockId: string, inheritedCssMap: Map<string, VisualBlock
     this.resolveCssTree(childId, localCssMap);
   }
 }
-
-
-
-
-
 
 
 
@@ -373,33 +407,50 @@ private resolveComponentTreeWithImportMap(
     const child = this.blocks.get(childId);
     if (!child) continue;
 
-    // Элемент с большой буквы
-    if (child.type === 'element' && /^[A-Z]/.test(child.name)) {
-      const replacementId = importMap.get(child.name);
-      if (replacementId) {
-        const realComp = this.blocks.get(replacementId);
-        if (realComp) {
-          realComp.usedIn.push(block.id);
-          newChildren.push(realComp.id);
+    // Если элемент с большой буквы
+    if (child.type === 'element') {
+      if (/^[A-Z]/.test(child.name)) {
+        const replacementId = importMap.get(child.name);
+        if (replacementId) {
+          const realComp = this.blocks.get(replacementId);
+          if (realComp) {
+            realComp.usedIn.push(block.id);
+            newChildren.push(realComp.id);
+            this.blocks.delete(child.id);
+            continue; // не идем внутрь реального компонента
+          }
+        }
+      }
 
-          // удаляем временный JSX элемент
-          this.blocks.delete(child.id);
-
-          // НЕ идём внутрь реального компонента
-          continue;
+      // 2) Проверка props, которые могут быть компонентами
+      for (const [propName, propValue] of Object.entries(child.props || {})) {
+       
+        if (((propValue as any).type === 'expression' || (propValue as any).type === 'component')  && /^[A-Z]/.test(propValue.value)) {
+          // значение пропа — имя компонента
+          const replacementId = importMap.get(propValue.value);
+          if (replacementId) {
+            const realComp = this.blocks.get(replacementId);
+            if (realComp) {
+              realComp.usedIn.push(block.id);
+ 
+              // можно заменить prop на блок компонента
+              child.childrenIds.push(realComp.id);
+            }
+          }
         }
       }
     }
 
-    // оставляем элемент/компонент
+    // оставляем текущий элемент
     newChildren.push(childId);
 
-    // рекурсивно идем в оставшиеся children
+    // рекурсивно обходим оставшиеся children
     this.resolveComponentTreeWithImportMap(childId, importMap);
   }
 
   block.childrenIds = newChildren;
 }
+
 
 
 

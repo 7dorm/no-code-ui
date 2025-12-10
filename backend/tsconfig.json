@@ -19,7 +19,7 @@
   },
   "include": [
     "./**/*.ts"
-, "test_project/src/components/Header.tsx"  ],
+, "test_project1/src/components/Header.jsx"  ],
   "exclude": [
     "node_modules",
     "dist"

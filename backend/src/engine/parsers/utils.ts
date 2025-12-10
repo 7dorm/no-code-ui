@@ -3,7 +3,7 @@ let counter = 0;
 export const generateId = (filePath: string, type: string, name: string = ''): string => {
   const cleanPath = filePath.replace(/[\/\\.]/g, '_');
   const cleanName = name.replace(/[^a-zA-Z0-9]/g, '_') || 'anon';
-  return `${cleanPath}__${type}__${cleanName}__${Date.now()}_${counter++}`;
+  return `${cleanPath}__${type}__${cleanName}_${counter++}`;
 };
 
 // Найти JSX-элемент по нашему ID (сохраняем в комментариях при парсинге)

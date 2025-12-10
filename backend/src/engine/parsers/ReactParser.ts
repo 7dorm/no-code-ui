@@ -13,104 +13,207 @@ export class ReactParser {
   ) {}
 
   parse(sourceFile: SourceFile): void {
-    const imports = this.collectImports(sourceFile);
+  const ext = this.filePath.split('.').pop()?.toLowerCase();
 
-    sourceFile.getExportedDeclarations().forEach((decls) => {
-      decls.forEach(decl => {
-        if (Node.isFunctionDeclaration(decl) || Node.isVariableDeclaration(decl)) {
-          const name = decl.getName() || '<anonymous>';
-          const isDefault =
-            sourceFile.getDefaultExportSymbol()?.getDeclarations().includes(decl) ?? false;
-
-          if (this.isReactComponent(decl)) {
-            this.parseComponent(decl, name, isDefault, imports);
-          }
-        }
-      });
-    });
-  }
-
-
-  private isReactComponent(node: Node): boolean {
-    const code = node.getFullText();
-    return (
-      /return\s*\(?\s*</.test(code) ||           // возвращает JSX
-      /use[A-Z]/.test(code) ||                   // использует хуки
-      /[A-Z][a-zA-Z]*\(.*\)\s*{/.test(code)      // функциональный компонент с заглавной буквы
+  let plugins: any[] = ['jsx'];
+  if (ext === 'ts' || ext === 'tsx') {
+    plugins.push(
+      'typescript',
+      'classProperties',
+      'decorators-legacy',
+      'optionalChaining',
+      'nullishCoalescingOperator'
     );
   }
 
-  private parseComponent(node: Node, name: string, isDefault: boolean, imports: string[]): void {
-    const jsxRoot = this.extractJsxRoot(node);
-    if (!jsxRoot) return;
+  const code = sourceFile.getFullText();
+  const imports = this.collectImports(sourceFile);
 
-    const componentId = generateId(this.filePath, 'component', name);
+  // Парсим через Babel
+  const ast = parse(code, { sourceType: 'module', plugins });
+  traverse(ast, {
+  ExportDefaultDeclaration: path => {
+    const decl = path.node.declaration;
 
-    const componentBlock: VisualBlock = {
-      id: componentId,
-      type: 'component',
-      name,
-      astNode: node,
-      filePath: this.filePath.replace(/\\/g, '/'),
-      sourceCode: node.getFullText(),
-      startLine: node.getStartLineNumber(),
-      endLine: node.getEndLineNumber(),
-      childrenIds: [],
-      uses: [],
-      usedIn: [],
-      isExported: true,
-      props: this.extractComponentProps(node),
-      metadata: { isDefaultExport: isDefault },
-      imports: imports,
-    };
+    // Пропускаем, если уже обработан
+    if ((decl as any).__parsed) return;
 
-    this.blocks.set(componentId, componentBlock);
-    this.parseJsxTree(jsxRoot, componentId);
-  }
+    const name = (decl as any).id?.name || 'DefaultExport';
+    this.parseJsxComponent(code, name, true, imports, decl);
 
-  private extractJsxRoot(node: Node): t.JSXElement | t.JSXFragment | null {
-  try {
-    const code = node.getFullText();
+    // Помечаем как обработанный
+    (decl as any).__parsed = true;
+  },
 
-    // Если первая строка — экспорт с ошибкой типа "export { default } = ...", пропускаем
-    if (/^\s*export\s*\{[^}]*\}\s*=/.test(code)) {
-      console.warn(`Пропущен файл с некорректным экспортом: ${this.filePath}`);
-      return null;
+  FunctionDeclaration: path => {
+    const node = path.node;
+
+    // Пропускаем, если уже обработан как export default
+    if ((node as any).__parsed) return;
+
+    if (this.isReactComponentBabel(node)) {
+      const name = node.id?.name || '<anonymous>';
+      this.parseJsxComponent(code, name, false, imports, node);
+      (node as any).__parsed = true;
     }
+  },
 
-    const ast = parse(code, {
-      sourceType: 'module',
-      plugins: [
-        'jsx',
-        'typescript',
-        'classProperties',
-        'optionalChaining',
-        'nullishCoalescingOperator',
-        'decorators-legacy',
-      ],
-      errorRecovery: true, // ← ВАЖНО: не падать, а продолжать
-    });
+  VariableDeclaration: path => {
+    path.node.declarations.forEach(decl => {
+      const fn = decl.init;
+      if (
+        t.isArrowFunctionExpression(fn) ||
+        t.isFunctionExpression(fn)
+      ) {
+        // Пропускаем, если уже обработан
+        if ((fn as any).__parsed) return;
 
-    let result: t.JSXElement | t.JSXFragment | null = null;
-
-    traverse(ast, {
-      ReturnStatement(path) {
-        const arg = path.node.argument;
-        if (arg && (t.isJSXElement(arg) || t.isJSXFragment(arg))) {
-          result = arg;
-          path.stop();
+        if (this.isReactComponentBabel(fn)) {
+          const name = (decl.id as any)?.name || '<anonymous>';
+          this.parseJsxComponent(code, name, false, imports, fn);
+          (fn as any).__parsed = true;
         }
-      },
+      }
     });
+  },
 
-    return result;
-  } catch (error: any) {
-    console.warn(`Babel не смог распарсить ${this.filePath}: ${error.message}`);
-    return null;
+  ClassDeclaration: path => {
+    const node = path.node;
+
+    // Ищем метод render
+    const renderMethod = node.body.body.find(
+      (m): m is t.ClassMethod =>
+        t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === 'render'
+    );
+
+    if (renderMethod) {
+      // Пропускаем, если метод уже обработан
+      if ((renderMethod as any).__parsed) return;
+
+      const name = node.id?.name || 'DefaultClass';
+      this.parseJsxComponent(code, name, false, imports, renderMethod);
+      (renderMethod as any).__parsed = true;
+    }
   }
+});
+
 }
 
+
+  private parseJsxComponent(
+    code: string,
+    name: string,
+    isDefault: boolean,
+    imports: string[],
+    babelNode: any
+  ): void {
+  
+        
+  const jsxRoot = this.findJsxInBabelNode(babelNode);
+  if (!jsxRoot) return;
+  const componentId = generateId(this.filePath, 'component', name);
+    
+  const componentBlock: VisualBlock = {
+    id: componentId,
+    type: 'component',
+    name,
+    astNode: babelNode,
+    filePath: this.filePath.replace(/\\/g, '/'),
+    sourceCode: code.slice(babelNode.start, babelNode.end),
+    startLine: babelNode.loc?.start.line || 0,
+    endLine: babelNode.loc?.end.line || 0,
+    childrenIds: [],
+    uses: [],
+    usedIn: [],
+    isExported: true,
+    props: {},                       // можно сделать extractComponentPropsBabel
+    metadata: { isDefaultExport: isDefault },
+    imports: imports,
+  };
+
+  this.blocks.set(componentId, componentBlock);
+  this.parseJsxTree(jsxRoot, componentId);
+}
+
+private findJsxInBabelNode(node: any): t.JSXElement | t.JSXFragment | null {
+  if (!node) return null;
+
+  // Стрелочные функции с implicit return
+  if (t.isArrowFunctionExpression(node) && (t.isJSXElement(node.body) || t.isJSXFragment(node.body))) {
+    return node.body;
+  }
+
+  // Обычные функции
+  if (t.isFunctionDeclaration(node) || t.isFunctionExpression(node) || t.isArrowFunctionExpression(node)) {
+    if (t.isBlockStatement(node.body)) {
+      for (const stmt of node.body.body) {
+        if (t.isReturnStatement(stmt) && stmt.argument &&
+            (t.isJSXElement(stmt.argument) || t.isJSXFragment(stmt.argument))) {
+          return stmt.argument;
+        }
+      }
+    }
+  }
+
+  // Метод render() класса
+  if (t.isClassMethod(node) && t.isIdentifier(node.key) && node.key.name === 'render') {
+    for (const stmt of node.body.body) {
+      if (t.isReturnStatement(stmt) && stmt.argument &&
+          (t.isJSXElement(stmt.argument) || t.isJSXFragment(stmt.argument))) {
+        return stmt.argument;
+      }
+    }
+  }
+
+  return null;
+}
+
+
+private isReactComponentBabel(node: t.Node): boolean {
+  if (!node) return false;
+
+  // стрелочные функции с JSX
+  if (t.isArrowFunctionExpression(node)) {
+    if (t.isJSXElement(node.body) || t.isJSXFragment(node.body)) return true;
+    if (t.isBlockStatement(node.body)) {
+      for (const stmt of node.body.body) {
+        if (t.isReturnStatement(stmt) && stmt.argument &&
+            (t.isJSXElement(stmt.argument) || t.isJSXFragment(stmt.argument))) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // обычные функции
+  if (t.isFunctionDeclaration(node) || t.isFunctionExpression(node)) {
+    if (t.isBlockStatement(node.body)) {
+      for (const stmt of node.body.body) {
+        if (t.isReturnStatement(stmt) && stmt.argument &&
+            (t.isJSXElement(stmt.argument) || t.isJSXFragment(stmt.argument))) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // классы
+  if (t.isClassDeclaration(node)) {
+    const renderMethod = node.body.body.find(
+      m => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === 'render'
+    );
+    return !!renderMethod;
+  }
+
+  return false;
+}
+
+  
+
+
+
   private parseJsxTree(node: t.JSXElement | t.JSXFragment, parentId: string): void {
+
     const opening = 'openingElement' in node ? node.openingElement : null;
     const tagName = opening
       ? t.isJSXIdentifier(opening.name)
@@ -176,36 +279,46 @@ export class ReactParser {
     });
   }
 
-  private extractJsxProps(attrs: any[]): Record<string, any> {
-    const props: Record<string, any> = {};
-    attrs.forEach(attr => {
-      if (t.isJSXAttribute(attr)) {
-        const name = attr.name.name as string;
-        if (t.isStringLiteral(attr.value)) {
-          props[name] = { type: 'string', value: attr.value.value };
-        } else if (t.isJSXExpressionContainer(attr.value)) {
-          props[name] = { type: 'expression', value: '{' + (attr.value.expression as any)?.getText?.() || '...' + '}' };
-        } else {
-          props[name] = { type: 'string', value: 'true' };
-        }
-      }
-    });
-    return props;
-  }
+private extractJsxProps(attrs: any[]): Record<string, any> {
+  const props: Record<string, any> = {};
+  attrs.forEach(attr => {
+    if (t.isJSXAttribute(attr)) {
+      const name = attr.name.name as string;
 
-  private extractComponentProps(node: Node): Record<string, any> {
-    // Простое извлечение параметров функции
-    const props: Record<string, any> = {};
-    if (Node.isFunctionDeclaration(node) || Node.isArrowFunction(node)) {
-      const param = node.getParameters()[0];
-      if (param) {
-        const type = param.getType().getText();
-        // Можно распарсить интерфейс, но пока заглушка
-        props['props'] = { type: 'object', value: type };
+      if (t.isStringLiteral(attr.value)) {
+        props[name] = { type: 'string', value: attr.value.value };
+      } else if (t.isJSXExpressionContainer(attr.value)) {
+        const expr = attr.value.expression;
+        if (t.isIdentifier(expr)) {
+          // Вот здесь сохраняем реальный идентификатор
+          props[name] = { type: 'component', value: expr.name };
+        } else if (t.isMemberExpression(expr)) {
+          // например Some.Component
+          props[name] = { type: 'component', value: this.memberExprToString(expr) };
+        } else {
+          props[name] = { type: 'expression', value: '<complex_expression>' };
+        }
+      } else {
+        props[name] = { type: 'string', value: 'true' };
       }
     }
-    return props;
+  });
+  return props;
+}
+
+private memberExprToString(expr: t.MemberExpression): string {
+  const parts: string[] = [];
+  let e: any = expr;
+  while (t.isMemberExpression(e)) {
+    if (t.isIdentifier(e.property)) parts.unshift(e.property.name);
+    e = e.object;
   }
+  if (t.isIdentifier(e)) parts.unshift(e.name);
+  return parts.join('.');
+}
+
+
+
 
   private nodeToString(node: any): string {
     if (node.getSourceFile) return node.getFullText();

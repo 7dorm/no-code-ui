@@ -18,7 +18,7 @@
   },
   "include": [
     "./**/*.ts"
-, "backend/tsconfig.jsin", "backend/test_project/src/components/Header.tsx"  ],
+, "backend/tsconfig.jsin", "backend/test_project1/src/components/Header.jsx"  ],
   "exclude": [
     "node_modules",
     "dist"
