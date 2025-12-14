@@ -9,6 +9,7 @@ import { generateId } from './utils';
 export class ReactParser {
   constructor(
     private filePath: string,
+    private relPath: string,
     private blocks: Map<string, VisualBlock>
   ) {}
 
@@ -100,40 +101,85 @@ export class ReactParser {
 }
 
 
-  private parseJsxComponent(
-    code: string,
-    name: string,
-    isDefault: boolean,
-    imports: string[],
-    babelNode: any
-  ): void {
-  
-        
+private parseJsxComponent(
+  code: string,
+  name: string,
+  isDefault: boolean,
+  imports: string[],
+  babelNode: any
+): void {
+
   const jsxRoot = this.findJsxInBabelNode(babelNode);
   if (!jsxRoot) return;
-  const componentId = generateId(this.filePath, 'component', name);
-    
+
+  const componentId = generateId(this.relPath, 'component', name);
+
+  // Извлекаем аргументы с типами
+  const args: Record<string, string> = {};
+  if (babelNode.params && Array.isArray(babelNode.params)) {
+    for (const param of babelNode.params) {
+      // Обычный идентификатор
+      if (param.type === 'Identifier') {
+        const type = param.typeAnnotation?.typeAnnotation?.type || 'any';
+        args[param.name] = this.extractTypeString(param.typeAnnotation) || 'any';
+      }
+      // Деструктуризация { a, b }
+      else if (param.type === 'ObjectPattern') {
+        for (const prop of param.properties) {
+          if (prop.type === 'ObjectProperty' && prop.key.type === 'Identifier') {
+            let type = 'any';
+            if (prop.value.typeAnnotation) {
+              type = this.extractTypeString(prop.value.typeAnnotation);
+            }
+            args[prop.key.name] = type;
+          }
+        }
+      }
+      // rest параметр ...rest
+      else if (param.type === 'RestElement' && param.argument.type === 'Identifier') {
+        args['...' + param.argument.name] = 'any';
+      }
+    }
+  }
+
   const componentBlock: VisualBlock = {
     id: componentId,
     type: 'component',
     name,
     astNode: babelNode,
     filePath: this.filePath.replace(/\\/g, '/'),
+    relPath: this.relPath.replace(/\\/g, '/'),
     sourceCode: code.slice(babelNode.start, babelNode.end),
     startLine: babelNode.loc?.start.line || 0,
     endLine: babelNode.loc?.end.line || 0,
+    startCol: babelNode.loc?.start.column || 0,
+    endCol: babelNode.loc?.end.column || 0,
     childrenIds: [],
     uses: [],
     usedIn: [],
     isExported: true,
-    props: {},                       // можно сделать extractComponentPropsBabel
     metadata: { isDefaultExport: isDefault },
     imports: imports,
+    args: args, // <--- новое поле с типами и именами
   };
 
   this.blocks.set(componentId, componentBlock);
   this.parseJsxTree(jsxRoot, componentId);
 }
+
+// Помощник для извлечения строки типа из typeAnnotation
+private extractTypeString(typeAnnotation: any): string {
+  if (!typeAnnotation) return 'any';
+  switch (typeAnnotation.type) {
+    case 'TSStringKeyword': return 'string';
+    case 'TSNumberKeyword': return 'number';
+    case 'TSBooleanKeyword': return 'boolean';
+    case 'TSAnyKeyword': return 'any';
+    case 'TSTypeReference': return typeAnnotation.typeName?.name || 'any';
+    default: return 'any';
+  }
+}
+
 
 private findJsxInBabelNode(node: any): t.JSXElement | t.JSXFragment | null {
   if (!node) return null;
@@ -223,7 +269,7 @@ private isReactComponentBabel(node: t.Node): boolean {
         : 'Fragment'
       : 'Fragment';
 
-    const elementId = generateId(this.filePath, 'element', tagName);
+    const elementId = generateId(this.relPath, 'element', tagName);
 
     const block: VisualBlock = {
       id: elementId,
@@ -231,9 +277,12 @@ private isReactComponentBabel(node: t.Node): boolean {
       astNode: node,
       name: tagName,
       filePath: this.filePath.replace(/\\/g, '/'),
+      relPath: this.relPath.replace(/\\/g, '/'),
       sourceCode: this.nodeToString(node),
       startLine: node.loc?.start.line || 0,
       endLine: node.loc?.end.line || 0,
+      startCol:node.loc?.start.column || 0,
+      endCol: node.loc?.end.column || 0,
       parentId,
       childrenIds: [],
       props: this.extractJsxProps(opening?.attributes || []),
@@ -252,16 +301,19 @@ private isReactComponentBabel(node: t.Node): boolean {
       if (t.isJSXElement(child) || t.isJSXFragment(child)) {
         this.parseJsxTree(child, elementId);
       } else if (t.isJSXText(child) && child.value.trim()) {
-        const textId = generateId(this.filePath, 'text');
+        const textId = generateId(this.relPath, 'text');
         const textBlock: VisualBlock = {
           id: textId,
           type: 'element',
           name: '#text',
           astNode: child,
           filePath: this.filePath.replace(/\\/g, '/'),
+          relPath: this.relPath.replace(/\\/g, '/'),
           sourceCode: child.value,
           startLine: child.loc?.start.line || 0,
           endLine: child.loc?.end.line || 0,
+          startCol:child.loc?.start.column || 0,
+          endCol: child.loc?.end.column || 0,
           parentId: elementId,
           childrenIds: [],
           uses: [],
@@ -271,7 +323,7 @@ private isReactComponentBabel(node: t.Node): boolean {
         block.childrenIds.push(textId);
       } else if (t.isJSXExpressionContainer(child)) {
         if (t.isIdentifier(child.expression)) {
-          const varId = generateId(this.filePath, 'variable', child.expression.name);
+          const varId = generateId(this.relPath, 'variable', child.expression.name);
           block.uses.push(varId);
           // Можно создать блок переменной позже
         }

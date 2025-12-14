@@ -1,7 +1,10 @@
 // demo.ts
 import { VisualEngine } from './src/engine/Engine';
+import {removeBlockFromDisk} from './src/engine/Files/delete'
 import * as path from 'path';
 import * as fs from 'fs';
+import { removeBlockAndCleanup } from './src/engine/mutators/deleteBlock';
+import { insertTextToFile } from './src/engine/Files/add';
 const PROJECT_PATH = path.resolve(__dirname, '../test_project'); 
 console.log(PROJECT_PATH)
 async function main() {
@@ -13,6 +16,9 @@ async function main() {
 
     console.log(`Успешно! Найдено блоков: ${Object.keys(tree.blocks).length}`);
     console.log(`Корневых компонентов: ${tree.roots.length}`);
+
+    //removeBlockAndCleanup(tree.blocks, "src_components_Card_tsx__element__div_14")
+    insertTextToFile('./test_project/src/components/Card.tsx', "\n<Header />", 15, 9)
 
     // --- основной вывод ---
     const safeOutput = {

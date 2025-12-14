@@ -1,4 +1,4 @@
-import { VisualBlock } from "../types";
+import { VisualBlock } from "./types";
 
 function isDeletable(block: VisualBlock): boolean {
   return block.type !== 'component';
@@ -29,7 +29,6 @@ function collectSubtree(
     if (!block) return;
 
     result.add(id);
-    if (block.type !== "component")
     for (const childId of block.childrenIds) {
       dfs(childId);
     }
@@ -39,46 +38,11 @@ function collectSubtree(
   return result;
 }
 
-function getParentImportedComponentNames(
-  parentComponent: VisualBlock
-): Set<string> {
-  return new Set(
-    (parentComponent.imports ?? [])
-      .map(imp => imp.split('|')[2])
-      .filter(Boolean)
-  );
-}
-
-function traverseParentExcludingSubtree(
-  blocks: Record<string, VisualBlock>,
-  rootId: string,
-  excluded: Set<string>,
-  onComponent: (componentName: string) => void
-) {
-  function dfs(id: string) {
-    if (excluded.has(id)) return;
-
-    const block = blocks[id];
-    if (!block) return;
-
-    if (block.type === 'component') {
-      onComponent(block.name);
-    }
-
-    for (const childId of block.childrenIds) {
-      dfs(childId);
-    }
-  }
-
-  dfs(rootId);
-}
-
-
 export function removeBlockAndCleanup(
   blocks: Record<string, VisualBlock>,
   rootId: string
 ): {
-  removedBlocks: VisualBlock[];
+  removedBlockIds: string[];
   cleanedImports: Record<string, string[]>;
 } {
   const subtree = collectSubtree(blocks, rootId);
@@ -94,34 +58,35 @@ export function removeBlockAndCleanup(
   }
 
   // 1️⃣ Найти компоненты, используемые в поддереве
-const removableImports = new Set<string>();
-const parentImportedNames = getParentImportedComponentNames(parentComponent);
+  const usedComponents = new Set<string>();
 
-for (const id of subtree) {
-  const block = blocks[id];
-  if (!block) continue;
+  for (const id of subtree) {
+    const block = blocks[id];
+    if (!block) continue;
 
-  for (const usedId of block.childrenIds) {
-    const usedBlock = blocks[usedId];
-    if (
-      usedBlock?.type === 'component' &&
-      parentImportedNames.has(usedBlock.name)
-    ) {
-      removableImports.add(usedBlock.name);
+    for (const usedId of block.uses ?? []) {
+      const usedBlock = blocks[usedId];
+      if (usedBlock?.type === 'component') {
+        usedComponents.add(usedId);
+      }
     }
   }
-}
 
   // 2️⃣ Определить, какие компоненты используются ТОЛЬКО в поддереве
+  const removableImports = new Set<string>();
 
-  traverseParentExcludingSubtree(
-    blocks,
-    parentComponent.id,
-    subtree,
-    (componentName) => {
-      removableImports.delete(componentName);
+  for (const compId of usedComponents) {
+    const comp = blocks[compId];
+    if (!comp) continue;
+
+    const usedOutside = comp.usedIn?.some(
+      usageId => !subtree.has(usageId)
+    );
+
+    if (!usedOutside) {
+      removableImports.add(comp.name);
     }
-  );
+  }
 
   // 3️⃣ Почистить импорты в родительском компоненте
   const cleanedImports: Record<string, string[]> = {};
@@ -131,7 +96,6 @@ for (const id of subtree) {
 
     parentComponent.imports = parentComponent.imports.filter(imp => {
       const [, , localName] = imp.split('|');
-      console.log(localName, removableImports)
       return !removableImports.has(localName);
     });
 
@@ -140,17 +104,8 @@ for (const id of subtree) {
     );
   }
 
-  for (const block of Object.values(blocks)) {
-    if (block.type !== 'component') continue;
-    if (!removableImports.has(block.name)) continue;
-    if (!block.usedIn || block.usedIn.length === 0) continue;
-
-    block.usedIn = block.usedIn.filter(
-      usedId => !subtree.has(usedId) )
-  }
-
   // 4️⃣ Удалить блоки (кроме компонентов)
-  const removedBlocks: VisualBlock[] = [];
+  const removedBlockIds: string[] = [];
 
   for (const id of subtree) {
     const block = blocks[id];
@@ -158,17 +113,19 @@ for (const id of subtree) {
 
     if (isDeletable(block)) {
       delete blocks[id];
-      removedBlocks.push(block);
+      removedBlockIds.push(id);
     }
   }
 
-  const parentEl = rootBlock.parentId
-  blocks[parentEl].childrenIds = blocks[parentEl].childrenIds.filter(
-      id => !removedBlocks.find(i => i.id === id)
+  // 5️⃣ Почистить childrenIds у оставшихся блоков
+  for (const block of Object.values(blocks)) {
+    block.childrenIds = block.childrenIds.filter(
+      id => !removedBlockIds.includes(id)
     );
+  }
 
   return {
-    removedBlocks,
+    removedBlockIds,
     cleanedImports,
   };
 }

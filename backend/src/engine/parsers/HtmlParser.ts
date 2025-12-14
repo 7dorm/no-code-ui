@@ -8,6 +8,7 @@ import { generateId } from './utils';
 export class HtmlParser {
   constructor(
     private filePath: string,
+    private relPath: string,
     private blocks: Map<string, VisualBlock>
   ) {}
 
@@ -15,15 +16,18 @@ export class HtmlParser {
     const content = fs.readFileSync(fullPath, 'utf-8');
     const root = parse(content);
 
-    const rootId = generateId(this.filePath, 'html-root');
+    const rootId = generateId(this.relPath, 'html-root');
     const rootBlock: VisualBlock = {
       id: rootId,
       type: 'html-root',
       name: 'HTML Document',
       filePath: this.filePath.replace(/\\/g, '/'),
+      relPath: this.relPath.replace(/\\/g, '/'),
       sourceCode: content,
       startLine: 1,
       endLine: content.split('\n').length,
+      startCol: 0,
+      endCol: content.split('\n')[-1].length || 0,
       childrenIds: [],
       uses: [],
       usedIn: [],
@@ -39,16 +43,19 @@ export class HtmlParser {
     node.childNodes.forEach((child: any, index: number) => {
       if (child.tagName) {
         const tagName = child.tagName.toLowerCase();
-        const elementId = generateId(this.filePath, 'html-element', `${tagName}-${index}`);
+        const elementId = generateId(this.relPath, 'html-element', `${tagName}-${index}`);
 
         const block: VisualBlock = {
           id: elementId,
           type: 'html-element',
           name: tagName,
           filePath: this.filePath.replace(/\\/g, '/'),
+          relPath: this.relPath.replace(/\\/g, '/'),
           sourceCode: child.outerHTML,
           startLine: child.range?.[0]?.line || 0,
           endLine: child.range?.[1]?.line || 0,
+          startCol: child.range?.[0]?.column || 0,
+          endCol: child.range?.[1]?.column || 0,
           parentId,
           childrenIds: [],
           props: this.extractHtmlProps(child.attributes),

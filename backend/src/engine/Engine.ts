@@ -27,7 +27,7 @@ constructor(projectRoot: string) {
 
   const tsConfigPath = this.findConfigUpwards(
     this.projectRoot,
-    ['tsconfig.json', 'package.json']
+    ['tsconfig.json', 'package.json', "index.html"]
   );
 
   if (tsConfigPath) {
@@ -80,15 +80,15 @@ private findConfigUpwards(
 
       if (/\.(tsx|jsx|ts|js)$/.test(relPath) && !relPath.includes('node_modules')) {
         const sourceFile = this.project.addSourceFileAtPath(file);
-        new ReactParser(relPath, this.blocks).parse(sourceFile);
+        new ReactParser(file, relPath, this.blocks).parse(sourceFile);
       }
 
       if (/\.html?$/.test(relPath)) {
-        new HtmlParser(relPath, this.blocks).parse(file);
+        new HtmlParser(file, relPath, this.blocks).parse(file);
       }
 
       if (/\.(css|scss)$/.test(relPath)) {
-        new CssParser(relPath, this.cssStyles).parse(file);
+        new CssParser(file, relPath, this.cssStyles).parse(file);
       }
     }
 
@@ -108,134 +108,7 @@ private findConfigUpwards(
 };
   }
 
-  // ─────────────────────────────── МУТАЦИИ ───────────────────────────────
 
-async moveBlock(blockId: string, newParentId: string, index?: number): Promise<void> {
-  const block = this.blocks.get(blockId);
-  const newParent = this.blocks.get(newParentId);
-  if (!block || !newParent || block.filePath !== newParent.filePath || block.type !== 'element') return;
-
-  const sourceFile = this.project.getSourceFile(block.filePath);
-  if (!sourceFile) return;
-
-  const targetNode = block.astNode as JsxElement | JsxSelfClosingElement | undefined;
-  const parentNode = newParent.astNode as JsxElement | undefined;
-  if (!targetNode || !parentNode || !Node.isJsxElement(parentNode)) return;
-
-  // 1. Удаляем старый узел
-  const originalCode = block.sourceCode.trim();
-  (targetNode as any).remove?.();
-
-  // 2. Находим SyntaxList с детьми родителя
-  const syntaxList = parentNode.getFirstChildByKind(SyntaxKind.SyntaxList);
-  if (!syntaxList) return;
-
-  const indent = '  '.repeat(this.getIndentLevel(parentNode));
-  const codeToInsert = `\n${indent}${originalCode}\n${indent}`;
-
-  // 3. Определяем позицию вставки
-  const children = syntaxList.getChildren();
-  const insertAt = typeof index === 'number' ? Math.min(index, children.length) : children.length;
-
-  let insertPos: number;
-
-  if (insertAt === 0) {
-    // В начало
-    insertPos = syntaxList.getStart();
-  } else if (insertAt >= children.length) {
-    // В конец
-    insertPos = syntaxList.getEnd();
-  } else {
-    // Перед нужным ребёнком
-    const beforeNode = children[insertAt];
-    insertPos = beforeNode.getStart();
-  }
-
-  // Вставляем текст в нужное место
-  sourceFile.insertText(insertPos, codeToInsert);
-
-  // Обновляем связи
-  if (block.parentId) {
-    const old = this.blocks.get(block.parentId);
-    if (old) old.childrenIds = old.childrenIds.filter(id => id !== blockId);
-  }
-  block.parentId = newParentId;
-  newParent.childrenIds.splice(index ?? newParent.childrenIds.length, 0, blockId);
-
-  await sourceFile.save();
-}
-
-  async updateProp(blockId: string, propName: string, newValue: string): Promise<void> {
-    const block = this.blocks.get(blockId);
-    if (!block || block.type !== 'element') return;
-
-    const sourceFile = this.project.getSourceFile(block.filePath);
-    if (!sourceFile) return;
-
-    const node = block.astNode as JsxElement | JsxSelfClosingElement | undefined;
-    if (!node) return;
-
-    let opening: JsxOpeningElement | JsxSelfClosingElement;
-
-    if (Node.isJsxElement(node)) {
-      opening = node.getOpeningElement();
-    } else {
-      opening = node;
-    }
-
-    const attr = opening.getAttribute(propName);
-    if (attr && Node.isJsxAttribute(attr)) {
-      const init = attr.getInitializer();
-      if (init) init.replaceWithText(`"${newValue}"`);
-    } else {
-      opening.addAttribute({ name: propName, initializer: `"${newValue}"` });
-    }
-
-    if (block.props) block.props[propName] = { type: 'string', value: newValue };
-    await sourceFile.save();
-  }
-
-  async renameBlock(blockId: string, newName: string): Promise<void> {
-    const block = this.blocks.get(blockId);
-    if (!block || block.type !== 'component') return;
-
-    const sourceFile = this.project.getSourceFile(block.filePath);
-    if (!sourceFile) return;
-
-    const decl = sourceFile.getFunction(block.name) ?? sourceFile.getVariableDeclaration(block.name);
-    if (!decl) return;
-
-    decl.rename(newName);
-    block.name = newName;
-    await sourceFile.save();
-  }
-
-  async deleteBlock(blockId: string): Promise<void> {
-    const block = this.blocks.get(blockId);
-    if (!block || !block.parentId || block.usedIn.length > 0) return;
-
-    const sourceFile = this.project.getSourceFile(block.filePath);
-    if (!sourceFile) return;
-
-    const node = block.astNode as JsxElement | JsxSelfClosingElement | undefined;
-    if (node) {
-      (node as any).remove?.();
-    }
-
-    const parent = this.blocks.get(block.parentId)!;
-    parent.childrenIds = parent.childrenIds.filter(id => id !== blockId);
-    this.blocks.delete(blockId);
-
-    await sourceFile.save();
-  }
-
-  // ─────────────────────────────── ВСПОМОГАТЕЛЬНОЕ ───────────────────────────────
-
-  private getIndentLevel(node: Node): number {
-    const text = node.getFullText();
-    const match = text.match(/\n(\s*)</);
-    return match ? match[1].length : 2;
-  }
 
   private async findAllFiles(): Promise<string[]> {
     const entries = await fs.readdir(this.projectRoot, { recursive: true, withFileTypes: true });
@@ -255,7 +128,7 @@ private resolveCrossReferences() {
       .filter(Boolean);
 
     for (const cls of classes) {
-      const cssId = `${block.filePath}__css-class__${cls}`;
+      const cssId = `${block.relPath}__css-class__${cls}`;
 
       // 1. Проверяем обычные блоки
       const normalCss = this.blocks.get(cssId);
@@ -274,18 +147,6 @@ private resolveCrossReferences() {
   }
 }
 
-private isLocalImport(path: string): boolean {
-  return path.startsWith('./') || path.startsWith('../');
-}
-
-
-private removeExtension(p: string): string {
-  return p.replace(/\.(tsx|ts|jsx|js)$/, '');
-}
-
-private normalizePath(p: string) {
-  return p.replace(/\\/g, '/');
-}
 
 private resolveComponentImports() {
   const rootBlocks = this.findRootBlocks();
@@ -295,18 +156,18 @@ private resolveComponentImports() {
     const rootBlock = this.blocks.get(rootId);
     if (!rootBlock || !rootBlock.imports?.length) continue;
 
-    const baseDir = path.dirname(path.resolve(this.projectRoot, rootBlock.filePath));
+    const baseDir = path.dirname(path.resolve(this.projectRoot, rootBlock.relPath));
 
     // строим мапу компонентов для текущего файла
     const importMap = new Map<string, string>();
     for (const raw of rootBlock.imports) {
       const [importPath, , localName] = raw.split('|');
-      if (!importPath || !importPath.startsWith('.')) continue; // библиотечные игнорируем
+      if (!importPath || !importPath.startsWith('.')) continue; 
 
       const absPath = path.normalize(path.resolve(baseDir, importPath));
 
       const comp = Array.from(this.blocks.values()).find(
-        b => b.type === 'component' && path.normalize(path.resolve(this.projectRoot, "./" + b.filePath)).startsWith(absPath)
+        b => b.type === 'component' && path.normalize(path.resolve(this.projectRoot, "./" + b.relPath)).startsWith(absPath)
       );
       if (comp) importMap.set(localName, comp.id);
     }
@@ -324,7 +185,7 @@ private resolveComponentImports() {
     // строим локальную CSS-мапу по классам
     const cssMap = new Map<string, VisualBlock>();
     if (rootBlock.imports?.length) {
-      const baseDir = path.dirname(path.resolve(this.projectRoot, rootBlock.filePath));
+      const baseDir = path.dirname(path.resolve(this.projectRoot, rootBlock.relPath));
       for (const raw of rootBlock.imports) {
         const [importPath] = raw.split('|');
         if (!importPath || !importPath.endsWith('.css')) continue;
@@ -332,7 +193,7 @@ private resolveComponentImports() {
         const absPath = path.normalize(path.resolve(baseDir, importPath));
 
         for (const cssBlock of this.cssStyles.values()) {
-          const cssAbsPath = path.normalize(path.resolve(this.projectRoot, "./" + cssBlock.filePath));
+          const cssAbsPath = path.normalize(path.resolve(this.projectRoot, "./" + cssBlock.relPath));
           if (cssAbsPath === absPath) {
             cssMap.set(cssBlock.name, cssBlock); 
           }
@@ -355,14 +216,14 @@ private resolveCssTree(blockId: string, inheritedCssMap: Map<string, VisualBlock
 
   // добавляем CSS из текущего блока, если есть
   if (block.type === 'component' && block.imports?.length) {
-    const baseDir = path.dirname(path.resolve(this.projectRoot, block.filePath));
+    const baseDir = path.dirname(path.resolve(this.projectRoot, block.relPath));
     for (const raw of block.imports) {
       const [importPath] = raw.split('|');
       if (!importPath || !importPath.endsWith('.css')) continue;
 
       const absPath = path.normalize(path.resolve(baseDir, importPath));
       for (const cssBlock of this.cssStyles.values()) {
-        const cssAbsPath = path.normalize(path.resolve(this.projectRoot, "./" + cssBlock.filePath));
+        const cssAbsPath = path.normalize(path.resolve(this.projectRoot, "./" + cssBlock.relPath));
         if (cssAbsPath === absPath) {
           localCssMap.set(cssBlock.name, cssBlock);
         }
@@ -396,7 +257,7 @@ private resolveCssTree(blockId: string, inheritedCssMap: Map<string, VisualBlock
 
 private resolveComponentTreeWithImportMap(
   blockId: string,
-  importMap: Map<string, string> // имя компонента -> id компонента
+  importMap: Map<string, string>
 ) {
   const block = this.blocks.get(blockId);
   if (!block?.childrenIds?.length) return;
@@ -450,11 +311,6 @@ private resolveComponentTreeWithImportMap(
 
   block.childrenIds = newChildren;
 }
-
-
-
-
-
 
   private findRootBlocks(): string[] {
     return Array.from(this.blocks.values())

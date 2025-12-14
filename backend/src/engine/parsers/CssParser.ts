@@ -6,6 +6,7 @@ import { generateId } from './utils';
 export class CssParser {
   constructor(
     private filePath: string,
+    private relPath: string,
     private blocks: Map<string, VisualBlock>
   ) {}
 
@@ -16,16 +17,19 @@ export class CssParser {
 
     while ((match = classRegex.exec(content))) {
       const className = match[1];
-      const classId = generateId(this.filePath, 'css-class', className);
+      const classId = generateId(this.relPath, 'css-class', className);
 
       const block: VisualBlock = {
         id: classId,
         type: 'css-class',
         name: className,
         filePath: this.filePath.replace(/\\/g, '/'),
+        relPath: this.relPath.replace(/\\/g, '/'),
         sourceCode: match[0],
         startLine: 0,
         endLine: 0,
+        startCol: 0,
+        endCol: 0,
         childrenIds: [],
         uses: [],
         usedIn: [],

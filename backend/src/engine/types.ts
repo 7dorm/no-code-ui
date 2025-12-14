@@ -18,14 +18,18 @@ export interface VisualBlock {
   type: BlockType;
   name: string;
   filePath: string;
+  relPath: string;
   sourceCode: string;
   startLine: number;
   endLine: number;
+  startCol: number;
+  endCol: number;
 
   parentId?: string;
   childrenIds: string[];
 
   props?: Record<string, PropValue>;
+  args?: Record<string, string>;
   uses: string[];
   usedIn: string[];
 

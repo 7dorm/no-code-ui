@@ -6,7 +6,6 @@ export const generateId = (filePath: string, type: string, name: string = ''): s
   return `${cleanPath}__${type}__${cleanName}_${counter++}`;
 };
 
-// Найти JSX-элемент по нашему ID (сохраняем в комментариях при парсинге)
 export function findJsxNodeById(source: any, blockId: string) {
   let found: any = null;
 
