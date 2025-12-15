@@ -4,6 +4,7 @@ import { insertBlockIntoTree } from './addElement';
 
 interface CreateAndInsertBlockParams {
   blocks: Record<string, VisualBlock>;
+  cssBlocks?: Record<string, VisualBlock>;
 
   type: BlockType;
   name: string;
@@ -23,6 +24,7 @@ interface CreateAndInsertBlockParams {
 
 export function createAndInsertBlock({
   blocks,
+  cssBlocks,
   type,
   name,
   absPath,
@@ -57,6 +59,7 @@ export function createAndInsertBlock({
 
   insertBlockIntoTree({
     blocks,
+    cssBlocks,
     parentId,
     block: newBlock,
     index,

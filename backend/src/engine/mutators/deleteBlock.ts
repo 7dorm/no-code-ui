@@ -76,7 +76,8 @@ function traverseParentExcludingSubtree(
 
 export function removeBlockAndCleanup(
   blocks: Record<string, VisualBlock>,
-  rootId: string
+  rootId: string,
+  cssBlocks?: Record<string, VisualBlock>
 ): {
   removedBlocks: VisualBlock[];
   cleanedImports: Record<string, string[]>;
@@ -144,6 +145,19 @@ export function removeBlockAndCleanup(
 
     target.usedIn = (target.usedIn ?? []).filter(usedId => usedId !== block.id);
     target.usages = (target.usages ?? []).filter(u => u.usageId !== block.id);
+  }
+
+  // 4️⃣.5 Почистить связи uses/usedIn с CSS-блоками (если переданы)
+  if (cssBlocks) {
+    for (const id of subtree) {
+      const block = blocks[id];
+      if (!block?.uses?.length) continue;
+      for (const usedId of block.uses) {
+        const cssBlock = cssBlocks[usedId];
+        if (!cssBlock || cssBlock.type !== 'css-class') continue;
+        cssBlock.usedIn = (cssBlock.usedIn ?? []).filter(usedInId => usedInId !== id);
+      }
+    }
   }
 
   // 5️⃣ Удалить блоки (кроме компонентов)

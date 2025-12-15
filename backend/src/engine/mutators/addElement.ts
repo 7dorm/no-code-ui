@@ -2,6 +2,7 @@ import { VisualBlock } from "../types";
 
 export interface InsertBlockParams {
   blocks: Record<string, VisualBlock>;
+  cssBlocks?: Record<string, VisualBlock>;
   parentId: string;
   block: VisualBlock;
   index?: number; // если нет — в конец

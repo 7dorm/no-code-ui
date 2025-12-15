@@ -2,6 +2,7 @@
 export type BlockType =
   | 'component'
   | 'component-instance'
+  | 'object'
   | 'element'
   | 'html-root'
   | 'html-element'
@@ -10,7 +11,7 @@ export type BlockType =
   | 'css-class';
 
 export interface PropValue {
-  type: 'string' | 'expression' | 'number' | 'boolean' | 'component';
+  type: 'string' | 'expression' | 'number' | 'boolean' | 'component' | 'object';
   value: string;
 }
 

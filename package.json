@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:backend": "rm -rf backend/.tmp-test-dist && tsc -p backend/tsconfig.json --outDir backend/.tmp-test-dist --pretty false && node --test backend/tests/blackbox.test.js && rm -rf backend/.tmp-test-dist"
   },
   "dependencies": {
     "cheerio": "^1.1.2",

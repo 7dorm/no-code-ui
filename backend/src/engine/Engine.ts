@@ -26,10 +26,7 @@ export class VisualEngine {
 constructor(projectRoot: string) {
   this.projectRoot = path.resolve(projectRoot);
 
-  const tsConfigPath = this.findConfigUpwards(
-    this.projectRoot,
-    ['tsconfig.json', 'package.json', "index.html"]
-  );
+  const tsConfigPath = this.findConfigUpwards(this.projectRoot, ['tsconfig.json']);
 
   if (tsConfigPath) {
     this.project = new Project({
