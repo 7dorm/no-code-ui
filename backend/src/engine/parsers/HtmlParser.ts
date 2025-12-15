@@ -1,7 +1,6 @@
 // src/engine/parsers/HtmlParser.ts
 import { parse } from 'node-html-parser';
 import * as fs from 'fs';
-import * as path from 'path';
 import { VisualBlock } from '../types';
 import { generateId } from './utils';
 
@@ -15,6 +14,8 @@ export class HtmlParser {
   parse(fullPath: string): void {
     const content = fs.readFileSync(fullPath, 'utf-8');
     const root = parse(content);
+    const lines = content.split('\n');
+    const lastLine = lines[lines.length - 1] ?? '';
 
     const rootId = generateId(this.relPath, 'html-root');
     const rootBlock: VisualBlock = {
@@ -25,9 +26,9 @@ export class HtmlParser {
       relPath: this.relPath.replace(/\\/g, '/'),
       sourceCode: content,
       startLine: 1,
-      endLine: content.split('\n').length,
+      endLine: lines.length,
       startCol: 0,
-      endCol: content.split('\n')[-1].length || 0,
+      endCol: lastLine.length,
       childrenIds: [],
       uses: [],
       usedIn: [],

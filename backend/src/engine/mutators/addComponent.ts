@@ -1,4 +1,6 @@
 import { VisualBlock } from "../types";
+import { generateId } from "../parsers/utils";
+import path from "path";
 
 interface AddComponentChildParams {
   blocks: Record<string, VisualBlock>;
@@ -6,6 +8,11 @@ interface AddComponentChildParams {
   parentElementId: string;     // JSX-элемент (div, fragment и т.д.)
   componentId: string;         // вставляемая компонента
   index?: number;              // позиция в childrenIds
+  props?: VisualBlock['props']; // props, передаваемые в компоненту
+  startLine?: number;
+  startCol?: number;
+  endLine?: number;
+  endCol?: number;
 }
 
 function findParentComponent(
@@ -40,6 +47,11 @@ export function addComponentAsChild({
   parentElementId,
   componentId,
   index,
+  props,
+  startLine,
+  startCol,
+  endLine,
+  endCol,
 }: AddComponentChildParams): void {
   const parentElement = blocks[parentElementId];
   const component = blocks[componentId];
@@ -52,7 +64,30 @@ export function addComponentAsChild({
     throw new Error(`Block ${componentId} is not a component`);
   }
 
-  // 1️⃣ Вставляем в childrenIds
+  // 1️⃣ Создаём блок-использование компоненты (instance)
+  const instanceId = generateId(parentElement.relPath, 'component-instance', component.name);
+  const instanceBlock: VisualBlock = {
+    id: instanceId,
+    type: 'component-instance',
+    name: component.name,
+    filePath: parentElement.filePath,
+    relPath: parentElement.relPath,
+    sourceCode: '',
+    startLine: startLine ?? 0,
+    startCol: startCol ?? 0,
+    endLine: endLine ?? 0,
+    endCol: endCol ?? 0,
+    parentId: parentElementId,
+    childrenIds: [],
+    props: props ?? {},
+    uses: [componentId],
+    usedIn: [],
+    refId: componentId,
+  };
+
+  blocks[instanceId] = instanceBlock;
+
+  // 2️⃣ Вставляем в childrenIds родителя
   parentElement.childrenIds ??= [];
 
   if (
@@ -60,24 +95,34 @@ export function addComponentAsChild({
     index >= 0 &&
     index <= parentElement.childrenIds.length
   ) {
-    parentElement.childrenIds.splice(index, 0, componentId);
+    parentElement.childrenIds.splice(index, 0, instanceId);
   } else {
-    parentElement.childrenIds.push(componentId);
+    parentElement.childrenIds.push(instanceId);
   }
 
-  // 2️⃣ Обновляем uses / usedIn
-  parentElement.uses ??= [];
+  // 3️⃣ Обновляем usedIn/usages у компоненты
   component.usedIn ??= [];
 
-  if (!parentElement.uses.includes(componentId)) {
-    parentElement.uses.push(componentId);
+  if (!component.usedIn.includes(instanceId)) {
+    component.usedIn.push(instanceId);
   }
 
-  if (!component.usedIn.includes(parentElementId)) {
-    component.usedIn.push(parentElementId);
+  component.usages ??= [];
+  if (!component.usages.some(u => u.usageId === instanceId)) {
+    component.usages.push({
+      usageId: instanceId,
+      filePath: instanceBlock.filePath,
+      relPath: instanceBlock.relPath,
+      startLine: instanceBlock.startLine,
+      endLine: instanceBlock.endLine,
+      startCol: instanceBlock.startCol,
+      endCol: instanceBlock.endCol,
+      parentId: parentElementId,
+      props: instanceBlock.props,
+    });
   }
 
-  // 3️⃣ Находим родительскую компоненту
+  // 4️⃣ Находим родительскую компоненту (чтобы добавить import)
   const parentComponent = findParentComponent(blocks, parentElementId);
 
   if (!parentComponent) {
@@ -88,14 +133,15 @@ export function addComponentAsChild({
 
   parentComponent.imports ??= [];
 
-  // 4️⃣ Добавляем импорт, если его нет
+  // 5️⃣ Добавляем импорт, если его нет
   if (!hasImport(parentComponent, component.name)) {
-    const importPath = component.filePath
-      .replace(parentComponent.filePath.replace(/\\/g, '/'), '')
-      .replace(/\.tsx$/, '');
+    const fromDir = path.dirname(parentComponent.filePath);
+    let rel = path.relative(fromDir, component.filePath).replace(/\\/g, '/');
+    rel = rel.replace(/\.(tsx|ts|jsx|js)$/, '');
+    if (!rel.startsWith('.')) rel = `./${rel}`;
 
     parentComponent.imports.push(
-      `${importPath}|default|${component.name}`
+      `${rel}|default|${component.name}`
     );
   }
 }

@@ -93,35 +93,27 @@ export function removeBlockAndCleanup(
     throw new Error(`Parent component not found for ${rootId}`);
   }
 
-  // 1️⃣ Найти компоненты, используемые в поддереве
-const removableImports = new Set<string>();
-const parentImportedNames = getParentImportedComponentNames(parentComponent);
+  // 1️⃣ Найти импорты компонентов, используемые в поддереве
+  const removableImports = new Set<string>();
+  const parentImportedNames = getParentImportedComponentNames(parentComponent);
 
-for (const id of subtree) {
-  const block = blocks[id];
-  if (!block) continue;
+  for (const id of subtree) {
+    const block = blocks[id];
+    if (!block) continue;
 
-  for (const usedId of block.childrenIds) {
-    const usedBlock = blocks[usedId];
-    if (
-      usedBlock?.type === 'component' &&
-      parentImportedNames.has(usedBlock.name)
-    ) {
-      removableImports.add(usedBlock.name);
+    if (block.type === 'component-instance' && parentImportedNames.has(block.name)) {
+      removableImports.add(block.name);
     }
   }
-}
 
-  // 2️⃣ Определить, какие компоненты используются ТОЛЬКО в поддереве
-
-  traverseParentExcludingSubtree(
-    blocks,
-    parentComponent.id,
-    subtree,
-    (componentName) => {
-      removableImports.delete(componentName);
-    }
-  );
+  // 2️⃣ Оставить только те импорты, которые больше нигде в этом файле не используются
+  for (const block of Object.values(blocks)) {
+    if (!block) continue;
+    if (subtree.has(block.id)) continue;
+    if (block.type !== 'component-instance') continue;
+    if (block.filePath !== parentComponent.filePath) continue;
+    removableImports.delete(block.name);
+  }
 
   // 3️⃣ Почистить импорты в родительском компоненте
   const cleanedImports: Record<string, string[]> = {};
@@ -129,27 +121,32 @@ for (const id of subtree) {
   if (parentComponent.imports) {
     const before = [...parentComponent.imports];
 
-    parentComponent.imports = parentComponent.imports.filter(imp => {
+    const nextImports = parentComponent.imports.filter(imp => {
       const [, , localName] = imp.split('|');
-      console.log(localName, removableImports)
       return !removableImports.has(localName);
     });
+    parentComponent.imports.length = 0;
+    parentComponent.imports.push(...nextImports);
 
     cleanedImports[parentComponent.id] = before.filter(
       imp => !parentComponent.imports!.includes(imp)
     );
   }
 
-  for (const block of Object.values(blocks)) {
-    if (block.type !== 'component') continue;
-    if (!removableImports.has(block.name)) continue;
-    if (!block.usedIn || block.usedIn.length === 0) continue;
+  // 4️⃣ Удаляем связи usedIn/usages у компонентов для удаляемых instance-блоков
+  for (const id of subtree) {
+    const block = blocks[id];
+    if (!block) continue;
+    if (block.type !== 'component-instance' || !block.refId) continue;
 
-    block.usedIn = block.usedIn.filter(
-      usedId => !subtree.has(usedId) )
+    const target = blocks[block.refId];
+    if (!target || target.type !== 'component') continue;
+
+    target.usedIn = (target.usedIn ?? []).filter(usedId => usedId !== block.id);
+    target.usages = (target.usages ?? []).filter(u => u.usageId !== block.id);
   }
 
-  // 4️⃣ Удалить блоки (кроме компонентов)
+  // 5️⃣ Удалить блоки (кроме компонентов)
   const removedBlocks: VisualBlock[] = [];
 
   for (const id of subtree) {
@@ -162,10 +159,12 @@ for (const id of subtree) {
     }
   }
 
-  const parentEl = rootBlock.parentId
-  blocks[parentEl].childrenIds = blocks[parentEl].childrenIds.filter(
-      id => !removedBlocks.find(i => i.id === id)
-    );
+  // 6️⃣ Почистить childrenIds у оставшихся блоков
+  const removedIds = new Set(removedBlocks.map(b => b.id));
+  for (const block of Object.values(blocks)) {
+    if (!block?.childrenIds?.length) continue;
+    block.childrenIds = block.childrenIds.filter(id => !removedIds.has(id));
+  }
 
   return {
     removedBlocks,

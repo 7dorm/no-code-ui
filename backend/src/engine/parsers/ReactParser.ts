@@ -2,6 +2,7 @@
 import { SourceFile, Node, SyntaxKind } from 'ts-morph';
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
+import generate from '@babel/generator';
 import * as t from '@babel/types';
 import { VisualBlock } from '../types';
 import { generateId } from './utils';
@@ -114,33 +115,7 @@ private parseJsxComponent(
 
   const componentId = generateId(this.relPath, 'component', name);
 
-  // Извлекаем аргументы с типами
-  const args: Record<string, string> = {};
-  if (babelNode.params && Array.isArray(babelNode.params)) {
-    for (const param of babelNode.params) {
-      // Обычный идентификатор
-      if (param.type === 'Identifier') {
-        const type = param.typeAnnotation?.typeAnnotation?.type || 'any';
-        args[param.name] = this.extractTypeString(param.typeAnnotation) || 'any';
-      }
-      // Деструктуризация { a, b }
-      else if (param.type === 'ObjectPattern') {
-        for (const prop of param.properties) {
-          if (prop.type === 'ObjectProperty' && prop.key.type === 'Identifier') {
-            let type = 'any';
-            if (prop.value.typeAnnotation) {
-              type = this.extractTypeString(prop.value.typeAnnotation);
-            }
-            args[prop.key.name] = type;
-          }
-        }
-      }
-      // rest параметр ...rest
-      else if (param.type === 'RestElement' && param.argument.type === 'Identifier') {
-        args['...' + param.argument.name] = 'any';
-      }
-    }
-  }
+  const args = this.extractComponentArgs(babelNode);
 
   const componentBlock: VisualBlock = {
     id: componentId,
@@ -167,17 +142,131 @@ private parseJsxComponent(
   this.parseJsxTree(jsxRoot, componentId);
 }
 
+private extractComponentArgs(babelNode: any): Record<string, string> {
+  const args: Record<string, string> = {};
+
+  const params = Array.isArray(babelNode?.params) ? babelNode.params : [];
+  for (const param of params) {
+    this.collectArgsFromParam(param, args);
+  }
+
+  return args;
+}
+
+private collectArgsFromParam(param: any, args: Record<string, string>) {
+  if (!param) return;
+
+  if (t.isAssignmentPattern(param)) {
+    this.collectArgsFromParam(param.left, args);
+    return;
+  }
+
+  if (t.isIdentifier(param)) {
+    args[param.name] = this.extractTypeString(param.typeAnnotation);
+    return;
+  }
+
+  if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+    args[`...${param.argument.name}`] = 'any';
+    return;
+  }
+
+  if (t.isObjectPattern(param)) {
+    const typeMap = this.extractObjectPatternTypeMap(param.typeAnnotation);
+    for (const prop of param.properties) {
+      if (t.isRestElement(prop) && t.isIdentifier(prop.argument)) {
+        args[`...${prop.argument.name}`] = 'any';
+        continue;
+      }
+      if (!t.isObjectProperty(prop)) continue;
+
+      const keyName = t.isIdentifier(prop.key)
+        ? prop.key.name
+        : t.isStringLiteral(prop.key)
+          ? prop.key.value
+          : null;
+      if (!keyName) continue;
+
+      let type = typeMap?.[keyName] ?? 'any';
+      if (t.isIdentifier(prop.value) && (prop.value as any).typeAnnotation) {
+        type = this.extractTypeString((prop.value as any).typeAnnotation);
+      }
+
+      args[keyName] = type;
+    }
+  }
+}
+
+private extractObjectPatternTypeMap(typeAnnotation: any): Record<string, string> | null {
+  const inner = this.unwrapTsTypeAnnotation(typeAnnotation);
+  if (!inner || inner.type !== 'TSTypeLiteral') return null;
+
+  const result: Record<string, string> = {};
+  for (const member of inner.members) {
+    if (member.type !== 'TSPropertySignature') continue;
+
+    const key = member.key;
+    const keyName =
+      key.type === 'Identifier'
+        ? key.name
+        : key.type === 'StringLiteral'
+          ? key.value
+          : null;
+    if (!keyName) continue;
+
+    result[keyName] = this.extractTypeString(member.typeAnnotation);
+  }
+  return result;
+}
+
 // Помощник для извлечения строки типа из typeAnnotation
 private extractTypeString(typeAnnotation: any): string {
-  if (!typeAnnotation) return 'any';
-  switch (typeAnnotation.type) {
+  const typeNode = this.unwrapTsTypeAnnotation(typeAnnotation);
+  if (!typeNode) return 'any';
+
+  switch (typeNode.type) {
     case 'TSStringKeyword': return 'string';
     case 'TSNumberKeyword': return 'number';
     case 'TSBooleanKeyword': return 'boolean';
     case 'TSAnyKeyword': return 'any';
-    case 'TSTypeReference': return typeAnnotation.typeName?.name || 'any';
-    default: return 'any';
+    case 'TSUnknownKeyword': return 'unknown';
+    case 'TSNeverKeyword': return 'never';
+    case 'TSVoidKeyword': return 'void';
+    case 'TSLiteralType': {
+      const lit = typeNode.literal;
+      if (t.isStringLiteral(lit)) return JSON.stringify(lit.value);
+      if (t.isNumericLiteral(lit)) return String(lit.value);
+      if (t.isBooleanLiteral(lit)) return String(lit.value);
+      return 'any';
+    }
+    case 'TSArrayType':
+      return `${this.extractTypeString(typeNode.elementType)}[]`;
+    case 'TSUnionType':
+      return typeNode.types.map(tn => this.extractTypeString(tn)).join(' | ') || 'any';
+    case 'TSParenthesizedType':
+      return `(${this.extractTypeString(typeNode.typeAnnotation)})`;
+    case 'TSTypeReference':
+      return this.tsTypeNameToString(typeNode.typeName) || 'any';
+    case 'TSTypeLiteral':
+      return 'object';
+    default:
+      return 'any';
   }
+}
+
+private unwrapTsTypeAnnotation(typeAnnotation: any): any | null {
+  if (!typeAnnotation) return null;
+  if (typeAnnotation.type === 'TSTypeAnnotation') return typeAnnotation.typeAnnotation ?? null;
+  return typeAnnotation;
+}
+
+private tsTypeNameToString(typeName: any): string {
+  if (!typeName) return '';
+  if (typeName.type === 'Identifier') return typeName.name;
+  if (typeName.type === 'TSQualifiedName') {
+    return `${this.tsTypeNameToString(typeName.left)}.${this.tsTypeNameToString(typeName.right)}`;
+  }
+  return '';
 }
 
 
@@ -341,17 +430,30 @@ private extractJsxProps(attrs: any[]): Record<string, any> {
         props[name] = { type: 'string', value: attr.value.value };
       } else if (t.isJSXExpressionContainer(attr.value)) {
         const expr = attr.value.expression;
-        if (t.isIdentifier(expr)) {
-          // Вот здесь сохраняем реальный идентификатор
-          props[name] = { type: 'component', value: expr.name };
-        } else if (t.isMemberExpression(expr)) {
-          // например Some.Component
-          props[name] = { type: 'component', value: this.memberExprToString(expr) };
-        } else {
-          props[name] = { type: 'expression', value: '<complex_expression>' };
+        if (t.isNumericLiteral(expr)) {
+          props[name] = { type: 'number', value: String(expr.value) };
+          return;
         }
+        if (t.isBooleanLiteral(expr)) {
+          props[name] = { type: 'boolean', value: String(expr.value) };
+          return;
+        }
+        if (t.isStringLiteral(expr)) {
+          props[name] = { type: 'string', value: expr.value };
+          return;
+        }
+        if (t.isIdentifier(expr) && /^[A-Z]/.test(expr.name)) {
+          props[name] = { type: 'component', value: expr.name };
+          return;
+        }
+
+        let exprCode = '<expression>';
+        try {
+          exprCode = generate(expr as any, { jsescOption: { minimal: true } }).code;
+        } catch {}
+        props[name] = { type: 'expression', value: exprCode };
       } else {
-        props[name] = { type: 'string', value: 'true' };
+        props[name] = { type: 'boolean', value: 'true' };
       }
     }
   });

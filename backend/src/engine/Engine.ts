@@ -92,8 +92,8 @@ private findConfigUpwards(
       }
     }
 
-    this.resolveCrossReferences();
-    this.resolveComponentImports();
+    this.resolveComponentUsages();
+    this.resolveStyleImportsReactPriority();
     return {
   blocks: Object.fromEntries(
     Array.from(this.blocks.entries()).map(([id, block]) => [
@@ -118,143 +118,270 @@ private findConfigUpwards(
       .filter(f => !f.includes('node_modules') && !f.includes('.git'));
   }
 
-private resolveCrossReferences() {
+private resolveComponentUsages() {
+  // Reset usages so loadProject() is deterministic
   for (const block of this.blocks.values()) {
-    if (!block.props?.className?.value) continue;
+    if (block.type !== 'component') continue;
+    block.usages = [];
+    block.usedIn = [];
+  }
 
-    const classes = block.props.className.value
-      .split(' ')
-      .map(c => c.trim())
-      .filter(Boolean);
+  const componentsByFile = new Map<string, VisualBlock[]>();
+  const importsByFile = new Map<string, string[]>();
+  for (const block of this.blocks.values()) {
+    if (block.type !== 'component') continue;
+    const abs = this.normalizeAbs(block.filePath);
+    const list = componentsByFile.get(abs) ?? [];
+    list.push(block);
+    componentsByFile.set(abs, list);
 
-    for (const cls of classes) {
-      const cssId = `${block.relPath}__css-class__${cls}`;
-
-      // 1. Проверяем обычные блоки
-      const normalCss = this.blocks.get(cssId);
-      if (normalCss) {
-        block.uses.push(cssId);
-        normalCss.usedIn.push(block.id);
-      }
-
-      // 2. Проверяем отдельно cssStyles
-      const separateCss = this.cssStyles.get(cssId);
-      if (separateCss) {
-        block.uses.push(cssId);
-        separateCss.usedIn.push(block.id);
-      }
+    if (block.imports && !importsByFile.has(abs)) {
+      importsByFile.set(abs, block.imports);
     }
   }
-}
 
-
-private resolveComponentImports() {
-  const rootBlocks = this.findRootBlocks();
-
-  // --- сначала строим все компоненты ---
-  for (const rootId of rootBlocks) {
-    const rootBlock = this.blocks.get(rootId);
-    if (!rootBlock || !rootBlock.imports?.length) continue;
-
-    const baseDir = path.dirname(path.resolve(this.projectRoot, rootBlock.relPath));
-
-    // строим мапу компонентов для текущего файла
-    const importMap = new Map<string, string>();
-    for (const raw of rootBlock.imports) {
-      const [importPath, , localName] = raw.split('|');
-      if (!importPath || !importPath.startsWith('.')) continue; 
-
-      const absPath = path.normalize(path.resolve(baseDir, importPath));
-
-      const comp = Array.from(this.blocks.values()).find(
-        b => b.type === 'component' && path.normalize(path.resolve(this.projectRoot, "./" + b.relPath)).startsWith(absPath)
+  const importMapByFile = new Map<string, Map<string, string>>();
+  for (const block of this.blocks.values()) {
+    if (block.type !== 'component') continue;
+    const absFile = this.normalizeAbs(block.filePath);
+    let importMap = importMapByFile.get(absFile);
+    if (!importMap) {
+      importMap = this.buildImportMapForFile(
+        block.filePath,
+        componentsByFile,
+        importsByFile.get(absFile)
       );
-      if (comp) importMap.set(localName, comp.id);
+      importMapByFile.set(absFile, importMap);
     }
-
-    // рекурсивная замена элементов на компоненты
-    this.resolveComponentTreeWithImportMap(rootId, importMap);
-  }
-  
-
-  // --- потом строим CSS-мапы и сопоставляем ---
-  for (const rootId of rootBlocks) {
-    const rootBlock = this.blocks.get(rootId);
-    if (!rootBlock) continue;
-
-    // строим локальную CSS-мапу по классам
-    const cssMap = new Map<string, VisualBlock>();
-    if (rootBlock.imports?.length) {
-      const baseDir = path.dirname(path.resolve(this.projectRoot, rootBlock.relPath));
-      for (const raw of rootBlock.imports) {
-        const [importPath] = raw.split('|');
-        if (!importPath || !importPath.endsWith('.css')) continue;
-
-        const absPath = path.normalize(path.resolve(baseDir, importPath));
-
-        for (const cssBlock of this.cssStyles.values()) {
-          const cssAbsPath = path.normalize(path.resolve(this.projectRoot, "./" + cssBlock.relPath));
-          if (cssAbsPath === absPath) {
-            cssMap.set(cssBlock.name, cssBlock); 
-          }
-        }
-      }
-    }
-
-    // рекурсивно сопоставляем CSS всем элементам, наследуя от родителей
-    this.resolveCssTree(rootId, cssMap);
+    this.resolveComponentTreeWithImportMap(block.id, importMap);
   }
 }
 
-// Рекурсивное сопоставление CSS с элементами
-private resolveCssTree(blockId: string, inheritedCssMap: Map<string, VisualBlock>) {
-  const block = this.blocks.get(blockId);
-  if (!block?.childrenIds?.length) return;
-
-  // создаём локальную карту CSS для этого блока (на основе наследуемой)
-  const localCssMap = new Map(inheritedCssMap);
-
-  // добавляем CSS из текущего блока, если есть
-  if (block.type === 'component' && block.imports?.length) {
-    const baseDir = path.dirname(path.resolve(this.projectRoot, block.relPath));
-    for (const raw of block.imports) {
-      const [importPath] = raw.split('|');
-      if (!importPath || !importPath.endsWith('.css')) continue;
-
-      const absPath = path.normalize(path.resolve(baseDir, importPath));
-      for (const cssBlock of this.cssStyles.values()) {
-        const cssAbsPath = path.normalize(path.resolve(this.projectRoot, "./" + cssBlock.relPath));
-        if (cssAbsPath === absPath) {
-          localCssMap.set(cssBlock.name, cssBlock);
-        }
-      }
-    }
+private resolveStyleImportsReactPriority() {
+  // Clear old links (if any)
+  for (const cssBlock of this.cssStyles.values()) cssBlock.usedIn = [];
+  for (const block of this.blocks.values()) {
+    if (!block.uses?.length) continue;
+    block.uses = block.uses.filter(id => !this.cssStyles.has(id));
   }
-  for (const childId of block.childrenIds) {
-    const child = this.blocks.get(childId);
-    if (!child || (child.type !== 'component' && child.type !== 'element')) continue;
 
-    // сопоставляем классы с CSS
-    const className = child.props?.className?.value;
-    if (className) {
-      const classes = className.split(' ').map(c => c.trim()).filter(Boolean);
-      for (const cls of classes) {
-        const cssBlock = localCssMap.get(cls);
-        if (cls === "main-header")
-        if (cssBlock) {
-          if (!child.uses.includes(cssBlock.id)) child.uses.push(cssBlock.id);
-          if (!cssBlock.usedIn.includes(child.id)) cssBlock.usedIn.push(child.id);
-        }
-      }
-    }
+  const cssBlocksByFile = new Map<string, VisualBlock[]>();
+  for (const cssBlock of this.cssStyles.values()) {
+    const abs = this.normalizeAbs(cssBlock.filePath);
+    const list = cssBlocksByFile.get(abs) ?? [];
+    list.push(cssBlock);
+    cssBlocksByFile.set(abs, list);
+  }
 
-    // рекурсивно передаём локальную карту CSS детям
-    this.resolveCssTree(childId, localCssMap);
+  const importsByFile = new Map<string, string[]>();
+  for (const block of this.blocks.values()) {
+    if (block.type !== 'component') continue;
+    if (!block.imports) continue;
+    const abs = this.normalizeAbs(block.filePath);
+    if (!importsByFile.has(abs)) importsByFile.set(abs, block.imports);
+  }
+
+  for (const rootId of this.findRootBlocks()) {
+    const root = this.blocks.get(rootId);
+    if (!root || root.type !== 'component') continue;
+
+    const styleLoadOrder = this.collectStyleLoadOrder(root.filePath, importsByFile);
+    const effectiveClassMap = this.buildEffectiveClassMap(styleLoadOrder, cssBlocksByFile);
+    this.linkCssInTree(rootId, effectiveClassMap);
   }
 }
 
+private collectStyleLoadOrder(
+  entryFilePath: string,
+  importsByFile: Map<string, string[]>
+): string[] {
+  const visitedFiles = new Set<string>();
+  const visitedStyles = new Set<string>();
+  const order: string[] = [];
 
+  const visitFile = (absFilePath: string) => {
+    const normalized = this.normalizeAbs(absFilePath);
+    if (visitedFiles.has(normalized)) return;
+    visitedFiles.add(normalized);
 
+    let importSpecs: string[] = [];
+
+    const rawImports = importsByFile.get(normalized);
+    if (rawImports !== undefined) {
+      importSpecs = rawImports.map(raw => raw.split('|')[0]).filter(Boolean);
+    } else {
+      // fallback: file has no parsed components, but still might contain CSS imports
+      let sourceFile = this.project.getSourceFile(absFilePath);
+      if (!sourceFile && fs.existsSync(absFilePath)) {
+        try {
+          sourceFile = this.project.addSourceFileAtPath(absFilePath);
+        } catch {
+          return;
+        }
+      }
+      if (!sourceFile) return;
+      importSpecs = sourceFile.getImportDeclarations().map(imp => imp.getModuleSpecifierValue());
+    }
+
+    for (const spec of importSpecs) {
+      if (!spec || !spec.startsWith('.')) continue;
+
+      const resolved = this.resolveImportToAbsPath(absFilePath, spec);
+      if (!resolved) continue;
+
+      const resolvedAbs = this.normalizeAbs(resolved);
+      if (this.isStyleFile(resolvedAbs)) {
+        if (!visitedStyles.has(resolvedAbs)) {
+          visitedStyles.add(resolvedAbs);
+          order.push(resolvedAbs);
+        }
+        continue;
+      }
+
+      if (this.isScriptFile(resolvedAbs)) {
+        visitFile(resolvedAbs);
+      }
+    }
+  };
+
+  visitFile(entryFilePath);
+  return order;
+}
+
+private buildEffectiveClassMap(
+  styleLoadOrder: string[],
+  cssBlocksByFile: Map<string, VisualBlock[]>
+): Map<string, VisualBlock> {
+  const effective = new Map<string, VisualBlock>();
+
+  for (const cssAbsPath of styleLoadOrder) {
+    const blocks = cssBlocksByFile.get(cssAbsPath);
+    if (!blocks) continue;
+
+    // Within one file: later rules override earlier ones (approx by source position)
+    const sorted = [...blocks].sort((a, b) => this.cssBlockOrderKey(a) - this.cssBlockOrderKey(b));
+    const perFile = new Map<string, VisualBlock>();
+    for (const block of sorted) {
+      perFile.set(block.name, block);
+    }
+
+    // Between files: later imports override earlier ones
+    for (const [className, block] of perFile.entries()) {
+      effective.set(className, block);
+    }
+  }
+
+  return effective;
+}
+
+private linkCssInTree(rootId: string, effectiveClassMap: Map<string, VisualBlock>) {
+  const visited = new Set<string>();
+  const stack: string[] = [rootId];
+
+  while (stack.length > 0) {
+    const blockId = stack.pop()!;
+    if (visited.has(blockId)) continue;
+    visited.add(blockId);
+
+    const block = this.blocks.get(blockId);
+    if (!block) continue;
+
+    const isDomElement = block.type === 'element' || block.type === 'html-element';
+    if (isDomElement) {
+      const className = block.props?.className?.value;
+      if (className) {
+        const classes = className.split(' ').map(c => c.trim()).filter(Boolean);
+        for (const cls of classes) {
+          const cssBlock = effectiveClassMap.get(cls);
+          if (!cssBlock) continue;
+          if (!block.uses.includes(cssBlock.id)) block.uses.push(cssBlock.id);
+          if (!cssBlock.usedIn.includes(block.id)) cssBlock.usedIn.push(block.id);
+        }
+      }
+    }
+
+    for (const childId of block.childrenIds ?? []) stack.push(childId);
+
+    // Follow component-instance -> component definition for tree traversal
+    if (block.type === 'component-instance' && block.refId) {
+      stack.push(block.refId);
+    }
+  }
+}
+
+private cssBlockOrderKey(block: VisualBlock): number {
+  const idx = block.metadata?.ruleStartIndex;
+  if (typeof idx === 'number') return idx;
+  return block.startLine * 1_000_000 + block.startCol;
+}
+
+private normalizeAbs(p: string): string {
+  return path.normalize(p).replace(/\\/g, '/');
+}
+
+private isStyleFile(absPath: string): boolean {
+  const ext = path.extname(absPath).toLowerCase();
+  return ext === '.css' || ext === '.scss' || ext === '.sass' || ext === '.less';
+}
+
+private isScriptFile(absPath: string): boolean {
+  const ext = path.extname(absPath).toLowerCase();
+  return ext === '.tsx' || ext === '.ts' || ext === '.jsx' || ext === '.js';
+}
+
+private resolveImportToAbsPath(fromAbsFilePath: string, importPath: string): string | null {
+  const baseDir = path.dirname(fromAbsFilePath);
+  const base = path.resolve(baseDir, importPath);
+
+  // Exact file (with extension)
+  if (fs.existsSync(base) && fs.statSync(base).isFile()) return base;
+
+  // Try known extensions
+  if (!path.extname(base)) {
+    const candidates = [
+      ...['.tsx', '.ts', '.jsx', '.js', '.css', '.scss', '.sass', '.less'].map(ext => base + ext),
+      ...['.tsx', '.ts', '.jsx', '.js', '.css', '.scss', '.sass', '.less'].map(ext =>
+        path.join(base, 'index' + ext)
+      ),
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+    }
+  }
+
+  return null;
+}
+
+private buildImportMapForFile(
+  absFilePath: string,
+  componentsByFile: Map<string, VisualBlock[]>,
+  imports: string[] = []
+): Map<string, string> {
+  const importMap = new Map<string, string>();
+
+  for (const raw of imports) {
+    const [spec, importKind, localName] = raw.split('|');
+    if (!spec || !spec.startsWith('.')) continue;
+    if (importKind !== 'default' && importKind !== 'named') continue;
+    if (!localName) continue;
+
+    const resolved = this.resolveImportToAbsPath(absFilePath, spec);
+    if (!resolved) continue;
+
+    const candidates = componentsByFile.get(this.normalizeAbs(resolved)) ?? [];
+    if (candidates.length === 0) continue;
+
+    const target =
+      importKind === 'default'
+        ? candidates.find(c => c.metadata?.isDefaultExport) ??
+          candidates.find(c => c.name === localName) ??
+          (candidates.length === 1 ? candidates[0] : candidates[0])
+        : candidates.find(c => c.name === localName) ?? candidates[0];
+    if (target) importMap.set(localName, target.id);
+  }
+
+  return importMap;
+}
 private resolveComponentTreeWithImportMap(
   blockId: string,
   importMap: Map<string, string>
@@ -268,35 +395,34 @@ private resolveComponentTreeWithImportMap(
     const child = this.blocks.get(childId);
     if (!child) continue;
 
-    // Если элемент с большой буквы
-    if (child.type === 'element') {
-      if (/^[A-Z]/.test(child.name)) {
-        const replacementId = importMap.get(child.name);
-        if (replacementId) {
-          const realComp = this.blocks.get(replacementId);
-          if (realComp) {
-            realComp.usedIn.push(block.id);
-            newChildren.push(realComp.id);
-            this.blocks.delete(child.id);
-            continue; // не идем внутрь реального компонента
-          }
-        }
-      }
+    // If JSX tag starts with an uppercase letter, treat it as component usage.
+    if (child.type === 'element' && /^[A-Z]/.test(child.name)) {
+      const targetComponentId = importMap.get(child.name);
+      if (targetComponentId) {
+        const targetComponent = this.blocks.get(targetComponentId);
+        if (targetComponent && targetComponent.type === 'component') {
+          child.type = 'component-instance';
+          child.refId = targetComponentId;
 
-      // 2) Проверка props, которые могут быть компонентами
-      for (const [propName, propValue] of Object.entries(child.props || {})) {
-       
-        if (((propValue as any).type === 'expression' || (propValue as any).type === 'component')  && /^[A-Z]/.test(propValue.value)) {
-          // значение пропа — имя компонента
-          const replacementId = importMap.get(propValue.value);
-          if (replacementId) {
-            const realComp = this.blocks.get(replacementId);
-            if (realComp) {
-              realComp.usedIn.push(block.id);
- 
-              // можно заменить prop на блок компонента
-              child.childrenIds.push(realComp.id);
-            }
+          child.uses ??= [];
+          if (!child.uses.includes(targetComponentId)) child.uses.push(targetComponentId);
+
+          targetComponent.usedIn ??= [];
+          if (!targetComponent.usedIn.includes(child.id)) targetComponent.usedIn.push(child.id);
+
+          targetComponent.usages ??= [];
+          if (!targetComponent.usages.some(u => u.usageId === child.id)) {
+            targetComponent.usages.push({
+              usageId: child.id,
+              filePath: child.filePath,
+              relPath: child.relPath,
+              startLine: child.startLine,
+              endLine: child.endLine,
+              startCol: child.startCol,
+              endCol: child.endCol,
+              parentId: child.parentId,
+              props: child.props,
+            });
           }
         }
       }

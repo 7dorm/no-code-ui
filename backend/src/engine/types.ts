@@ -1,6 +1,7 @@
 // src/engine/types.ts
 export type BlockType =
   | 'component'
+  | 'component-instance'
   | 'element'
   | 'html-root'
   | 'html-element'
@@ -9,8 +10,20 @@ export type BlockType =
   | 'css-class';
 
 export interface PropValue {
-  type: 'string' | 'expression' | 'number' | 'boolean';
+  type: 'string' | 'expression' | 'number' | 'boolean' | 'component';
   value: string;
+}
+
+export interface ComponentUsage {
+  usageId: string;
+  filePath: string;
+  relPath: string;
+  startLine: number;
+  endLine: number;
+  startCol: number;
+  endCol: number;
+  parentId?: string;
+  props?: Record<string, PropValue>;
 }
 
 export interface VisualBlock {
@@ -37,6 +50,12 @@ export interface VisualBlock {
 
   isExported?: boolean;
   metadata?: Record<string, any>;
+
+  // For component-instance blocks: points to component definition block id
+  refId?: string;
+
+  // For component definition blocks: where it's used (instances)
+  usages?: ComponentUsage[];
 
   // Только для JSX-узлов, опционально
   astNode?: any;
