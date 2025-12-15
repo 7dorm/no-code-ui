@@ -282,6 +282,9 @@ private createObjectImportBlocks(importBindings: ImportBindingInfo[], componentL
     if (!binding.localName) continue;
     if (componentLikeNames.has(binding.localName)) continue;
 
+    // --- фильтр для локальных файлов ---
+    if (!binding.source.startsWith('.')) continue;
+
     this.objectImportNames.add(binding.localName);
 
     const objectId = generateId(this.relPath, 'object', binding.localName);

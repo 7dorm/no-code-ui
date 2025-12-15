@@ -187,7 +187,7 @@ private findConfigUpwards(
 }
 
 async reloadFile(entryFile: string): Promise<void> {
-  const absPath = this.normalizeAbs(path.resolve(entryFile));
+  const absPath = entryFile;
 
   // ---------- УДАЛЕНИЕ БЛОКОВ ----------
   const blocksInFile = Object.fromEntries(
@@ -227,13 +227,23 @@ async reloadFile(entryFile: string): Promise<void> {
 
 
 
-  private async findAllFiles(): Promise<string[]> {
-    const entries = await fs.readdir(this.projectRoot, { recursive: true, withFileTypes: true });
-    return entries
-      .filter(d => d.isFile())
-      .map(d => path.join(d.parentPath!, d.name))
-      .filter(f => !f.includes('node_modules') && !f.includes('.git'));
-  }
+private async findAllFiles(): Promise<string[]> {
+  const walk = async (dir: string): Promise<string[]> => {
+    const dirents = await fs.readdir(dir, { withFileTypes: true });
+    const files = await Promise.all(
+      dirents.map(async (d) => {
+        const res = path.join(dir, d.name);
+        if (d.isDirectory()) return walk(res);
+        return res;
+      })
+    );
+    return Array.prototype.concat(...files);
+  };
+
+  const allFiles = await walk(this.projectRoot);
+  return allFiles.filter(f => !f.includes('node_modules') && !f.includes('.git'));
+}
+
 
 private resolveComponentUsages() {
   // Reset usages so loadProject() is deterministic

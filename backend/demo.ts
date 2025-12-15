@@ -47,30 +47,27 @@ async function parseAndWrite(project: DemoProject, outDir: string) {
   const engine = new VisualEngine(project.rootPath);
   const tree = await engine.loadProject();
 
-  const ms = Date.now() - start;
-  const totalBlocks = Object.keys(tree.blocks).length;
-  const filesProcessed = new Set(Object.values(tree.blocks).map(b => b.filePath)).size;
-  const cssFilesProcessed = new Set(Array.from(engine.cssStyles.values()).map(b => b.filePath))
-    .size;
+    console.log(`Успешно! Найдено блоков: ${Object.keys(tree.blocks).length}`);
+    console.log(`Корневых компонентов: ${tree.roots.length}`);
 
-  console.log(`Успешно! time=${ms}ms blocks=${totalBlocks} roots=${tree.roots.length}`);
-  console.log(`filesProcessed=${filesProcessed} cssBlocks=${engine.cssStyles.size} cssFiles=${cssFilesProcessed}`);
+    //removeBlockAndCleanup(tree.blocks, "src_components_Card_tsx__element__div_14")
+    insertTextToFile('./test_project/src/components/Card.tsx', "\n<Header />", 15, 9)
 
-  const structureOutput = {
-    stats: {
-      totalBlocks,
-      roots: tree.roots.length,
-      filesProcessed,
-      timeMs: ms,
-    },
-    roots: tree.roots.map(id => ({
-      id,
-      name: tree.blocks[id]?.name,
-      type: tree.blocks[id]?.type,
-      file: tree.blocks[id]?.filePath,
-    })),
-    blocks: tree.blocks,
-  };
+    // --- основной вывод ---
+    const safeOutput = {
+      stats: {
+        totalBlocks: Object.keys(tree.blocks).length,
+        roots: tree.roots.length,
+        filesProcessed: Array.from(new Set(Object.values(tree.blocks).map(b => b.filePath))).length,
+      },
+      roots: tree.roots.map(id => ({
+        id,
+        name: tree.blocks[id].name,
+        type: tree.blocks[id].type,
+        file: tree.blocks[id].filePath,
+      })),
+      blocks: tree.blocks,
+    };
 
   const cssOutput = {
     stats: {
