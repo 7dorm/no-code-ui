@@ -190,7 +190,7 @@ private findConfigUpwards(
 }
 
 async reloadFile(entryFile: string): Promise<void> {
-  const absPath = this.normalizeAbs(path.resolve(entryFile));
+  const absPath = entryFile;
 
   // ---------- УДАЛЕНИЕ БЛОКОВ ----------
   const blocksInFile = Object.fromEntries(
