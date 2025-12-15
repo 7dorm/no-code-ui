@@ -4,6 +4,7 @@ import path from "path";
 
 interface AddComponentChildParams {
   blocks: Record<string, VisualBlock>;
+  cssBlocks?: Record<string, VisualBlock>;
 
   parentElementId: string;     // JSX-элемент (div, fragment и т.д.)
   componentId: string;         // вставляемая компонента
@@ -44,6 +45,7 @@ function hasImport(
 
 export function addComponentAsChild({
   blocks,
+  cssBlocks,
   parentElementId,
   componentId,
   index,

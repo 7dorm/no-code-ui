@@ -38,7 +38,6 @@ export function insertTextToFile(
       originalLine.slice(column);
   }
 
-  console.log(lines[lineIdx])
   fs.writeFileSync(absPath, lines.join('\n'), 'utf8');
 
   return {
