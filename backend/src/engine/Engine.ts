@@ -15,6 +15,7 @@ import { VisualBlock, ProjectTree } from './types';
 import { ReactParser } from './parsers/ReactParser';
 import { HtmlParser } from './parsers/HtmlParser';
 import { CssParser } from './parsers/CssParser';
+import { removeBlockAndCleanup } from './mutators/deleteBlock';
 
 export class VisualEngine {
   private project: Project;
@@ -107,6 +108,125 @@ private findConfigUpwards(
   roots: this.findRootBlocks(),
 };
   }
+
+  async loadFileTree(entryFile: string): Promise<ProjectTree> {
+  this.blocks.clear();
+  this.cssStyles.clear();
+
+  const visitedFiles = new Set<string>();
+
+  const processFile = async (absPath: string) => {
+    const normalized = this.normalizeAbs(absPath);
+    if (visitedFiles.has(normalized)) return;
+    visitedFiles.add(normalized);
+
+    const relPath = path.relative(this.projectRoot, absPath);
+
+    // ---------- PARSE FILE ----------
+    if (this.isScriptFile(normalized)) {
+      const sourceFile =
+        this.project.getSourceFile(absPath) ??
+        this.project.addSourceFileAtPath(absPath);
+
+      new ReactParser(absPath, relPath, this.blocks).parse(sourceFile);
+    }
+
+    if (/\.html?$/.test(normalized)) {
+      new HtmlParser(absPath, relPath, this.blocks).parse(absPath);
+    }
+
+    // ---------- COLLECT IMPORTS FROM PARSED BLOCKS ----------
+    const blocksFromFile = Array.from(this.blocks.values()).filter(
+      b => this.normalizeAbs(b.filePath) === normalized
+    );
+
+    for (const block of blocksFromFile) {
+      for (const raw of block.imports ?? []) {
+        const [importSpec] = raw.split('|');
+        if (!importSpec || !importSpec.startsWith('.')) continue;
+
+        const resolved = this.resolveImportToAbsPath(absPath, importSpec);
+        if (!resolved) continue;
+
+        const resolvedAbs = this.normalizeAbs(resolved);
+
+        // CSS — парсим, но не уходим дальше
+        if (this.isStyleFile(resolvedAbs)) {
+          if (!this.cssStyles.has(resolvedAbs)) {
+            new CssParser(
+              resolvedAbs,
+              path.relative(this.projectRoot, resolvedAbs),
+              this.cssStyles
+            ).parse(resolvedAbs);
+          }
+          continue;
+        }
+
+        // JS / TS — идём рекурсивно
+        if (this.isScriptFile(resolvedAbs)) {
+          await processFile(resolvedAbs);
+        }
+      }
+    }
+  };
+
+  // ---------- ENTRY ----------
+  const entryAbs = this.normalizeAbs(path.resolve(entryFile));
+  await processFile(entryAbs);
+
+  // ---------- POST PROCESS ----------
+  this.resolveComponentUsages();
+  this.resolveStyleImportsReactPriority();
+
+  return {
+    blocks: Object.fromEntries(
+      Array.from(this.blocks.entries()).map(([id, block]) => [
+        id,
+        { ...block, astNode: undefined },
+      ])
+    ),
+    roots: this.findRootBlocks(),
+  };
+}
+
+async reloadFile(entryFile: string): Promise<void> {
+  const absPath = this.normalizeAbs(path.resolve(entryFile));
+
+  // ---------- УДАЛЕНИЕ БЛОКОВ ----------
+  const blocksInFile = Object.fromEntries(
+    Object.entries(this.blocks).filter(
+      ([, block]) => this.normalizeAbs(block.filePath) === absPath
+    )
+  );
+
+  for (const block of Object.values(blocksInFile)) {
+    removeBlockAndCleanup(Object.fromEntries(this.blocks), block.id);
+    this.blocks.delete(block.id); // убедимся, что удалили из карты
+  }
+
+  // ---------- ПАРСИНГ ФАЙЛА ----------
+  const relPath = path.relative(this.projectRoot, absPath);
+
+  if (this.isScriptFile(absPath)) {
+    const sourceFile =
+      this.project.getSourceFile(absPath) ??
+      this.project.addSourceFileAtPath(absPath);
+    new ReactParser(absPath, relPath, this.blocks).parse(sourceFile);
+  }
+
+  if (/\.html?$/.test(absPath)) {
+    new HtmlParser(absPath, relPath, this.blocks).parse(absPath);
+  }
+
+  if (this.isStyleFile(absPath)) {
+    new CssParser(absPath, relPath, this.cssStyles).parse(absPath);
+  }
+
+
+  // ---------- ПОСТ ОБРАБОТКА ----------
+  this.resolveComponentUsages();
+  this.resolveStyleImportsReactPriority();
+}
 
 
 
