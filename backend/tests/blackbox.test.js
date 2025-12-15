@@ -410,6 +410,45 @@ test('Engine parses project, resolves component usages, args, and CSS priority',
   assert(cssFromB.startLine > 0 && cssFromB.endLine > 0);
 });
 
+test('CSS: для className выбирается один “эффективный” css-class (без дублей из CSS компонентов)', async t => {
+  // Что проверяем (неочевидный кейс):
+  // - В проекте один и тот же класс может быть определён:
+  //   - локально в компоненте (`Card.tsx` импортирует `card.css`)
+  //   - и “глобально” по цепочке импортов от корня (`App.tsx` импортирует `b.css` последним)
+  // - При React-приоритизации нам важен итоговый (effective) источник для `.card`,
+  //   поэтому элемент внутри `Card` должен ссылаться только на `b.css`, а не ещё и на `card.css`.
+  const projectRoot = createFullFixtureProject();
+  t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
+
+  const engine = new VisualEngine(projectRoot);
+  const tree = await engine.loadProject();
+  const { blocks } = tree;
+
+  const cardDiv = findBlock(
+    blocks,
+    b =>
+      b.type === 'element' &&
+      b.name === 'div' &&
+      b.relPath.endsWith('src/components/Card.tsx') &&
+      b.props?.className?.value === 'card'
+  );
+  assert(cardDiv);
+
+  const usedCssBlocks = (cardDiv.uses ?? [])
+    .map(id => engine.cssStyles.get(id))
+    .filter(Boolean);
+
+  const cardCss = usedCssBlocks.filter(b => b.name === 'card');
+  assert.equal(cardCss.length, 1, 'Ожидаем ровно 1 css-class блок для `.card`');
+
+  const onlyCard = cardCss[0];
+  assert(onlyCard);
+  assert(
+    normalizePath(onlyCard.filePath).endsWith('/src/styles/b.css'),
+    'Ожидаем, что `.card` берётся из b.css (последний импорт в App.tsx)'
+  );
+});
+
 test('Parser creates object blocks for non-rendered imports (svg/utils) and supports multiple returns', async t => {
   // Что проверяем:
   // - Импорты, которые НЕ рендерятся как JSX-элементы (svg, константы, utils, react-native модули),
@@ -436,6 +475,13 @@ test('Parser creates object blocks for non-rendered imports (svg/utils) and supp
     b => b.type === 'object' && b.name === 'StyleSheet' && b.relPath.endsWith('src/components/Comment.tsx')
   );
   assert(styleSheet, 'Expected StyleSheet import to be parsed as object');
+
+  // Импорты, которые реально используются как JSX-теги, НЕ должны быть `object`.
+  const viewAsObject = findBlock(
+    blocks,
+    b => b.type === 'object' && b.name === 'View' && b.relPath.endsWith('src/components/Comment.tsx')
+  );
+  assert.equal(viewAsObject, null);
 
   const database = findBlock(
     blocks,
@@ -564,6 +610,76 @@ test('updateBlockPropInFile updates JSX props by coordinates', async t => {
     .filter(Boolean)
     .sort();
   assert.deepEqual(titles, ['Second', 'Updated']);
+});
+
+test('updateBlockPropInFile: boolean shorthand + добавление component-пропса; usages обновляются', async t => {
+  // Что проверяем (неочевидные случаи):
+  // - boolean shorthand `<Card active />` корректно превращается в `active={false}` при обновлении
+  // - добавление пропса с выражением (`icon={Icon}`) парсится как type=component
+  // - эти изменения попадают не только в instance.props, но и в `component.usages[*].props`
+  const projectRoot = createFullFixtureProject();
+  t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
+
+  const engine = new VisualEngine(projectRoot);
+  const tree = await engine.loadProject();
+
+  const firstCardInstance = findBlock(
+    tree.blocks,
+    b =>
+      b.type === 'component-instance' &&
+      b.name === 'Card' &&
+      b.relPath.endsWith('src/App.tsx') &&
+      b.props?.title?.value === 'First'
+  );
+  assert(firstCardInstance);
+  assert.equal(firstCardInstance.props?.active?.type, 'boolean');
+  assert.equal(firstCardInstance.props?.active?.value, 'true');
+  assert.equal(firstCardInstance.props?.icon, undefined);
+
+  // 1) обновляем boolean shorthand
+  updateBlockPropInFile(firstCardInstance, 'active', 'false');
+
+  const engine2 = new VisualEngine(projectRoot);
+  const tree2 = await engine2.loadProject();
+  const first2 = findBlock(
+    tree2.blocks,
+    b =>
+      b.type === 'component-instance' &&
+      b.name === 'Card' &&
+      b.relPath.endsWith('src/App.tsx') &&
+      b.props?.title?.value === 'First'
+  );
+  assert(first2);
+  assert.equal(first2.props?.active?.type, 'boolean');
+  assert.equal(first2.props?.active?.value, 'false');
+
+  // 2) добавляем пропс-выражение, которое должно стать type=component
+  updateBlockPropInFile(first2, 'icon', '{Icon}');
+
+  const engine3 = new VisualEngine(projectRoot);
+  const tree3 = await engine3.loadProject();
+  const first3 = findBlock(
+    tree3.blocks,
+    b =>
+      b.type === 'component-instance' &&
+      b.name === 'Card' &&
+      b.relPath.endsWith('src/App.tsx') &&
+      b.props?.title?.value === 'First'
+  );
+  assert(first3);
+  assert.equal(first3.props?.icon?.type, 'component');
+  assert.equal(first3.props?.icon?.value, 'Icon');
+
+  const cardComponent = findBlock(
+    tree3.blocks,
+    b => b.type === 'component' && b.name === 'Card' && b.relPath.endsWith('src/components/Card.tsx')
+  );
+  assert(cardComponent);
+
+  const usageFirst = (cardComponent.usages ?? []).find(u => u.props?.title?.value === 'First') ?? null;
+  assert(usageFirst);
+  assert.equal(usageFirst.props?.icon?.type, 'component');
+  assert.equal(usageFirst.props?.icon?.value, 'Icon');
 });
 
 test('removeFragmentFromFile removes JSX usage; Engine reflects usages', async t => {
@@ -723,6 +839,42 @@ test('removeBlockAndCleanup removes component instances and cleans imports when 
   assert.equal(appComponent.imports?.some(imp => imp.split('|')[2] === 'Card'), false);
   assert.equal(cardComponent.usages?.length ?? 0, 0);
   assert.equal(cardComponent.usedIn?.length ?? 0, 0);
+});
+
+test('removeBlockAndCleanup: чистит cssBlocks.usedIn если передать cssBlocks', async t => {
+  // Что проверяем:
+  // - removeBlockAndCleanup умеет чистить обратные ссылки в CSS блоках (`css-class.usedIn`)
+  //   когда удаляется элемент/поддерево, которое было привязано к этому css-class.
+  const projectRoot = createFullFixtureProject();
+  t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
+
+  const engine = new VisualEngine(projectRoot);
+  const tree = await engine.loadProject();
+  const { blocks } = tree;
+
+  const cardDiv = findBlock(
+    blocks,
+    b =>
+      b.type === 'element' &&
+      b.name === 'div' &&
+      b.relPath.endsWith('src/components/Card.tsx') &&
+      b.props?.className?.value === 'card'
+  );
+  assert(cardDiv);
+
+  const usedCssBlocks = (cardDiv.uses ?? [])
+    .map(id => engine.cssStyles.get(id))
+    .filter(Boolean);
+  const cssFromB = usedCssBlocks.find(b =>
+    normalizePath(b.filePath).endsWith('/src/styles/b.css')
+  );
+  assert(cssFromB);
+  assert(cssFromB.usedIn?.includes(cardDiv.id));
+
+  const cssBlocks = Object.fromEntries(engine.cssStyles.entries());
+  removeBlockAndCleanup(blocks, cardDiv.id, cssBlocks);
+
+  assert.equal(cssFromB.usedIn?.includes(cardDiv.id), false);
 });
 
 test('Engine loads project without tsconfig/package.json (fallback config)', async t => {

@@ -298,7 +298,25 @@ private resolveStyleImportsReactPriority() {
     if (!importsByFile.has(abs)) importsByFile.set(abs, block.imports);
   }
 
-  for (const rootId of this.findRootBlocks()) {
+  // IMPORTANT:
+  // Linking CSS for every parsed component as a "root" causes duplicates:
+  // the same element can be reached from multiple roots with different style graphs.
+  // We prefer "entry" components (those not used by any other component-instance),
+  // and fall back to all component roots only if we can't detect any entries
+  // (e.g. circular component graphs).
+  const allComponentRoots = this.findRootBlocks().filter(id => {
+    const b = this.blocks.get(id);
+    return b?.type === 'component';
+  });
+
+  const entryComponentRoots = allComponentRoots.filter(id => {
+    const b = this.blocks.get(id);
+    return (b?.usedIn ?? []).length === 0;
+  });
+
+  const rootsToLink = entryComponentRoots.length > 0 ? entryComponentRoots : allComponentRoots;
+
+  for (const rootId of rootsToLink) {
     const root = this.blocks.get(rootId);
     if (!root || root.type !== 'component') continue;
 

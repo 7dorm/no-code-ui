@@ -6,6 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "demo:backend": "rm -rf backend/.tmp-demo-dist && tsc -p backend/tsconfig.json --outDir backend/.tmp-demo-dist --pretty false && node backend/.tmp-demo-dist/demo.js",
+    "codegen:smoke": "rm -rf backend/.tmp-codegen-dist && tsc -p backend/tsconfig.json --outDir backend/.tmp-codegen-dist --pretty false && node backend/.tmp-codegen-dist/codegen-smoke.js",
     "test:backend": "rm -rf backend/.tmp-test-dist && tsc -p backend/tsconfig.json --outDir backend/.tmp-test-dist --pretty false && node --test backend/tests/blackbox.test.js && rm -rf backend/.tmp-test-dist"
   },
   "dependencies": {
