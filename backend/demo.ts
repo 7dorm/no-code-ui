@@ -18,7 +18,7 @@ async function main() {
     console.log(`Корневых компонентов: ${tree.roots.length}`);
 
     //removeBlockAndCleanup(tree.blocks, "src_components_Card_tsx__element__div_14")
-    insertTextToFile('./test_project/src/components/Card.tsx', "\n<Header />", 15, 9)
+    //insertTextToFile('./test_project/src/components/Card.tsx', "\n<Header />", 15, 9)
 
     // --- основной вывод ---
     const safeOutput = {
