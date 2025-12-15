@@ -1,9 +1,17 @@
+// Blackbox-тесты для backend "VisualEngine".
+//
+// Почему "blackbox":
+// - мы грузим скомпилированный JS из `.tmp-test-dist` (как рантайм/прод),
+//   а не TypeScript-исходники напрямую;
+// - мы создаём маленький реальный проект на диске (временная папка),
+//   прогоняем движок и проверяем результат (дерево блоков) + правки файлов.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// `npm -C no-code-ui run test:backend` сначала собирает backend в эту папку.
 const distRoot = path.join(__dirname, '..', '.tmp-test-dist');
 
 function requireFromDist(...segments) {
@@ -54,6 +62,7 @@ const { createTsxComponent } = requireFromDist(
   'createFile.js'
 );
 
+// Нормализуем пути, чтобы ассерты были стабильны на Windows/macOS/Linux.
 function normalizePath(p) {
   return p.replace(/\\/g, '/');
 }
@@ -69,6 +78,11 @@ function writeFile(root, relPath, contents) {
   return abs;
 }
 
+// Создаёт минимальный, но "насыщенный" фикстурный проект:
+// - несколько React-компонент с пропсами + граф использований (usages/uses)
+// - импорты CSS в разных местах, чтобы проверить React-приоритизацию импортов
+// - импорты, которые не рендерятся как JSX (svg/utils/constants) → должны стать `object` блоками
+// - компонент с несколькими return (try/catch + if), чтобы проверить парсинг нескольких корней
 function createFullFixtureProject() {
   const root = mkTempDir('visual-engine-fixture-');
 
@@ -272,6 +286,7 @@ const styles = StyleSheet.create({
   return root;
 }
 
+// Хелперы, чтобы ассерты читались проще.
 function findBlock(blocks, predicate) {
   return Object.values(blocks).find(predicate) || null;
 }
@@ -281,6 +296,14 @@ function findBlocks(blocks, predicate) {
 }
 
 test('Engine parses project, resolves component usages, args, and CSS priority', async t => {
+  // Что проверяем:
+  // 1) Движок парсит компоненты и создаёт блоки "component-instance" для использований.
+  // 2) Аргументы/типы компонента вытягиваются из TS-описания пропсов.
+  // 3) Для каждого component-instance пропсы парсятся с правильными типами значений:
+  //    - string/number/boolean литералы
+  //    - expression (например `count`, `() => ...`)
+  //    - component (например `icon={Icon}`)
+  // 4) React-похожий приоритет CSS: более поздние импорты побеждают ранние для одинакового селектора.
   const projectRoot = createFullFixtureProject();
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -325,9 +348,11 @@ test('Engine parses project, resolves component usages, args, and CSS priority',
   assert.equal(secondInstance.props?.onAction?.type, 'expression');
   assert.match(secondInstance.props?.onAction?.value ?? '', /count \+ 1/);
 
+  // refId/uses у instance указывает на определение компонента.
   assert.equal(secondInstance.refId, cardComponent.id);
   assert(secondInstance.uses.includes(cardComponent.id));
 
+  // Определение компонента хранит список usages, включая пропсы для каждого места использования.
   assert(Array.isArray(cardComponent.usages));
   assert.equal(cardComponent.usages.length, 2);
   const usageTitles = cardComponent.usages
@@ -336,6 +361,7 @@ test('Engine parses project, resolves component usages, args, and CSS priority',
     .sort();
   assert.deepEqual(usageTitles, ['First', 'Second']);
 
+  // Связи parent/children: <Card /> — дочерние элементы instance-а <Layout /> в App.
   const layoutInstance = findBlock(
     blocks,
     b => b.type === 'component-instance' && b.name === 'Layout' && b.relPath.endsWith('src/App.tsx')
@@ -343,6 +369,7 @@ test('Engine parses project, resolves component usages, args, and CSS priority',
   assert(layoutInstance, 'Layout usage not found (should be component-instance)');
   assert(cardInstances.every(i => i.parentId === layoutInstance.id));
 
+  // Пропсы, которые берутся из области видимости компонента (например `title`), парсятся как expression.
   const buttonInstanceInCard = findBlock(
     blocks,
     b =>
@@ -364,6 +391,8 @@ test('Engine parses project, resolves component usages, args, and CSS priority',
   );
   assert(cardDiv, 'Expected <div className="card"> inside Card');
 
+  // Привязка CSS: `.card` определён в нескольких файлах, но импорт `b.css` идёт последним в App,
+  // значит `.card` должен ссылаться на последний `.card` rule в `b.css` (green).
   const usedCssBlocks = (cardDiv.uses ?? [])
     .map(id => engine.cssStyles.get(id))
     .filter(Boolean);
@@ -382,6 +411,12 @@ test('Engine parses project, resolves component usages, args, and CSS priority',
 });
 
 test('Parser creates object blocks for non-rendered imports (svg/utils) and supports multiple returns', async t => {
+  // Что проверяем:
+  // - Импорты, которые НЕ рендерятся как JSX-элементы (svg, константы, utils, react-native модули),
+  //   всё равно должны создавать блоки, но типа `object` (а не `component`).
+  // - Компонент с несколькими JSX return должен дать несколько корневых детей (childrenIds).
+  // - Если такой импортированный объект передаётся в JSX-проп (например `source={LikeIcon}`),
+  //   то тип пропса должен быть `object` (не `expression`/`component`).
   const projectRoot = createFullFixtureProject();
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -437,6 +472,10 @@ test('Parser creates object blocks for non-rendered imports (svg/utils) and supp
 });
 
 test('updateCssPropertyInFile works even after rule changes (stale coordinates)', async t => {
+  // Что проверяем:
+  // - `updateCssPropertyInFile(cssBlock, prop, value)` работает даже если вызвать два раза
+  //   с ОДНИМ и тем же cssBlock (т.е. когда координаты start/end уже устарели).
+  // - После правок файла перепарсинг должен показать обновлённое свойство в нужном правиле.
   const projectRoot = createFullFixtureProject();
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -470,7 +509,7 @@ test('updateCssPropertyInFile works even after rule changes (stale coordinates)'
   const afterInsert = fs.readFileSync(bCssPath, 'utf8');
   assert.match(afterInsert, /padding:\s*10px;/);
 
-  // Call again with the SAME css block (coordinates are now stale if rule grew).
+  // Вызываем ещё раз с ТЕМ ЖЕ cssBlock (координаты уже устарели, потому что правило увеличилось).
   updateCssPropertyInFile(cssFromB, 'padding', '12px');
   const afterUpdate = fs.readFileSync(bCssPath, 'utf8');
   assert.match(afterUpdate, /padding:\s*12px;/);
@@ -493,6 +532,10 @@ test('updateCssPropertyInFile works even after rule changes (stale coordinates)'
 });
 
 test('updateBlockPropInFile updates JSX props by coordinates', async t => {
+  // Что проверяем:
+  // - `updateBlockPropInFile(block, propName, newValue)` редактирует TSX-файл по координатам блока
+  //   (start/end range в исходнике).
+  // - После правки и перепарсинга новое значение пропса отражается в дереве.
   const projectRoot = createFullFixtureProject();
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -524,6 +567,11 @@ test('updateBlockPropInFile updates JSX props by coordinates', async t => {
 });
 
 test('removeFragmentFromFile removes JSX usage; Engine reflects usages', async t => {
+  // Что проверяем:
+  // - `removeFragmentFromFile(file, startLine, startCol, endLine, endCol)` удаляет JSX-ноду
+  //   (использование компонента) из файла по координатам.
+  // - После перепарсинга соответствующий component-instance исчезает,
+  //   а список `usages` у компонента обновляется.
   const projectRoot = createFullFixtureProject();
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -569,6 +617,11 @@ test('removeFragmentFromFile removes JSX usage; Engine reflects usages', async t
 });
 
 test('addComponentAsChild updates blocks tree (instance + usages + imports)', async t => {
+  // Что проверяем:
+  // - `addComponentAsChild(...)` — мутация в памяти, которая:
+  //   - вставляет новый component-instance в childrenIds родителя по индексу
+  //   - регистрирует usage на определении компонента
+  //   - добавляет импорт компонента в родительский компонент (если нужно)
   const projectRoot = createFullFixtureProject();
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -622,6 +675,11 @@ test('addComponentAsChild updates blocks tree (instance + usages + imports)', as
 });
 
 test('removeBlockAndCleanup removes component instances and cleans imports when unused', async t => {
+  // Что проверяем:
+  // - `removeBlockAndCleanup(blocks, id)` удаляет блок и поддерживает консистентность графа:
+  //   - обновляет `usages`/`usedIn`
+  //   - удаляет ставшие неиспользуемыми импорты в родительских компонентах
+  // - Импорт удаляется только когда символ больше нигде не используется.
   const projectRoot = createFullFixtureProject();
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -668,6 +726,9 @@ test('removeBlockAndCleanup removes component instances and cleans imports when 
 });
 
 test('Engine loads project without tsconfig/package.json (fallback config)', async t => {
+  // Что проверяем:
+  // - Движок не падает, если в проекте нет `tsconfig.json` или `package.json`.
+  // - Он всё равно парсит HTML + простые JSX/JS файлы с fallback-конфигом.
   const projectRoot = mkTempDir('visual-engine-fallback-');
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
@@ -692,6 +753,9 @@ test('Engine loads project without tsconfig/package.json (fallback config)', asy
 });
 
 test('Files helpers: createTsxComponent + insertTextToFile', t => {
+  // Что проверяем:
+  // - Files-слой умеет создавать новый TSX-файл компонента на диске.
+  // - Files-слой умеет вставлять текст по (line,column).
   const root = mkTempDir('visual-engine-files-');
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
