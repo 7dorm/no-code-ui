@@ -24,8 +24,255 @@ function indexFromLineCol(
   return lineStarts[lineIndex] + column;
 }
 
+function findFirstNonWhitespaceIndex(
+  source: string,
+  start: number,
+  end: number
+): number | null {
+  for (let i = start; i < end; i++) {
+    const ch = source[i];
+    if (ch !== ' ' && ch !== '\t' && ch !== '\n' && ch !== '\r') return i;
+  }
+  return null;
+}
+
 function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+type CurlyBlock = {
+  prelude: string;
+  preludeStart: number;
+  preludeEnd: number;
+  blockStart: number;
+  blockEnd: number;
+  blockEndExclusive: number;
+};
+
+function scanCurlyBlocks(source: string): CurlyBlock[] {
+  const blocks: CurlyBlock[] = [];
+  const segmentStartByDepth: number[] = [0];
+  const stack: Array<{
+    prelude: string;
+    preludeStart: number;
+    preludeEnd: number;
+    blockStart: number;
+  }> = [];
+
+  let depth = 0;
+  let inBlockComment = false;
+  let inString: "'" | '"' | null = null;
+  let stringEscape = false;
+
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    const next = source[i + 1];
+
+    if (inBlockComment) {
+      if (ch === '*' && next === '/') {
+        inBlockComment = false;
+        i++;
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (stringEscape) {
+        stringEscape = false;
+        continue;
+      }
+      if (ch === '\\') {
+        stringEscape = true;
+        continue;
+      }
+      if (ch === inString) inString = null;
+      continue;
+    }
+
+    if (ch === '/' && next === '*') {
+      inBlockComment = true;
+      i++;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = ch;
+      continue;
+    }
+
+    if (ch === '{') {
+      const preludeStart = segmentStartByDepth[depth] ?? 0;
+      const preludeEnd = i;
+      const prelude = source.slice(preludeStart, preludeEnd).trim();
+
+      stack.push({ prelude, preludeStart, preludeEnd, blockStart: i });
+      depth++;
+      segmentStartByDepth[depth] = i + 1;
+      continue;
+    }
+
+    if (ch === '}') {
+      if (depth === 0) continue;
+
+      depth--;
+      const open = stack.pop();
+      if (open) {
+        blocks.push({
+          prelude: open.prelude,
+          preludeStart: open.preludeStart,
+          preludeEnd: open.preludeEnd,
+          blockStart: open.blockStart,
+          blockEnd: i,
+          blockEndExclusive: i + 1,
+        });
+      }
+      segmentStartByDepth[depth] = i + 1;
+      continue;
+    }
+
+    if (ch === ';') {
+      segmentStartByDepth[depth] = i + 1;
+      continue;
+    }
+  }
+
+  return blocks;
+}
+
+function findMatchingClosingBrace(source: string, openBraceIndex: number): number | null {
+  let depth = 0;
+  let inBlockComment = false;
+  let inString: "'" | '"' | null = null;
+  let stringEscape = false;
+
+  for (let i = openBraceIndex; i < source.length; i++) {
+    const ch = source[i];
+    const next = source[i + 1];
+
+    if (inBlockComment) {
+      if (ch === '*' && next === '/') {
+        inBlockComment = false;
+        i++;
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (stringEscape) {
+        stringEscape = false;
+        continue;
+      }
+      if (ch === '\\') {
+        stringEscape = true;
+        continue;
+      }
+      if (ch === inString) inString = null;
+      continue;
+    }
+
+    if (ch === '/' && next === '*') {
+      inBlockComment = true;
+      i++;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = ch;
+      continue;
+    }
+
+    if (ch === '{') {
+      depth++;
+      continue;
+    }
+
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return i;
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function resolveCssRuleRange(
+  source: string,
+  cssBlock: VisualBlock
+): { startIndex: number; endIndex: number } {
+  const className = cssBlock.name;
+
+  const lineStarts = buildLineStarts(source);
+
+  const candidates = new Set<number>();
+  const metaStart = cssBlock.metadata?.ruleStartIndex;
+  if (typeof metaStart === 'number' && Number.isFinite(metaStart)) {
+    candidates.add(metaStart);
+  }
+  try {
+    candidates.add(indexFromLineCol(lineStarts, cssBlock.startLine, cssBlock.startCol));
+  } catch {}
+
+  const classInPrelude = new RegExp(`\\.${escapeRegExp(className)}(?![_a-zA-Z0-9-])`);
+
+  for (const start of candidates) {
+    if (start < 0 || start >= source.length) continue;
+
+    const openBrace = source.indexOf('{', start);
+    if (openBrace === -1) continue;
+
+    const firstNonWs = findFirstNonWhitespaceIndex(source, start, openBrace);
+    if (firstNonWs === null) continue;
+
+    const prelude = source.slice(firstNonWs, openBrace).trim();
+    if (!prelude || prelude.startsWith('@')) continue;
+    if (!classInPrelude.test(prelude)) continue;
+
+    const closeBrace = findMatchingClosingBrace(source, openBrace);
+    if (closeBrace === null) continue;
+
+    let endIndex = closeBrace + 1;
+    if (source[endIndex] === '\r' && source[endIndex + 1] === '\n') endIndex += 2;
+    else if (source[endIndex] === '\n') endIndex += 1;
+
+    return { startIndex: firstNonWs, endIndex };
+  }
+
+  // Fallback: re-scan file and pick the last rule that contains this class.
+  const classRegex = /\.([_a-zA-Z][_a-zA-Z0-9-]*)/g;
+  const blocks = scanCurlyBlocks(source);
+  let best: { startIndex: number; endIndex: number; sortKey: number } | null = null;
+
+  for (const curlyBlock of blocks) {
+    if (!curlyBlock.prelude || curlyBlock.prelude.startsWith('@')) continue;
+
+    const firstNonWs = findFirstNonWhitespaceIndex(
+      source,
+      curlyBlock.preludeStart,
+      curlyBlock.preludeEnd
+    );
+    if (firstNonWs === null) continue;
+
+    const selectorText = source.slice(firstNonWs, curlyBlock.preludeEnd).trim();
+    const classNames = new Set<string>();
+    let classMatch: RegExpExecArray | null;
+    while ((classMatch = classRegex.exec(selectorText))) classNames.add(classMatch[1]);
+    if (!classNames.has(className)) continue;
+
+    let ruleEndExclusive = curlyBlock.blockEndExclusive;
+    if (source[ruleEndExclusive] === '\r' && source[ruleEndExclusive + 1] === '\n') {
+      ruleEndExclusive += 2;
+    } else if (source[ruleEndExclusive] === '\n') {
+      ruleEndExclusive += 1;
+    }
+
+    const candidate = { startIndex: firstNonWs, endIndex: ruleEndExclusive, sortKey: firstNonWs };
+    if (!best || candidate.sortKey > best.sortKey) best = candidate;
+  }
+
+  if (best) return { startIndex: best.startIndex, endIndex: best.endIndex };
+
+  throw new Error(`Unable to locate CSS rule range for block ${cssBlock.id}`);
 }
 
 export type UpdateCssPropertyAction = 'updated' | 'inserted';
@@ -69,16 +316,7 @@ export function updateCssPropertyInFile(
   const source = fs.readFileSync(absPath, 'utf8');
   const eol = source.includes('\r\n') ? '\r\n' : '\n';
 
-  const lineStarts = buildLineStarts(source);
-  const startIndex = indexFromLineCol(lineStarts, cssBlock.startLine, cssBlock.startCol);
-  const endIndex = indexFromLineCol(lineStarts, cssBlock.endLine, cssBlock.endCol);
-
-  if (startIndex < 0 || startIndex >= source.length) {
-    throw new Error(`Invalid start position for css block ${cssBlock.id}`);
-  }
-  if (endIndex <= startIndex || endIndex > source.length) {
-    throw new Error(`Invalid end position for css block ${cssBlock.id}`);
-  }
+  const { startIndex, endIndex } = resolveCssRuleRange(source, cssBlock);
 
   const ruleText = source.slice(startIndex, endIndex);
   const openBraceIndex = ruleText.indexOf('{');
@@ -158,4 +396,3 @@ export function updateCssPropertyInFile(
     value,
   };
 }
-
