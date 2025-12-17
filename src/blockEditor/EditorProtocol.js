@@ -1,0 +1,39 @@
+export const MRPAK_PROTOCOL_VERSION = 1;
+
+export const MRPAK_MSG = {
+  SELECT: 'MRPAK_SELECT',
+  HOVER: 'MRPAK_HOVER',
+  APPLY: 'MRPAK_APPLY',
+  TREE: 'MRPAK_TREE',
+  STYLE_SNAPSHOT: 'MRPAK_STYLE_SNAPSHOT',
+  TEXT_SNAPSHOT: 'MRPAK_TEXT_SNAPSHOT',
+  DROP_TARGET: 'MRPAK_DROP_TARGET',
+  READY: 'MRPAK_READY',
+  ERROR: 'MRPAK_ERROR',
+};
+
+// Команды из UI -> iframe (локальные изменения, без записи в файлы)
+export const MRPAK_CMD = {
+  SELECT: 'MRPAK_CMD_SELECT',
+  INSERT: 'MRPAK_CMD_INSERT',
+  DELETE: 'MRPAK_CMD_DELETE',
+  SET_STYLE: 'MRPAK_CMD_SET_STYLE',
+  REQUEST_STYLE_SNAPSHOT: 'MRPAK_CMD_REQUEST_STYLE_SNAPSHOT',
+  REPARENT: 'MRPAK_CMD_REPARENT',
+  SET_MOVE_MODE: 'MRPAK_CMD_SET_MOVE_MODE',
+  SET_TEXT: 'MRPAK_CMD_SET_TEXT',
+  REQUEST_TEXT_SNAPSHOT: 'MRPAK_CMD_REQUEST_TEXT_SNAPSHOT',
+  START_DRAG: 'MRPAK_CMD_START_DRAG',
+  END_DRAG: 'MRPAK_CMD_END_DRAG',
+};
+
+export function isMrpakMessage(data) {
+  return (
+    data &&
+    typeof data === 'object' &&
+    typeof data.type === 'string' &&
+    data.type.startsWith('MRPAK_')
+  );
+}
+
+

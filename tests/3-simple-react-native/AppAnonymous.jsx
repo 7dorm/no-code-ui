@@ -1,0 +1,76 @@
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+
+/**
+ * Тестовый React Native компонент с анонимной функцией export default
+ * Проверяет автоматическое обнаружение рендерабельных компонентов
+ */
+export default function Anon() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Анонимная функция</Text>
+      
+      
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Счетчик: {count}</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setCount(count + 1)}
+        >
+          <Text style={styles.buttonText}>Увеличить</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#667eea',
+    marginBottom: 16,
+  },
+  text: {
+    fontSize: 16,
+    color: '#495057',
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#764ba2',
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: '#667eea',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
+

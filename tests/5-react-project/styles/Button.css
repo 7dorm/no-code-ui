@@ -1,0 +1,95 @@
+/* Стили для компонента Button */
+
+.button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.button:active {
+  transform: translateY(0);
+}
+
+/* Варианты */
+.button-default {
+  background: #6c757d;
+  color: white;
+}
+
+.button-default:hover {
+  background: #5a6268;
+}
+
+.button-primary {
+  background: #667eea;
+  color: white;
+}
+
+.button-primary:hover {
+  background: #5568d3;
+}
+
+.button-success {
+  background: #28a745;
+  color: white;
+}
+
+.button-success:hover {
+  background: #218838;
+}
+
+.button-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.button-danger:hover {
+  background: #c82333;
+}
+
+.button-warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.button-warning:hover {
+  background: #e0a800;
+}
+
+/* Размеры */
+.button-small {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.button-medium {
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+.button-large {
+  padding: 16px 32px;
+  font-size: 18px;
+}
+
+/* Отключенная кнопка */
+.button-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
