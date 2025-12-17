@@ -23,6 +23,7 @@ function RenderFile({ filePath }) {
   const [error, setError] = useState(null);
   const [unsavedContent, setUnsavedContent] = useState(null); // Несохраненные изменения
   const [isModified, setIsModified] = useState(false); // Флаг изменений
+  const [showSaveIndicator, setShowSaveIndicator] = useState(false); // Индикатор сохранения
   const monacoEditorRef = useRef(null);
   
   // Хуки для React и React Native файлов (всегда вызываются)
@@ -61,10 +62,19 @@ function RenderFile({ filePath }) {
   const [textSnapshots, setTextSnapshots] = useState({}); // { [mrpakId]: text }
   const [externalStylesMap, setExternalStylesMap] = useState({}); // { [varName]: { path: string, type: string } }
 
+  // История для Undo/Redo
+  const [undoStack, setUndoStack] = useState([]); // Стек операций для отмены
+  const [redoStack, setRedoStack] = useState([]); // Стек операций для повтора
+
   // Рефы для актуальных значений staged состояний (чтобы избегать устаревших замыканий)
   const stagedPatchesRef = useRef(stagedPatches);
   const stagedOpsRef = useRef(stagedOps);
   const hasStagedChangesRef = useRef(hasStagedChanges);
+  
+  // Защита от дублирования операций
+  const lastInsertOperationRef = useRef(null);
+  const lastDeleteOperationRef = useRef(null);
+  const lastReparentOperationRef = useRef(null);
   
   // Хелперы для синхронного обновления state + ref одновременно
   const updateStagedPatches = useCallback((updater) => {
@@ -95,23 +105,304 @@ function RenderFile({ filePath }) {
 
   // injectBlockEditorScript теперь импортируется из модуля
 
+  // Команды для iframe - определяем рано, так как используется в undo/redo
+  const sendIframeCommand = useCallback((cmd) => {
+    setIframeCommand({ ...cmd, ts: Date.now() });
+  }, []);
+
+  // Функция для добавления операции в историю undo
+  const addToHistory = useCallback((operation) => {
+    setUndoStack((prev) => [...prev, operation]);
+    setRedoStack([]); // Очищаем redo стек при новой операции
+    console.log('📝 [History] Добавлена операция в историю:', operation.type);
+  }, []);
+
+  // Функция отмены (Undo)
+  const undo = useCallback(() => {
+    if (undoStack.length === 0) {
+      console.log('⏮️ [Undo] Стек пуст, нечего отменять');
+      return;
+    }
+
+    const operation = undoStack[undoStack.length - 1];
+    console.log('⏮️ [Undo] Отменяю операцию:', operation.type, operation);
+
+    // Сохраняем операцию в redo стек
+    setRedoStack((prev) => [...prev, operation]);
+    setUndoStack((prev) => prev.slice(0, -1));
+
+    // Применяем обратную операцию
+    switch (operation.type) {
+      case 'patch': {
+        console.log('⏮️ [Undo] Отменяю patch:', {
+          blockId: operation.blockId,
+          previousValue: operation.previousValue,
+          currentPatch: operation.patch
+        });
+        
+        // Отменяем патч - возвращаем предыдущее значение
+        updateStagedPatches((prev) => {
+          const next = { ...prev };
+          if (operation.previousValue) {
+            next[operation.blockId] = operation.previousValue;
+          } else {
+            delete next[operation.blockId];
+          }
+          console.log('⏮️ [Undo] Обновлены stagedPatches:', next);
+          return next;
+        });
+        
+        // Формируем патч для отмены в iframe
+        let patchToApply;
+        if (operation.previousValue) {
+          // Если было предыдущее значение - применяем его
+          patchToApply = operation.previousValue;
+        } else {
+          // Если это была первая операция - удаляем все ключи из текущего патча
+          patchToApply = {};
+          for (const key in operation.patch) {
+            patchToApply[key] = null; // null означает удалить стиль
+          }
+        }
+        
+        console.log('⏮️ [Undo] Отправляю команду SET_STYLE в iframe:', patchToApply);
+        sendIframeCommand({
+          type: MRPAK_CMD.SET_STYLE,
+          id: operation.blockId,
+          patch: patchToApply,
+          fileType
+        });
+        break;
+      }
+      case 'insert': {
+        console.log('⏮️ [Undo] Отменяю вставку блока:', operation.blockId);
+        // Отменяем вставку - удаляем блок
+        updateStagedOps((prev) => {
+          const filtered = prev.filter(op => op.blockId !== operation.blockId);
+          console.log('⏮️ [Undo] Обновлены stagedOps:', filtered);
+          return filtered;
+        });
+        console.log('⏮️ [Undo] Отправляю команду DELETE в iframe');
+        sendIframeCommand({ type: MRPAK_CMD.DELETE, id: operation.blockId });
+        break;
+      }
+      case 'delete': {
+        console.log('⏮️ [Undo] Отменяю удаление, восстанавливаю блок:', operation.blockId);
+        // Отменяем удаление - восстанавливаем блок
+        updateStagedOps((prev) => {
+          const restored = [
+            ...prev,
+            {
+              type: 'insert',
+              targetId: operation.parentId,
+              mode: 'child',
+              snippet: operation.snippet,
+              blockId: operation.blockId,
+              fileType,
+              filePath,
+            },
+          ];
+          console.log('⏮️ [Undo] Обновлены stagedOps:', restored);
+          return restored;
+        });
+        console.log('⏮️ [Undo] Отправляю команду INSERT в iframe');
+        sendIframeCommand({
+          type: MRPAK_CMD.INSERT,
+          targetId: operation.parentId,
+          mode: 'child',
+          html: operation.snippet,
+        });
+        break;
+      }
+      case 'setText': {
+        console.log('⏮️ [Undo] Отменяю изменение текста:', {
+          blockId: operation.blockId,
+          previousText: operation.previousText
+        });
+        // Отменяем изменение текста
+        updateStagedOps((prev) => {
+          const filtered = prev.filter(
+            op => !(op.type === 'setText' && op.blockId === operation.blockId)
+          );
+          console.log('⏮️ [Undo] Обновлены stagedOps:', filtered);
+          return filtered;
+        });
+        console.log('⏮️ [Undo] Отправляю команду SET_TEXT в iframe');
+        sendIframeCommand({
+          type: MRPAK_CMD.SET_TEXT,
+          id: operation.blockId,
+          text: operation.previousText || '',
+        });
+        break;
+      }
+      default:
+        console.warn('⏮️ [Undo] Неизвестный тип операции:', operation.type);
+    }
+
+    // Проверяем, остались ли изменения после отмены
+    // Используем setTimeout чтобы получить обновленные значения после setState
+    setTimeout(() => {
+      const hasChanges = undoStack.length > 0 || 
+                         Object.keys(stagedPatchesRef.current || {}).length > 0 ||
+                         (stagedOpsRef.current || []).length > 0;
+      console.log('⏮️ [Undo] Проверка наличия изменений:', {
+        undoStackLength: undoStack.length - 1, // -1 потому что мы уже удалили операцию
+        stagedPatchesCount: Object.keys(stagedPatchesRef.current || {}).length,
+        stagedOpsCount: (stagedOpsRef.current || []).length,
+        hasChanges
+      });
+      updateHasStagedChanges(hasChanges);
+    }, 0);
+  }, [undoStack, fileType, filePath, sendIframeCommand, updateStagedPatches, updateStagedOps, updateHasStagedChanges]);
+
+  // Функция повтора (Redo)
+  const redo = useCallback(() => {
+    if (redoStack.length === 0) {
+      console.log('⏭️ [Redo] Стек пуст, нечего повторять');
+      return;
+    }
+
+    const operation = redoStack[redoStack.length - 1];
+    console.log('⏭️ [Redo] Повторяю операцию:', operation.type, operation);
+
+    // Возвращаем операцию в undo стек
+    setUndoStack((prev) => [...prev, operation]);
+    setRedoStack((prev) => prev.slice(0, -1));
+
+    // Применяем операцию снова
+    switch (operation.type) {
+      case 'patch': {
+        console.log('⏭️ [Redo] Применяю patch:', {
+          blockId: operation.blockId,
+          patch: operation.patch
+        });
+        updateStagedPatches((prev) => {
+          const next = {
+            ...prev,
+            [operation.blockId]: { ...(prev[operation.blockId] || {}), ...operation.patch },
+          };
+          console.log('⏭️ [Redo] Обновлены stagedPatches:', next);
+          return next;
+        });
+        console.log('⏭️ [Redo] Отправляю команду SET_STYLE в iframe');
+        sendIframeCommand({
+          type: MRPAK_CMD.SET_STYLE,
+          id: operation.blockId,
+          patch: operation.patch,
+          fileType
+        });
+        break;
+      }
+      case 'insert': {
+        console.log('⏭️ [Redo] Повторяю вставку блока:', operation.blockId);
+        updateStagedOps((prev) => {
+          const updated = [
+            ...prev,
+            {
+              type: 'insert',
+              targetId: operation.targetId,
+              mode: operation.mode,
+              snippet: operation.snippet,
+              blockId: operation.blockId,
+              fileType,
+              filePath,
+            },
+          ];
+          console.log('⏭️ [Redo] Обновлены stagedOps:', updated);
+          return updated;
+        });
+        console.log('⏭️ [Redo] Отправляю команду INSERT в iframe');
+        sendIframeCommand({
+          type: MRPAK_CMD.INSERT,
+          targetId: operation.targetId,
+          mode: operation.mode,
+          html: operation.snippet,
+        });
+        break;
+      }
+      case 'delete': {
+        console.log('⏭️ [Redo] Повторяю удаление блока:', operation.blockId);
+        updateStagedOps((prev) => {
+          const updated = [
+            ...prev,
+            {
+              type: 'delete',
+              blockId: operation.blockId,
+              fileType,
+              filePath,
+            },
+          ];
+          console.log('⏭️ [Redo] Обновлены stagedOps:', updated);
+          return updated;
+        });
+        console.log('⏭️ [Redo] Отправляю команду DELETE в iframe');
+        sendIframeCommand({ type: MRPAK_CMD.DELETE, id: operation.blockId });
+        break;
+      }
+      case 'setText': {
+        console.log('⏭️ [Redo] Повторяю изменение текста:', {
+          blockId: operation.blockId,
+          text: operation.text
+        });
+        updateStagedOps((prev) => {
+          const updated = [
+            ...prev,
+            {
+              type: 'setText',
+              blockId: operation.blockId,
+              text: operation.text,
+              fileType,
+              filePath,
+            },
+          ];
+          console.log('⏭️ [Redo] Обновлены stagedOps:', updated);
+          return updated;
+        });
+        console.log('⏭️ [Redo] Отправляю команду SET_TEXT в iframe');
+        sendIframeCommand({
+          type: MRPAK_CMD.SET_TEXT,
+          id: operation.blockId,
+          text: operation.text,
+        });
+        break;
+      }
+      default:
+        console.warn('⏭️ [Redo] Неизвестный тип операции:', operation.type);
+    }
+
+    console.log('⏭️ [Redo] Обновляю hasStagedChanges = true');
+    updateHasStagedChanges(true);
+  }, [redoStack, fileType, filePath, sendIframeCommand, updateStagedPatches, updateStagedOps, updateHasStagedChanges]);
+
   const applyBlockPatch = useCallback(
     async (blockId, patch) => {
       try {
         // Для сохранения прогресса в редакторе мы НЕ применяем изменения сразу.
         // Вместо этого — накапливаем staged-патчи и применяем их при смене таба или по кнопке.
         if (!blockId) return;
+        
+        // Сохраняем предыдущее значение для undo
+        const previousValue = stagedPatchesRef.current[blockId] || null;
+        
         updateStagedPatches((prev) => ({
           ...prev,
           [blockId]: { ...(prev?.[blockId] || {}), ...(patch || {}) },
         }));
         updateHasStagedChanges(true);
+        
+        // Добавляем в историю для undo
+        addToHistory({
+          type: 'patch',
+          blockId,
+          patch,
+          previousValue,
+        });
       } catch (e) {
         console.error('BlockEditor apply error:', e);
         setError(`Ошибка применения изменений: ${e.message}`);
       }
     },
-    [updateStagedPatches, updateHasStagedChanges]
+    [updateStagedPatches, updateHasStagedChanges, addToHistory]
   );
 
   const commitStagedPatches = useCallback(async () => {
@@ -242,7 +533,19 @@ function RenderFile({ filePath }) {
       updateStagedOps([]);
       updateHasStagedChanges(false);
       
-      console.log('commitStagedPatches: state updated, fileContent will trigger useEffect to update blockMap');
+      // Очищаем историю undo/redo после успешного коммита
+      setUndoStack([]);
+      setRedoStack([]);
+      
+      // Показываем индикатор успешного сохранения
+      setShowSaveIndicator(true);
+      setTimeout(() => setShowSaveIndicator(false), 2000);
+      
+      console.log('💾 commitStagedPatches: Изменения успешно сохранены в файл', {
+        filePath,
+        patchesCount: entries.length,
+        opsCount: ops.length
+      });
       
       // После сохранения нужно обновить blockMap и editorHTML, так как файл изменился
       // Это произойдет автоматически через useEffect, который зависит от fileContent
@@ -390,10 +693,6 @@ function RenderFile({ filePath }) {
     [projectRoot, filePath]
   );
 
-  const sendIframeCommand = useCallback((cmd) => {
-    setIframeCommand({ ...cmd, ts: Date.now() });
-  }, []);
-
   // Создаем framework экземпляр для использования в компоненте
   const framework = useMemo(() => {
     if (!fileType || !filePath || !isFrameworkSupported(fileType)) {
@@ -426,7 +725,24 @@ function RenderFile({ filePath }) {
   const stageDeleteBlock = useCallback(
     (blockId) => {
       if (!blockId) return;
+      
+      // Защита от дублирования
+      const now = Date.now();
+      if (lastDeleteOperationRef.current) {
+        const { blockId: lastBlockId, timestamp } = lastDeleteOperationRef.current;
+        if (lastBlockId === blockId && (now - timestamp) < 500) {
+          console.warn('[stageDeleteBlock] Дублирование операции удаления предотвращено', { blockId });
+          return;
+        }
+      }
+      lastDeleteOperationRef.current = { blockId, timestamp: now };
+      
       const entry = blockMapForFile ? blockMapForFile[blockId] : null;
+      
+      // Для undo сохраняем информацию об удаляемом блоке
+      // Пытаемся получить HTML элемента из iframe для восстановления
+      // (это упрощенная версия, в production нужно сохранять полную информацию)
+      
       updateStagedOps((prev) => [
         ...prev,
         {
@@ -438,18 +754,51 @@ function RenderFile({ filePath }) {
         },
       ]);
       updateHasStagedChanges(true);
+      
+      // Добавляем в историю для undo
+      addToHistory({
+        type: 'delete',
+        blockId,
+        parentId: layersTree?.nodes[blockId]?.parentId || null,
+        snippet: `<div data-no-code-ui-id="${blockId}">Удаленный блок</div>`, // Упрощенная версия
+      });
+      
       // Локально удаляем в iframe
       sendIframeCommand({ type: MRPAK_CMD.DELETE, id: blockId });
     },
-    [blockMapForFile, fileType, filePath, sendIframeCommand, updateStagedOps, updateHasStagedChanges]
+    [blockMapForFile, fileType, filePath, layersTree, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory]
   );
 
   const stageInsertBlock = useCallback(
     ({ targetId, mode, snippet }) => {
+      console.log('[stageInsertBlock] Вызван', { targetId, mode, snippetPreview: snippet?.substring(0, 100) });
+      
       if (!targetId) return;
+      
+      // Защита от дублирования: проверяем, не была ли такая же операция только что
+      const operationKey = `${targetId}:${mode}:${snippet}`;
+      const now = Date.now();
+      if (lastInsertOperationRef.current) {
+        const { key, timestamp } = lastInsertOperationRef.current;
+        if (key === operationKey && (now - timestamp) < 500) {
+          console.warn('❌ [stageInsertBlock] ДУБЛИРОВАНИЕ ПРЕДОТВРАЩЕНО!', { 
+            targetId, 
+            mode, 
+            timeDiff: now - timestamp 
+          });
+          return;
+        }
+      }
+      lastInsertOperationRef.current = { key: operationKey, timestamp: now };
+      
+      console.log('[stageInsertBlock] ✅ Операция разрешена, создаю ID...');
+      
       const entry = blockMapForFile ? blockMapForFile[targetId] : null;
       const newId = makeTempMrpakId();
+      console.log('[stageInsertBlock] Сгенерирован новый ID:', newId);
+      
       const snippetWithId = ensureSnippetHasMrpakId(snippet, newId);
+      console.log('[stageInsertBlock] Сниппет с ID:', snippetWithId);
       updateStagedOps((prev) => [
         ...prev,
         {
@@ -464,6 +813,16 @@ function RenderFile({ filePath }) {
         },
       ]);
       updateHasStagedChanges(true);
+      
+      // Добавляем в историю для undo
+      addToHistory({
+        type: 'insert',
+        blockId: newId,
+        targetId,
+        mode: mode === 'sibling' ? 'sibling' : 'child',
+        snippet: String(snippetWithId || ''),
+      });
+      
       // Локально вставляем в iframe (html для DOM вставки)
       sendIframeCommand({
         type: MRPAK_CMD.INSERT,
@@ -472,7 +831,7 @@ function RenderFile({ filePath }) {
         html: String(snippetWithId || ''),
       });
     },
-    [blockMapForFile, ensureSnippetHasMrpakId, fileType, filePath, makeTempMrpakId, sendIframeCommand, updateStagedOps, updateHasStagedChanges, framework]
+    [blockMapForFile, ensureSnippetHasMrpakId, fileType, filePath, makeTempMrpakId, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory]
   );
 
   const stageReparentBlock = useCallback(
@@ -482,6 +841,19 @@ function RenderFile({ filePath }) {
         console.log('stageReparentBlock: skipping - invalid ids');
         return;
       }
+      
+      // Защита от дублирования
+      const operationKey = `${sourceId}:${targetParentId}`;
+      const now = Date.now();
+      if (lastReparentOperationRef.current) {
+        const { key, timestamp } = lastReparentOperationRef.current;
+        if (key === operationKey && (now - timestamp) < 500) {
+          console.warn('[stageReparentBlock] Дублирование операции reparent предотвращено', { sourceId, targetParentId });
+          return;
+        }
+      }
+      lastReparentOperationRef.current = { key: operationKey, timestamp: now };
+      
       const sourceEntry = blockMapForFile ? blockMapForFile[sourceId] : null;
       const targetEntry = blockMapForFile ? blockMapForFile[targetParentId] : null;
       console.log('stageReparentBlock: entries found', { 
@@ -523,6 +895,10 @@ function RenderFile({ filePath }) {
   const stageSetText = useCallback(
     ({ blockId, text }) => {
       if (!blockId) return;
+      
+      // Сохраняем предыдущий текст для undo
+      const previousText = textSnapshots[blockId] || '';
+      
       const entry = blockMapForFile ? blockMapForFile[blockId] : null;
       updateStagedOps((prev) => [
         ...prev,
@@ -536,10 +912,19 @@ function RenderFile({ filePath }) {
         },
       ]);
       updateHasStagedChanges(true);
+      
+      // Добавляем в историю для undo
+      addToHistory({
+        type: 'setText',
+        blockId,
+        text: String(text ?? ''),
+        previousText,
+      });
+      
       // Локально применяем в iframe
       sendIframeCommand({ type: MRPAK_CMD.SET_TEXT, id: blockId, text: String(text ?? '') });
     },
-    [blockMapForFile, fileType, filePath, sendIframeCommand, updateStagedOps, updateHasStagedChanges]
+    [blockMapForFile, fileType, filePath, textSnapshots, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory]
   );
 
   // Функция сохранения файла
@@ -580,13 +965,17 @@ function RenderFile({ filePath }) {
           setUnsavedContent(null);
           setIsModified(false);
           
+          // Показываем индикатор сохранения
+          setShowSaveIndicator(true);
+          setTimeout(() => setShowSaveIndicator(false), 2000);
+          
           // Обновляем парсинг импортов стилей для React/React Native файлов
           if (fileType === 'react' || fileType === 'react-native') {
             const imports = parseStyleImports(content);
             setExternalStylesMap(imports);
           }
           
-          console.log('RenderFile: File saved successfully, length:', content.length);
+          console.log('💾 RenderFile: Файл успешно сохранён, размер:', content.length);
         } else {
           setError(`Ошибка сохранения файла: ${writeRes?.error || 'Неизвестная ошибка'}`);
         }
@@ -602,23 +991,42 @@ function RenderFile({ filePath }) {
     setIsModified(true);
   }, []);
 
-  // Обработка Ctrl+S
+  // Обработка Ctrl+S (глобальный обработчик)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         e.stopPropagation();
+        console.log('💾 [Global Ctrl+S] Нажата комбинация для сохранения', {
+          isModified,
+          viewMode,
+          hasStagedChanges,
+          hasFilePath: !!filePath
+        });
+        
+        // В режиме конструктора (edit) сохраняем staged изменения
+        if (viewMode === 'edit' && hasStagedChanges && filePath) {
+          console.log('💾 [Global Ctrl+S] Сохраняю staged изменения из конструктора...');
+          commitStagedPatches();
+          return;
+        }
+        
+        // В режиме редактора кода или preview с несохраненными изменениями
         if ((isModified || viewMode === 'code') && filePath) {
           // Получаем текущее значение из редактора, если доступно
           let contentToSave = null;
           if (monacoEditorRef?.current) {
             try {
               contentToSave = monacoEditorRef.current.getValue();
+              console.log('💾 [Global Ctrl+S] Получено содержимое из редактора');
             } catch (e) {
               console.warn('Failed to get value from editor in global handler:', e);
             }
           }
+          console.log('💾 [Global Ctrl+S] Вызываю saveFile...');
           saveFile(contentToSave);
+        } else {
+          console.log('💾 [Global Ctrl+S] Сохранение пропущено (нет изменений или файла)');
         }
       }
     };
@@ -627,7 +1035,47 @@ function RenderFile({ filePath }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isModified, filePath, saveFile, viewMode]);
+  }, [isModified, filePath, saveFile, viewMode, hasStagedChanges, commitStagedPatches]);
+
+  // Обработка Ctrl+Z (Undo) и Ctrl+Shift+Z (Redo)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Только в режиме конструктора
+      if (viewMode !== 'edit') return;
+      
+      // Ctrl+Z или Cmd+Z (без Shift) - Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('⏮️ [Global Ctrl+Z] Отмена операции');
+        undo();
+        return;
+      }
+      
+      // Ctrl+Shift+Z или Cmd+Shift+Z - Redo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('⏭️ [Global Ctrl+Shift+Z] Повтор операции');
+        redo();
+        return;
+      }
+      
+      // Альтернативная комбинация для Redo: Ctrl+Y
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('⏭️ [Global Ctrl+Y] Повтор операции');
+        redo();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [viewMode, undo, redo]);
 
   const loadFile = useCallback(async (path) => {
     setLoading(true);
@@ -746,6 +1194,9 @@ function RenderFile({ filePath }) {
     setUnsavedContent(null);
     setIsModified(false);
     setRenderVersion((v) => v + 1);
+    // Очищаем историю undo/redo при смене файла
+    setUndoStack([]);
+    setRedoStack([]);
     loadFile(filePath);
     
     // Начинаем отслеживание изменений файла
@@ -3542,26 +3993,42 @@ function RenderFile({ filePath }) {
             }}
           />
         ) : viewMode === 'edit' ? (
-          <BlockEditorPanel
-            fileType="html"
-            html={editorHTML || htmlToRender}
-            selectedBlock={selectedBlock}
-            onMessage={handleEditorMessage}
-            onApplyPatch={applyAndCommitPatch}
-            onStagePatch={applyBlockPatch}
-            layersTree={layersTree}
-            layerNames={layerNames}
-            onRenameLayer={handleRenameLayer}
-            outgoingMessage={iframeCommand}
-            onSendCommand={sendIframeCommand}
-            onInsertBlock={stageInsertBlock}
-            onDeleteBlock={stageDeleteBlock}
-            styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
-            textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
-            onReparentBlock={stageReparentBlock}
-            onSetText={stageSetText}
-            framework={framework}
-          />
+          <View style={{ flex: 1, position: 'relative' }}>
+            <BlockEditorPanel
+              fileType="html"
+              html={editorHTML || htmlToRender}
+              selectedBlock={selectedBlock}
+              onMessage={handleEditorMessage}
+              onApplyPatch={applyAndCommitPatch}
+              onStagePatch={applyBlockPatch}
+              layersTree={layersTree}
+              layerNames={layerNames}
+              onRenameLayer={handleRenameLayer}
+              outgoingMessage={iframeCommand}
+              onSendCommand={sendIframeCommand}
+              onInsertBlock={stageInsertBlock}
+              onDeleteBlock={stageDeleteBlock}
+              styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
+              textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
+              onReparentBlock={stageReparentBlock}
+              onSetText={stageSetText}
+              framework={framework}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={undoStack.length > 0}
+              canRedo={redoStack.length > 0}
+            />
+            {showSaveIndicator && (
+              <View style={[styles.saveIndicator, styles.saveSuccessIndicator]}>
+                <Text style={[styles.saveIndicatorText, styles.saveSuccessText]}>✓ Изменения сохранены</Text>
+              </View>
+            )}
+            {hasStagedChanges && !showSaveIndicator && (
+              <View style={styles.saveIndicator}>
+                <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S для сохранения)</Text>
+              </View>
+            )}
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>История изменений</Text>
@@ -3595,7 +4062,12 @@ function RenderFile({ filePath }) {
               onSave={saveFile}
               editorRef={monacoEditorRef}
             />
-            {isModified && (
+            {showSaveIndicator && (
+              <View style={[styles.saveIndicator, styles.saveSuccessIndicator]}>
+                <Text style={[styles.saveIndicatorText, styles.saveSuccessText]}>✓ Файл сохранён</Text>
+              </View>
+            )}
+            {isModified && !showSaveIndicator && (
               <View style={styles.saveIndicator}>
                 <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S для сохранения)</Text>
               </View>
@@ -3654,26 +4126,42 @@ function RenderFile({ filePath }) {
             }}
           />
         ) : viewMode === 'edit' ? (
-          <BlockEditorPanel
-            fileType="react"
-            html={editorHTML || reactHTML}
-            selectedBlock={selectedBlock}
-            onMessage={handleEditorMessage}
-            onApplyPatch={applyAndCommitPatch}
-            onStagePatch={applyBlockPatch}
-            layersTree={layersTree}
-            layerNames={layerNames}
-            onRenameLayer={handleRenameLayer}
-            outgoingMessage={iframeCommand}
-            onSendCommand={sendIframeCommand}
-            onInsertBlock={stageInsertBlock}
-            onDeleteBlock={stageDeleteBlock}
-            styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
-            textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
-            onReparentBlock={stageReparentBlock}
-            onSetText={stageSetText}
-            framework={framework}
-          />
+          <View style={{ flex: 1, position: 'relative' }}>
+            <BlockEditorPanel
+              fileType="react"
+              html={editorHTML || reactHTML}
+              selectedBlock={selectedBlock}
+              onMessage={handleEditorMessage}
+              onApplyPatch={applyAndCommitPatch}
+              onStagePatch={applyBlockPatch}
+              layersTree={layersTree}
+              layerNames={layerNames}
+              onRenameLayer={handleRenameLayer}
+              outgoingMessage={iframeCommand}
+              onSendCommand={sendIframeCommand}
+              onInsertBlock={stageInsertBlock}
+              onDeleteBlock={stageDeleteBlock}
+              styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
+              textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
+              onReparentBlock={stageReparentBlock}
+              onSetText={stageSetText}
+              framework={framework}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={undoStack.length > 0}
+              canRedo={redoStack.length > 0}
+            />
+            {showSaveIndicator && (
+              <View style={[styles.saveIndicator, styles.saveSuccessIndicator]}>
+                <Text style={[styles.saveIndicatorText, styles.saveSuccessText]}>✓ Изменения сохранены</Text>
+              </View>
+            )}
+            {hasStagedChanges && !showSaveIndicator && (
+              <View style={styles.saveIndicator}>
+                <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S для сохранения)</Text>
+              </View>
+            )}
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>История изменений</Text>
@@ -3702,7 +4190,12 @@ function RenderFile({ filePath }) {
               onSave={saveFile}
               editorRef={monacoEditorRef}
             />
-            {isModified && (
+            {showSaveIndicator && (
+              <View style={[styles.saveIndicator, styles.saveSuccessIndicator]}>
+                <Text style={[styles.saveIndicatorText, styles.saveSuccessText]}>✓ Файл сохранён</Text>
+              </View>
+            )}
+            {isModified && !showSaveIndicator && (
               <View style={styles.saveIndicator}>
                 <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S для сохранения)</Text>
               </View>
@@ -3761,26 +4254,42 @@ function RenderFile({ filePath }) {
             }}
           />
         ) : viewMode === 'edit' ? (
-          <BlockEditorPanel
-            fileType="react-native"
-            html={editorHTML || reactNativeHTML}
-            selectedBlock={selectedBlock}
-            onMessage={handleEditorMessage}
-            onApplyPatch={applyAndCommitPatch}
-            onStagePatch={applyBlockPatch}
-            layersTree={layersTree}
-            layerNames={layerNames}
-            onRenameLayer={handleRenameLayer}
-            outgoingMessage={iframeCommand}
-            onSendCommand={sendIframeCommand}
-            onInsertBlock={stageInsertBlock}
-            onDeleteBlock={stageDeleteBlock}
-            styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
-            textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
-            onReparentBlock={stageReparentBlock}
-            onSetText={stageSetText}
-            framework={framework}
-          />
+          <View style={{ flex: 1, position: 'relative' }}>
+            <BlockEditorPanel
+              fileType="react-native"
+              html={editorHTML || reactNativeHTML}
+              selectedBlock={selectedBlock}
+              onMessage={handleEditorMessage}
+              onApplyPatch={applyAndCommitPatch}
+              onStagePatch={applyBlockPatch}
+              layersTree={layersTree}
+              layerNames={layerNames}
+              onRenameLayer={handleRenameLayer}
+              outgoingMessage={iframeCommand}
+              onSendCommand={sendIframeCommand}
+              onInsertBlock={stageInsertBlock}
+              onDeleteBlock={stageDeleteBlock}
+              styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
+              textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
+              onReparentBlock={stageReparentBlock}
+              onSetText={stageSetText}
+              framework={framework}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={undoStack.length > 0}
+              canRedo={redoStack.length > 0}
+            />
+            {showSaveIndicator && (
+              <View style={[styles.saveIndicator, styles.saveSuccessIndicator]}>
+                <Text style={[styles.saveIndicatorText, styles.saveSuccessText]}>✓ Изменения сохранены</Text>
+              </View>
+            )}
+            {hasStagedChanges && !showSaveIndicator && (
+              <View style={styles.saveIndicator}>
+                <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S для сохранения)</Text>
+              </View>
+            )}
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>История изменений</Text>
@@ -3809,7 +4318,12 @@ function RenderFile({ filePath }) {
               onSave={saveFile}
               editorRef={monacoEditorRef}
             />
-            {isModified && (
+            {showSaveIndicator && (
+              <View style={[styles.saveIndicator, styles.saveSuccessIndicator]}>
+                <Text style={[styles.saveIndicatorText, styles.saveSuccessText]}>✓ Файл сохранён</Text>
+              </View>
+            )}
+            {isModified && !showSaveIndicator && (
               <View style={styles.saveIndicator}>
                 <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S для сохранения)</Text>
               </View>
@@ -4173,6 +4687,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#000000',
     fontWeight: '600',
+  },
+  saveSuccessIndicator: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+  },
+  saveSuccessText: {
+    color: '#ffffff',
   },
 });
 

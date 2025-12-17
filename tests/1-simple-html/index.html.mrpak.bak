@@ -1,4 +1,4 @@
-<!DOCTYPE html>\n<html lang="ru"><head></head><body>\n\n\n\n\n\n\n\n\n\n
+<!DOCTYPE html>\n<html lang="ru"><head></head><body>\n\n\n\n\n\n\n\n
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Тестовый HTML</title>
@@ -68,7 +68,7 @@
         
         <div class="card">
             <h2 style="color: #764ba2; margin-top: 0;">Карточка 1</h2>
-            <p class="text" style="position: relative; left: 135px; top: -9px; width: 287px; height: 83.78125px">
+            <p class="text" style="position: relative; left: -2px; top: -8px">
                 Это простой HTML файл для тестирования HtmlFramework. 
                 Содержит базовые элементы: текст, кнопки, карточки.
             </p>

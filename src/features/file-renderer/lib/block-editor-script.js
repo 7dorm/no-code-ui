@@ -575,19 +575,44 @@ export function generateBlockEditorScript(type, mode = 'preview') {
                 if (el) selectEl(el);
                 return;
               }
-              if (data.type === CMD_SET_STYLE && data.id && data.patch) {
+              if (data.type === CMD_SET_STYLE && data.id) {
+                console.log('[iframe CMD_SET_STYLE] Получена команда:', {
+                  id: data.id,
+                  patch: data.patch,
+                  hasPatch: !!data.patch
+                });
                 const el = document.querySelector(byIdSelector(String(data.id)));
-                if (!el) return;
+                if (!el) {
+                  console.warn('[iframe CMD_SET_STYLE] Элемент не найден:', data.id);
+                  return;
+                }
                 const patch = data.patch || {};
+                console.log('[iframe CMD_SET_STYLE] Применяю патч:', patch);
                 for (const k in patch) {
                   const v = patch[k];
                   if (k.includes('-')) {
-                    el.style.setProperty(k, String(v));
+                    if (v === null || v === undefined || v === '') {
+                      // Удаляем свойство, если значение пустое
+                      el.style.removeProperty(k);
+                    } else {
+                      el.style.setProperty(k, String(v));
+                    }
                   } else {
                     // DOM style: camelCase
-                    try { el.style[k] = String(v); } catch(e) {}
+                    try { 
+                      if (v === null || v === undefined || v === '') {
+                        el.style[k] = '';
+                      } else {
+                        el.style[k] = String(v);
+                      }
+                    } catch(e) {}
                   }
                 }
+                console.log('[iframe CMD_SET_STYLE] Стили применены, текущий style:', el.getAttribute('style'));
+                
+                // Перестроим дерево после изменения стилей
+                buildTree();
+                
                 // обновим снапшот
                 try {
                   const cs = window.getComputedStyle(el);
@@ -653,14 +678,26 @@ export function generateBlockEditorScript(type, mode = 'preview') {
                 return;
               }
               if (data.type === CMD_INSERT && data.targetId && data.mode && data.html) {
+                console.log('[iframe CMD_INSERT] Получена команда вставки', {
+                  targetId: data.targetId,
+                  mode: data.mode,
+                  htmlPreview: String(data.html).substring(0, 100)
+                });
                 const target = document.querySelector(byIdSelector(String(data.targetId)));
-                if (!target) return;
+                if (!target) {
+                  console.warn('[iframe CMD_INSERT] Target не найден!', data.targetId);
+                  return;
+                }
                 const tmp = document.createElement('div');
                 tmp.innerHTML = String(data.html);
                 const newEl = tmp.firstElementChild;
-                if (!newEl) return;
+                if (!newEl) {
+                  console.warn('[iframe CMD_INSERT] Не удалось создать элемент из HTML');
+                  return;
+                }
                 // временный id для дерева до commit
-                ensureId(newEl);
+                const newElId = ensureId(newEl);
+                console.log('[iframe CMD_INSERT] ✅ Вставляю элемент с ID:', newElId);
                 if (data.mode === 'child') {
                   target.appendChild(newEl);
                 } else if (data.mode === 'sibling') {

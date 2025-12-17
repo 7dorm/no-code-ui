@@ -35,12 +35,44 @@ export function MonacoEditorWrapper({ value, language, onChange, filePath, onSav
               }
             }, 100);
             
+            // Обработчик Ctrl+S / Cmd+S для сохранения
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+              console.log('💾 [Monaco] Ctrl+S нажата, сохраняю файл...');
               if (onSave) {
                 const currentValue = editor.getValue();
                 onSave(currentValue);
+                
+                // Показываем визуальное подтверждение
+                const decorations = editor.deltaDecorations([], [
+                  {
+                    range: new monaco.Range(1, 1, 1, 1),
+                    options: {
+                      isWholeLine: false,
+                      glyphMarginClassName: 'save-indicator',
+                    }
+                  }
+                ]);
+                
+                // Убираем индикатор через 1 секунду
+                setTimeout(() => {
+                  editor.deltaDecorations(decorations, []);
+                }, 1000);
               }
             });
+            
+            // Добавляем глобальный обработчик для предотвращения стандартного поведения Ctrl+S
+            const handleKeyDown = (e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            };
+            
+            // Добавляем обработчик на DOM элемент редактора
+            const domNode = editor.getDomNode();
+            if (domNode) {
+              domNode.addEventListener('keydown', handleKeyDown, true);
+            }
           }}
           options={{
             readOnly: false,

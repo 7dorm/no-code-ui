@@ -62,7 +62,11 @@ export default function App() {
               Прогресс: <strong>{totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}%</strong>
             </p>
           </Card>
-        </div>
+        
+
+
+
+</div>
 
         <Card>
           <h3>Добавить задачу</h3>
@@ -137,7 +141,9 @@ export default function App() {
           </div>
         </Card>
       </div>
-    </div>
+    
+
+</div>
   );
 }
 

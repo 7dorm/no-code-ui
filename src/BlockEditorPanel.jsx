@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import WebView from './WebView';
 import {
@@ -43,6 +43,10 @@ export default function BlockEditorPanel({
   onReparentBlock,
   onSetText,
   framework,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }) {
   const [left, setLeft] = useState(null);
   const [top, setTop] = useState(null);
@@ -177,6 +181,14 @@ export default function BlockEditorPanel({
 
   const stageLocalStyles = () => {
     if (!canApply) return;
+    
+    // Защита от двойного клика (debounce 300ms)
+    const now = Date.now();
+    if (now - lastStageTimeRef.current < 300) {
+      return;
+    }
+    lastStageTimeRef.current = now;
+    
     const stylePatch = diffAgainstBaseline(buildCurrentStylePatch());
     // Stage для записи
     if (onStagePatch) {
@@ -194,6 +206,12 @@ export default function BlockEditorPanel({
   const [insertStyleMode, setInsertStyleMode] = useState('kv');
   const [insertStyleRows, setInsertStyleRows] = useState([{ key: '', value: '' }]);
   const [insertStyleText, setInsertStyleText] = useState('');
+  
+  // Защита от двойного клика
+  const lastInsertTimeRef = useRef(0);
+  const lastDeleteTimeRef = useRef(0);
+  const lastStageTimeRef = useRef(0);
+  const lastSetTextTimeRef = useRef(0);
 
   const buildInsertSnippet = () => {
     const patch =
@@ -350,6 +368,25 @@ export default function BlockEditorPanel({
     <View style={styles.container}>
       <View style={styles.sidebar}>
         <ScrollView style={styles.sidebarScroll} contentContainerStyle={styles.sidebarScrollContent}>
+        
+        {/* Кнопки Undo/Redo */}
+        <View style={styles.undoRedoContainer}>
+          <TouchableOpacity
+            style={[styles.undoRedoBtn, !canUndo && styles.undoRedoBtnDisabled]}
+            onPress={onUndo}
+            disabled={!canUndo}
+          >
+            <Text style={styles.undoRedoBtnText}>↶ Отменить (Ctrl+Z)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.undoRedoBtn, !canRedo && styles.undoRedoBtnDisabled]}
+            onPress={onRedo}
+            disabled={!canRedo}
+          >
+            <Text style={styles.undoRedoBtnText}>↷ Повторить (Ctrl+Shift+Z)</Text>
+          </TouchableOpacity>
+        </View>
+        
         <Text style={styles.sidebarTitle}>Блок</Text>
         <Text style={styles.sidebarMeta}>
           {selectedBlock?.id ? selectedBlock.id : 'Ничего не выбрано'}
@@ -391,6 +428,14 @@ export default function BlockEditorPanel({
               disabled={!selectedBlock?.id}
               onPress={() => {
                 if (!selectedBlock?.id) return;
+                
+                // Защита от двойного клика (debounce 300ms)
+                const now = Date.now();
+                if (now - lastDeleteTimeRef.current < 300) {
+                  return;
+                }
+                lastDeleteTimeRef.current = now;
+                
                 onDeleteBlock && onDeleteBlock(selectedBlock.id);
               }}
             >
@@ -557,8 +602,30 @@ export default function BlockEditorPanel({
                 <TouchableOpacity
                   style={styles.layerSaveBtn}
                   onPress={() => {
-                    if (!selectedBlock?.id) return;
+                    console.log('[BlockEditorPanel] 🔵 Кнопка "Добавить" нажата');
+                    
+                    if (!selectedBlock?.id) {
+                      console.warn('[BlockEditorPanel] selectedBlock.id отсутствует');
+                      return;
+                    }
+                    
+                    // Защита от двойного клика (debounce 300ms)
+                    const now = Date.now();
+                    if (now - lastInsertTimeRef.current < 300) {
+                      console.warn('[BlockEditorPanel] ❌ ДУБЛИРОВАНИЕ КЛИКА предотвращено!', {
+                        timeDiff: now - lastInsertTimeRef.current
+                      });
+                      return;
+                    }
+                    lastInsertTimeRef.current = now;
+                    
+                    console.log('[BlockEditorPanel] ✅ Генерирую сниппет...');
                     const snippet = buildInsertSnippet();
+                    console.log('[BlockEditorPanel] Сниппет сгенерирован:', snippet);
+                    console.log('[BlockEditorPanel] Вызываю onInsertBlock...', { 
+                      targetId: selectedBlock.id, 
+                      mode: insertMode 
+                    });
                     onInsertBlock && onInsertBlock({ targetId: selectedBlock.id, mode: insertMode, snippet });
                     setInsertMode(null);
                   }}
@@ -600,6 +667,14 @@ export default function BlockEditorPanel({
               disabled={!canApply}
               onPress={() => {
                 if (!canApply) return;
+                
+                // Защита от двойного клика (debounce 300ms)
+                const now = Date.now();
+                if (now - lastSetTextTimeRef.current < 300) {
+                  return;
+                }
+                lastSetTextTimeRef.current = now;
+                
                 if (onSetText) {
                   onSetText({ blockId: selectedBlock.id, text: textValue });
                 }
@@ -1013,6 +1088,31 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 600,
     backgroundColor: '#ffffff',
+  },
+  undoRedoContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  undoRedoBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(102, 126, 234, 0.8)',
+    alignItems: 'center',
+  },
+  undoRedoBtnDisabled: {
+    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+    opacity: 0.5,
+  },
+  undoRedoBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

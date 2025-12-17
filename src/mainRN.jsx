@@ -5,7 +5,5 @@ import './index.css';
 
 // React Native Web можно использовать напрямую с ReactDOM
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <AppRN />
-  </React.StrictMode>
+  <AppRN />
 );

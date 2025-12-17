@@ -78,7 +78,7 @@ export function RenameDialog({ visible, onClose, onRename, itemName, itemPath })
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute',
+    position: 'fixed',
     top: 0,
     left: 0,
     right: 0,

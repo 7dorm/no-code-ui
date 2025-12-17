@@ -416,16 +416,28 @@ export function createReactHTMLTemplate({
                   }
                   
                   // Используем MutationObserver для отслеживания новых элементов
+                  let mutationTimeout = null;
                   const observer = new MutationObserver((mutations) => {
-                    // Инструментируем новые элементы
-                    const rootElement = document.getElementById('root');
-                    if (rootElement) {
-                      instrumentReactDOM(rootElement, filePath);
-                      // Обновляем дерево слоев после инструментирования
-                      if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
-                        window.__MRPAK_BUILD_TREE__();
-                      }
+                    console.log('[MutationObserver] Обнаружены изменения DOM, mutations:', mutations.length);
+                    
+                    // Debounce для избежания множественных вызовов
+                    if (mutationTimeout) {
+                      clearTimeout(mutationTimeout);
                     }
+                    
+                    mutationTimeout = setTimeout(() => {
+                      console.log('[MutationObserver] Инструментирую новые элементы...');
+                      // Инструментируем новые элементы
+                      const rootElement = document.getElementById('root');
+                      if (rootElement) {
+                        instrumentReactDOM(rootElement, filePath);
+                        // Обновляем дерево слоев после инструментирования
+                        if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
+                          console.log('[MutationObserver] Вызываю buildTree...');
+                          window.__MRPAK_BUILD_TREE__();
+                        }
+                      }
+                    }, 50); // 50ms debounce
                   });
                   
                   observer.observe(document.body, {
