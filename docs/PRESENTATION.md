@@ -411,17 +411,12 @@ import commonStyles from './common.styles.js';
 
 ## Слайд 21: Вопросы?
 
-### Контакты
-- 📧 Email: [ваш email]
-- 💻 GitHub: [ваш репозиторий]
-- 📚 Документация: `/docs`
-
 ### Попробуйте сами!
 ```bash
-git clone [репозиторий]
-cd renderMRPAK
+git clone https://github.com/7dorm/no-code-ui
+cd no-code-ui
 npm install
-npm run dev
+npm run electron:run
 ```
 
 ### Примеры кода:
