@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { DeleteConfirmDialog } from './shared/ui/dialogs/delete-confirm-dialog';
 import { RenameDialog } from './shared/ui/dialogs/rename-dialog';
 import { CreateFileDialog } from './shared/ui/dialogs/create-file-dialog';
-import { loadDirectory, renameItem, deleteItem, deleteDir, createFile } from './features/file-operations/lib/file-operations';
+import { CreateFolderDialog } from './shared/ui/dialogs/create-folder-dialog';
+import { loadDirectory, renameItem, deleteItem, deleteDir, createFile, createFolder } from './features/file-operations/lib/file-operations';
 
 // Диалоги вынесены в shared/ui/dialogs
 
@@ -105,7 +106,7 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
 
 // CreateFileDialog вынесен в shared/ui/dialogs/create-file-dialog
 
-function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPaths, onToggleExpand, onCreateFile, onDelete, onRename }) {
+function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPaths, onToggleExpand, onCreateFile, onCreateFolder, onDelete, onRename }) {
   const isExpanded = expandedPaths.has(item.path);
   const isSelected = selectedPath === item.path;
   const hasChildren = item.isDirectory;
@@ -201,15 +202,26 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
         </TouchableOpacity>
         <View style={styles.actionButtons}>
           {item.isDirectory && (
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                onCreateFile && onCreateFile(item.path);
-              }}
-            >
-              <Text style={styles.addButtonText}>+</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onCreateFile && onCreateFile(item.path);
+                }}
+              >
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.addFolderButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onCreateFolder && onCreateFolder(item.path);
+                }}
+              >
+                <Text style={styles.addFolderButtonText}>📁</Text>
+              </TouchableOpacity>
+            </>
           )}
           <TouchableOpacity
             style={styles.deleteButton}
@@ -246,6 +258,8 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
   const [loadedPaths, setLoadedPaths] = useState(new Set());
   const [createDialogVisible, setCreateDialogVisible] = useState(false);
   const [createDialogPath, setCreateDialogPath] = useState(null);
+  const [createFolderDialogVisible, setCreateFolderDialogVisible] = useState(false);
+  const [createFolderDialogPath, setCreateFolderDialogPath] = useState(null);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [renameDialogVisible, setRenameDialogVisible] = useState(false);
@@ -333,6 +347,11 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
   const handleCreateFile = (parentPath) => {
     setCreateDialogPath(parentPath);
     setCreateDialogVisible(true);
+  };
+
+  const handleCreateFolder = (parentPath) => {
+    setCreateFolderDialogPath(parentPath);
+    setCreateFolderDialogVisible(true);
   };
 
   const handleDelete = (item) => {
@@ -544,6 +563,31 @@ export default ${componentName};`;
     }
   };
 
+  const handleCreateFolderConfirm = async (folderName) => {
+    if (!createFolderDialogPath || !folderName) return;
+
+    try {
+      const folderPath = `${createFolderDialogPath}/${folderName}`;
+      
+      const result = await createFolder(folderPath);
+      if (result.success) {
+        // Обновляем дерево
+        const parentDir = createFolderDialogPath;
+        setLoadedPaths(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(parentDir); // Сбрасываем кэш, чтобы перезагрузить
+          return newSet;
+        });
+        // Перезагружаем директорию
+        await loadDirectory(parentDir, parentDir === rootPath);
+      } else {
+        setError(`Ошибка создания папки: ${result.error}`);
+      }
+    } catch (err) {
+      setError(`Ошибка: ${err.message}`);
+    }
+  };
+
   const renderTree = (items, level = 0) => {
     return items.map((item) => {
       const isExpanded = expandedPaths.has(item.path);
@@ -559,6 +603,7 @@ export default ${componentName};`;
             expandedPaths={expandedPaths}
             onToggleExpand={handleToggleExpand}
             onCreateFile={handleCreateFile}
+            onCreateFolder={handleCreateFolder}
             onDelete={handleDelete}
             onRename={handleRename}
           />
@@ -575,7 +620,11 @@ export default ${componentName};`;
   if (!rootPath) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Выберите папку проекта</Text>
+        <Text style={styles.emptyIcon}>📁</Text>
+        <Text style={styles.emptyText}>Нет открытого проекта</Text>
+        <Text style={styles.emptyHint}>
+          Создайте новый проект или откройте существующую папку
+        </Text>
       </View>
     );
   }
@@ -607,6 +656,12 @@ export default ${componentName};`;
           >
             <Text style={styles.createFileButtonText}>+ Создать файл</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.createFolderButton}
+            onPress={() => handleCreateFolder(rootPath)}
+          >
+            <Text style={styles.createFolderButtonText}>📁 Создать папку</Text>
+          </TouchableOpacity>
         </View>
       )}
       <ScrollView style={styles.container}>
@@ -620,6 +675,15 @@ export default ${componentName};`;
         }}
         onCreate={handleCreateFileConfirm}
         parentPath={createDialogPath || rootPath}
+      />
+      <CreateFolderDialog
+        visible={createFolderDialogVisible}
+        onClose={() => {
+          setCreateFolderDialogVisible(false);
+          setCreateFolderDialogPath(null);
+        }}
+        onCreate={handleCreateFolderConfirm}
+        parentPath={createFolderDialogPath || rootPath}
       />
       <DeleteConfirmDialog
         visible={deleteDialogVisible}
@@ -689,10 +753,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+    opacity: 0.5,
+  },
   emptyText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#d4d4d4',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyHint: {
+    fontSize: 13,
     color: '#888',
     textAlign: 'center',
+    lineHeight: 18,
   },
   loadingContainer: {
     flex: 1,
@@ -740,6 +817,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     lineHeight: 20,
   },
+  addFolderButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 176, 59, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0.7,
+  },
+  addFolderButtonText: {
+    fontSize: 12,
+    lineHeight: 20,
+  },
   deleteButton: {
     width: 24,
     height: 24,
@@ -757,6 +847,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row',
+    gap: 8,
   },
   createFileButton: {
     backgroundColor: 'rgba(102, 126, 234, 0.2)',
@@ -764,9 +856,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: 'center',
+    flex: 1,
   },
   createFileButtonText: {
     color: '#667eea',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  createFolderButton: {
+    backgroundColor: 'rgba(255, 176, 59, 0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    flex: 1,
+  },
+  createFolderButtonText: {
+    color: '#ffb03b',
     fontSize: 13,
     fontWeight: '600',
   },

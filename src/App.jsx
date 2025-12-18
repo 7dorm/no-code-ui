@@ -21,7 +21,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>🚀 Render MRPAK</h1>
+        <h1>🚀 No-code UI</h1>
         <p>Electron + React приложение</p>
       </header>
       

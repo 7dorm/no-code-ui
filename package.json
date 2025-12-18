@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "com.rendermrpak.app",
-    "productName": "Render MRPAK",
+    "productName": "No-code UI",
     "directories": {
       "output": "release"
     },

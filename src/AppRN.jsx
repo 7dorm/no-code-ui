@@ -3,11 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import RenderFile from './RenderFile';
 import FileTree from './FileTree';
 import { openDirectoryDialog } from './shared/api/electron-api';
+import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
+import { createProject } from './features/file-operations/lib/file-operations';
 
 function AppRN() {
   const [projectPath, setProjectPath] = useState(null);
   const [selectedFilePath, setSelectedFilePath] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [createProjectDialogVisible, setCreateProjectDialogVisible] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSelectProject = async () => {
     try {
@@ -26,14 +30,49 @@ function AppRN() {
     setSelectedFilePath(filePath);
   };
 
+  const handleCreateProject = async (projectName, projectType) => {
+    try {
+      setError(null);
+      
+      // Открываем диалог выбора родительской папки
+      const result = await openDirectoryDialog();
+      
+      if (!result.canceled && result.directoryPath) {
+        // Создаем проект
+        const createResult = await createProject(result.directoryPath, projectName, projectType);
+        
+        if (createResult.success) {
+          // Устанавливаем путь к созданному проекту
+          setProjectPath(createResult.projectPath);
+          setSelectedFilePath(null);
+          setCreateProjectDialogVisible(false);
+        } else {
+          setError(`Ошибка создания проекта: ${createResult.error}`);
+        }
+      }
+    } catch (err) {
+      setError(`Ошибка: ${err.message}`);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Верхняя панель */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.title}>🚀 Render MRPAK</Text>
+          <Text style={styles.title}>🚀 No-code UI</Text>
         </View>
         <View style={styles.headerRight}>
+          {!projectPath && (
+            <TouchableOpacity 
+              style={[styles.selectButton, styles.createButton]}
+              onPress={() => setCreateProjectDialogVisible(true)}
+            >
+              <Text style={styles.selectButtonText}>
+                ✨ Создать проект
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={styles.selectButton}
             onPress={handleSelectProject}
@@ -49,6 +88,16 @@ function AppRN() {
           )}
         </View>
       </View>
+
+      {/* Сообщение об ошибке */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+          <TouchableOpacity onPress={() => setError(null)}>
+            <Text style={styles.errorClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Основной контент: две колонки */}
       <View style={styles.mainContent}>
@@ -84,6 +133,13 @@ function AppRN() {
           )}
         </View>
       </View>
+
+      {/* Диалог создания проекта */}
+      <CreateProjectDialog
+        visible={createProjectDialogVisible}
+        onClose={() => setCreateProjectDialogVisible(false)}
+        onCreate={handleCreateProject}
+      />
     </View>
   );
 }
@@ -122,10 +178,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
   },
+  createButton: {
+    backgroundColor: '#10b981',
+  },
   selectButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  errorBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(239, 68, 68, 0.5)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorText: {
+    color: '#fca5a5',
+    fontSize: 14,
+    flex: 1,
+  },
+  errorClose: {
+    color: '#fca5a5',
+    fontSize: 18,
+    fontWeight: 'bold',
+    paddingHorizontal: 10,
   },
   projectPath: {
     fontSize: 12,
