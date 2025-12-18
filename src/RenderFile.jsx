@@ -929,7 +929,17 @@ function RenderFile({ filePath }) {
 
   // Функция сохранения файла
   const saveFile = useCallback(async (contentToSave = null) => {
-    if (!filePath) return;
+    if (!filePath) {
+      console.warn('💾 saveFile: Нет пути к файлу');
+      return;
+    }
+    
+    console.log('💾 saveFile: Начинаю сохранение файла', {
+      hasContentToSave: contentToSave !== null && contentToSave !== undefined,
+      hasMonacoRef: !!monacoEditorRef?.current,
+      hasUnsavedContent: unsavedContent !== null,
+      fileType
+    });
     
     // Приоритет получения содержимого:
     // 1. Явно переданный contentToSave
@@ -942,22 +952,25 @@ function RenderFile({ filePath }) {
       if (monacoEditorRef?.current) {
         try {
           content = monacoEditorRef.current.getValue();
+          console.log('💾 saveFile: Получено содержимое из Monaco Editor');
         } catch (e) {
-          console.warn('Failed to get value from editor:', e);
+          console.warn('💾 saveFile: Ошибка получения значения из редактора:', e);
         }
       }
       // Если не удалось получить из редактора, используем состояние
       if (content === null || content === undefined) {
         content = unsavedContent !== null ? unsavedContent : fileContent;
+        console.log('💾 saveFile: Использую содержимое из состояния');
       }
     }
     
     if (content === null || content === undefined) {
-      console.warn('saveFile: content is null or undefined');
+      console.warn('💾 saveFile: content is null or undefined, сохранение прервано');
       return;
     }
 
     try {
+      console.log('💾 saveFile: Записываю файл, размер:', content.length, 'байт');
       const writeRes = await writeFile(filePath, content, { backup: true });
         if (writeRes?.success) {
           // Обновляем состояния после успешного сохранения
@@ -975,12 +988,18 @@ function RenderFile({ filePath }) {
             setExternalStylesMap(imports);
           }
           
-          console.log('💾 RenderFile: Файл успешно сохранён, размер:', content.length);
+          console.log('💾 saveFile: ✅ Файл успешно сохранён!', {
+            path: filePath,
+            size: content.length,
+            lines: content.split('\n').length
+          });
         } else {
-          setError(`Ошибка сохранения файла: ${writeRes?.error || 'Неизвестная ошибка'}`);
+          const errorMsg = `Ошибка сохранения файла: ${writeRes?.error || 'Неизвестная ошибка'}`;
+          console.error('💾 saveFile: ❌', errorMsg);
+          setError(errorMsg);
         }
     } catch (e) {
-      console.error('Error saving file:', e);
+      console.error('💾 saveFile: ❌ Исключение при сохранении:', e);
       setError(`Ошибка сохранения файла: ${e.message}`);
     }
   }, [filePath, unsavedContent, fileContent, fileType]);
@@ -993,10 +1012,24 @@ function RenderFile({ filePath }) {
 
   // Обработка Ctrl+S (глобальный обработчик)
   useEffect(() => {
+    console.log('💾 [useEffect] Регистрация глобального обработчика Ctrl+S', {
+      viewMode,
+      isModified,
+      hasStagedChanges,
+      hasFilePath: !!filePath
+    });
+    
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        console.log('💾 [Global Ctrl+S] ✅ ОБРАБОТЧИК ВЫЗВАН!', {
+          target: e.target.tagName,
+          currentTarget: e.currentTarget,
+          phase: e.eventPhase === 1 ? 'CAPTURE' : e.eventPhase === 2 ? 'TARGET' : 'BUBBLE'
+        });
+        
         e.preventDefault();
         e.stopPropagation();
+        
         console.log('💾 [Global Ctrl+S] Нажата комбинация для сохранения', {
           isModified,
           viewMode,
@@ -1004,38 +1037,61 @@ function RenderFile({ filePath }) {
           hasFilePath: !!filePath
         });
         
-        // В режиме конструктора (edit) сохраняем staged изменения
-        if (viewMode === 'edit' && hasStagedChanges && filePath) {
-          console.log('💾 [Global Ctrl+S] Сохраняю staged изменения из конструктора...');
-          commitStagedPatches();
+        if (!filePath) {
+          console.log('💾 [Global Ctrl+S] Нет файла для сохранения');
           return;
         }
         
-        // В режиме редактора кода или preview с несохраненными изменениями
-        if ((isModified || viewMode === 'code') && filePath) {
+        // В режиме конструктора (edit) сохраняем staged изменения
+        if (viewMode === 'edit') {
+          if (hasStagedChanges) {
+            console.log('💾 [Global Ctrl+S] Сохраняю staged изменения из конструктора...');
+            commitStagedPatches();
+          } else {
+            console.log('💾 [Global Ctrl+S] В режиме edit нет staged изменений');
+          }
+          return;
+        }
+        
+        // В режиме редактора кода всегда сохраняем (даже если не было изменений)
+        if (viewMode === 'code') {
           // Получаем текущее значение из редактора, если доступно
           let contentToSave = null;
           if (monacoEditorRef?.current) {
             try {
               contentToSave = monacoEditorRef.current.getValue();
-              console.log('💾 [Global Ctrl+S] Получено содержимое из редактора');
+              console.log('💾 [Global Ctrl+S] Получено содержимое из Monaco Editor, длина:', contentToSave?.length);
             } catch (e) {
-              console.warn('Failed to get value from editor in global handler:', e);
+              console.warn('💾 [Global Ctrl+S] Ошибка получения значения из редактора:', e);
             }
           }
-          console.log('💾 [Global Ctrl+S] Вызываю saveFile...');
+          
+          // Если не удалось получить из редактора, используем текущее состояние
+          if (!contentToSave) {
+            contentToSave = unsavedContent !== null ? unsavedContent : fileContent;
+            console.log('💾 [Global Ctrl+S] Использую содержимое из состояния, длина:', contentToSave?.length);
+          }
+          
+          console.log('💾 [Global Ctrl+S] Вызываю saveFile для режима code...');
           saveFile(contentToSave);
+          return;
+        }
+        
+        // В режиме preview сохраняем только если есть несохраненные изменения
+        if (viewMode === 'preview' && isModified) {
+          console.log('💾 [Global Ctrl+S] Сохраняю изменения в режиме preview...');
+          saveFile();
         } else {
-          console.log('💾 [Global Ctrl+S] Сохранение пропущено (нет изменений или файла)');
+          console.log('💾 [Global Ctrl+S] Сохранение пропущено (нет изменений в preview)');
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [isModified, filePath, saveFile, viewMode, hasStagedChanges, commitStagedPatches]);
+  }, [isModified, filePath, saveFile, viewMode, hasStagedChanges, commitStagedPatches, unsavedContent, fileContent, monacoEditorRef]);
 
   // Обработка Ctrl+Z (Undo) и Ctrl+Shift+Z (Redo)
   useEffect(() => {
@@ -4697,3 +4753,4 @@ const styles = StyleSheet.create({
 });
 
 export default RenderFile;
+

@@ -24,3 +24,18 @@ body {
   display: flex;
   flex: 1;
 }
+
+/* Monaco Editor - визуальная индикация сохранения */
+.monaco-save-flash {
+  background-color: rgba(76, 175, 80, 0.2) !important;
+  animation: save-flash 0.3s ease-out;
+}
+
+@keyframes save-flash {
+  0% {
+    background-color: rgba(76, 175, 80, 0.4);
+  }
+  100% {
+    background-color: rgba(76, 175, 80, 0);
+  }
+}
