@@ -1,5 +1,8 @@
 {
   "/Users/deu/Projects/no-code-ui/tests/hello.jsx": {
     "mrpak:hello.jsx:94:133:div": "test"
+  },
+  "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx": {
+    "mrpak:App.jsx:1072:1119:h2": "hello"
   }
 }

@@ -10,28 +10,70 @@ import { loadDirectory, renameItem, deleteItem, deleteDir, createFile, createFol
 
 // Компонент контекстного меню
 function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
+  const menuRef = useRef(null);
+  const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
+  const [isPositioned, setIsPositioned] = useState(false);
+
+  // Обновляем позицию при изменении координат
+  useEffect(() => {
+    if (visible) {
+      setAdjustedPosition({ x, y });
+      setIsPositioned(false);
+    }
+  }, [visible, x, y]);
+
+  // Корректируем позицию после рендера
+  useEffect(() => {
+    if (!visible || isPositioned) return;
+
+    // Корректируем позицию меню, чтобы оно не выходило за пределы экрана
+    if (menuRef.current) {
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let adjustedX = x;
+      let adjustedY = y;
+
+      // Проверяем, не выходит ли меню за правую границу
+      if (x + menuRect.width > viewportWidth) {
+        adjustedX = Math.max(10, viewportWidth - menuRect.width - 10);
+      }
+
+      // Проверяем, не выходит ли меню за нижнюю границу
+      if (y + menuRect.height > viewportHeight) {
+        adjustedY = Math.max(10, viewportHeight - menuRect.height - 10);
+      }
+
+      // Проверяем минимальные значения
+      adjustedX = Math.max(10, adjustedX);
+      adjustedY = Math.max(10, adjustedY);
+
+      if (adjustedX !== x || adjustedY !== y) {
+        setAdjustedPosition({ x: adjustedX, y: adjustedY });
+      }
+      setIsPositioned(true);
+    }
+  }, [visible, isPositioned, x, y]);
+
+  // Обработчики событий
   useEffect(() => {
     if (!visible) return;
-    
+
     const handleClick = (e) => {
       onClose();
     };
-    
-    const handleMenuClick = (e) => {
-      e.stopPropagation();
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
     };
-    
+
     document.addEventListener('click', handleClick);
-    const menu = document.getElementById('context-menu');
-    if (menu) {
-      menu.addEventListener('click', handleMenuClick);
-    }
-    
+    document.addEventListener('contextmenu', handleContextMenu);
+
     return () => {
       document.removeEventListener('click', handleClick);
-      if (menu) {
-        menu.removeEventListener('click', handleMenuClick);
-      }
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [visible, onClose]);
 
@@ -41,17 +83,20 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
     <div
       style={contextMenuStyles.overlay}
       onClick={onClose}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <div
+        ref={menuRef}
         id="context-menu"
         style={{
           ...contextMenuStyles.menu,
           position: 'fixed',
-          left: `${x}px`,
-          top: `${y}px`,
+          left: `${adjustedPosition.x}px`,
+          top: `${adjustedPosition.y}px`,
           zIndex: 999999999,
         }}
         onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
       >
         {onRename && (
           <div
@@ -59,7 +104,7 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
               ...contextMenuStyles.menuItem,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.backgroundColor = 'rgba(102, 126, 234, 0.2)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -67,22 +112,21 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (onRename) {
-                onRename();
-              }
+              onRename();
               onClose();
             }}
           >
-            <Text style={contextMenuStyles.menuItemText}>✏️ Переименовать</Text>
+            <span style={contextMenuStyles.menuItemText}>✏️ Переименовать</span>
           </div>
         )}
         {onDelete && (
           <div
+            data-name={'asdasd'}
             style={{
               ...contextMenuStyles.menuItem,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 107, 107, 0.2)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -90,13 +134,11 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (onDelete) {
-                onDelete();
-              }
+              onDelete();
               onClose();
             }}
           >
-            <Text style={contextMenuStyles.menuItemText}>🗑️ Удалить</Text>
+            <span style={contextMenuStyles.menuItemText}>🗑️ Удалить</span>
           </div>
         )}
       </div>
@@ -113,7 +155,8 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const itemRef = useRef(null);
-  
+  const containerRef = useRef(null);
+
   const handlePress = () => {
     if (item.isFile) {
       onSelectFile(item.path);
@@ -133,17 +176,31 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
     }
   };
 
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e) {
-      // Используем clientX/clientY для правильного позиционирования относительно viewport
-      const x = e.clientX || (e.nativeEvent && e.nativeEvent.clientX) || 0;
-      const y = e.clientY || (e.nativeEvent && e.nativeEvent.clientY) || 0;
+  // Используем прямой обработчик через DOM API для правильного получения координат
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Получаем точные координаты клика относительно viewport
+      const x = e.clientX;
+      const y = e.clientY;
+
+      console.log('Context menu at:', { x, y });
+
       setContextMenuPos({ x, y });
       setShowContextMenu(true);
-    }
-  };
+    };
+
+    container.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      container.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, []);
 
   const getIcon = () => {
     if (item.isDirectory) {
@@ -177,8 +234,7 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
           alignItems: 'center',
           position: 'relative',
         }}
-        ref={itemRef}
-        onContextMenu={handleContextMenu}
+        ref={containerRef}
       >
         <TouchableOpacity
           style={[
@@ -190,7 +246,7 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
           onLongPress={handleLongPress}
         >
           <Text style={styles.icon}>{getIcon()}</Text>
-          <Text 
+          <Text
             style={[styles.itemName, isSelected && styles.selectedItemName]}
             numberOfLines={1}
           >
@@ -203,15 +259,15 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
         <View style={styles.actionButtons}>
           {item.isDirectory && (
             <>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onCreateFile && onCreateFile(item.path);
-                }}
-              >
-                <Text style={styles.addButtonText}>+</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onCreateFile && onCreateFile(item.path);
+              }}
+            >
+              <Text style={styles.addButtonText}>+</Text>
+            </TouchableOpacity>
               <TouchableOpacity
                 style={styles.addFolderButton}
                 onPress={(e) => {
@@ -278,10 +334,10 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
     try {
       if (window.electronAPI && window.electronAPI.readDirectory) {
         const result = await window.electronAPI.readDirectory(dirPath);
-        
+
         if (result.success) {
           setLoadedPaths(prev => new Set([...prev, dirPath]));
-          
+
           // Обновляем дерево
           const updateTree = (items, targetPath, newItems) => {
             return items.map(item => {
@@ -374,7 +430,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
       const newPath = `${parentPath}/${newName}`;
 
       const result = await renameItem(itemToRename.path, newPath);
-        
+
         if (result.success) {
           // Если переименован выбранный файл, обновляем выбор
           if (selectedPath === itemToRename.path && onSelectFile) {
@@ -481,11 +537,11 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
 
     try {
       const filePath = `${createDialogPath}/${fileName}`;
-      
+
       // Определяем начальное содержимое по расширению
       const ext = fileName.split('.').pop()?.toLowerCase();
       const baseName = fileName.replace(/\.[^/.]+$/, '');
-      const componentName = baseName.split(/[-_]/).map(word => 
+      const componentName = baseName.split(/[-_]/).map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join('');
 
@@ -568,7 +624,7 @@ export default ${componentName};`;
 
     try {
       const folderPath = `${createFolderDialogPath}/${folderName}`;
-      
+
       const result = await createFolder(folderPath);
       if (result.success) {
         // Обновляем дерево
@@ -592,7 +648,7 @@ export default ${componentName};`;
     return items.map((item) => {
       const isExpanded = expandedPaths.has(item.path);
       const children = item.children || [];
-      
+
       return (
         <View key={item.path}>
           <FileTreeItem
@@ -986,26 +1042,31 @@ const contextMenuStyles = {
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 0,
+    zIndex: 999999998,
     backgroundColor: 'transparent',
+    pointerEvents: 'auto',
   },
   menu: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 4,
-    minWidth: 150,
+    minWidth: 180,
     border: '1px solid rgba(255, 255, 255, 0.1)',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
   },
   menuItem: {
     padding: '10px 16px',
     borderRadius: 4,
     cursor: 'pointer',
     transition: 'background-color 0.2s',
+    userSelect: 'none',
   },
   menuItemText: {
-    fontSize: 14,
+    fontSize: '14px',
     color: '#ffffff',
+    userSelect: 'none',
+    display: 'block',
+    whiteSpace: 'nowrap',
   },
 };
 

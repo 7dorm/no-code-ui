@@ -1,4 +1,4 @@
-<!DOCTYPE html>\n<html lang="ru"><head></head><body>\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n
+<!DOCTYPE html>\n<html lang="ru"><head></head><body>\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Тестовый HTML</title>
@@ -68,7 +68,7 @@
             <h2 style="color: #764ba2; margin-top: 0; width: 639px; height: 160.78125px">Карточка 2<p class="text" style="position: relative; left: 183px; top: -551.648px; width: 287px; height: 83.78125px">
                 Это простой HTML файл для тестирования HtmlFramework. 
                 Содержит базовые элементы: текст, кнопки, карточки.
-            </p><div>Новый блок</div><div style="position: relative; left: 5px; top: -107px; font-size: 4em">Новый блок</div></h2>
+            </p><div>Новый блок</div><div style="position: relative; left: 5px; top: -107px; font-size: 9em">Новый блок</div></h2>
             <p class="text">
                 Framework должен корректно обрабатывать инструментацию, 
                 применение стилей и операции вставки/удаления элементов.

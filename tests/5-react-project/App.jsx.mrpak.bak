@@ -70,7 +70,7 @@ export default function App() {
 
         <Card>
           <h3>Добавить задачу</h3>
-          <div className="add-task-form" style={{fontSize: "1em", backgroundColor: "black"}}>
+          <div className="add-task-form">
             <input
               type="text"
               className="task-input"
