@@ -1,0 +1,700 @@
+{
+  "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx": {
+    "timestamp": "2025-12-20T22:12:17.801Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 3016,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 86,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:369:671:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 312,
+        "end": 661,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:678:861:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 668,
+        "end": 898,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:880:1062:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 917,
+        "end": 1147,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1073:1167:h2": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 1158,
+        "end": 1300,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1190:1310:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 1323,
+        "end": 1489,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1341:1349:strong": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 1520,
+        "end": 1580,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1391:1739:button": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 1622,
+        "end": 2022,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1823:1939:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 2106,
+        "end": 2269,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2017:2199:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 2347,
+        "end": 2578,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2210:2257:h3": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 2589,
+        "end": 2684,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2280:2331:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/2-simple-react/App.jsx",
+        "start": 2707,
+        "end": 2805,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  },
+  "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx": {
+    "timestamp": "2025-12-20T19:49:17.742Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 2958,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 86,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:Card.jsx:369:671:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 312,
+        "end": 662,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:678:861:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 669,
+        "end": 900,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:880:1062:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 919,
+        "end": 1150,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:1073:1167:h2": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 1161,
+        "end": 1304,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:1190:1240:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 1327,
+        "end": 1425,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:1271:1279:strong": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 1456,
+        "end": 1517,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:1321:1669:button": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 1559,
+        "end": 1960,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:1753:1869:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 2044,
+        "end": 2208,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:1947:2129:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 2286,
+        "end": 2518,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:2140:2187:h3": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 2529,
+        "end": 2625,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Card.jsx:2210:2261:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/components/Card.jsx",
+        "start": 2648,
+        "end": 2747,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  },
+  "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx": {
+    "timestamp": "2025-12-20T19:57:56.666Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 9734,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 205,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:1350:1371:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 4775,
+        "end": 4845,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1378:1489:Header": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 4852,
+        "end": 5015,
+        "tagName": "Header",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1498:1525:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5024,
+        "end": 5100,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1534:1557:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5109,
+        "end": 5181,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1568:1574:Card": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5192,
+        "end": 5248,
+        "tagName": "Card",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1587:1591:h3": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5261,
+        "end": 5313,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1619:1645:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5341,
+        "end": 5414,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1671:1679:strong": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5440,
+        "end": 5500,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1708:1716:strong": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5529,
+        "end": 5589,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1767:1793:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5640,
+        "end": 5713,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1818:1826:strong": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5738,
+        "end": 5798,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1976:1982:Card": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 5948,
+        "end": 6004,
+        "tagName": "Card",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1993:1997:h3": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 6015,
+        "end": 6067,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2028:2139:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 6098,
+        "end": 6258,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2152:2435:input": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 6271,
+        "end": 6605,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2449:2493:Button": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 6619,
+        "end": 6715,
+        "tagName": "Button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2581:2587:Card": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 6803,
+        "end": 6859,
+        "tagName": "Card",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2598:2628:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 6870,
+        "end": 6949,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2641:2645:h3": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 6962,
+        "end": 7014,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2669:2703:label": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 7038,
+        "end": 7123,
+        "tagName": "label",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2718:2868:input": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 7138,
+        "end": 7339,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2884:2890:span": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 7355,
+        "end": 7411,
+        "tagName": "span",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2969:2997:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 7490,
+        "end": 7567,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3052:3081:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 7622,
+        "end": 7698,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3166:3274:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 7783,
+        "end": 7940,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3294:3471:input": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 7960,
+        "end": 8188,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3491:3520:span": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 8208,
+        "end": 8287,
+        "tagName": "span",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3558:3680:Button": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 8325,
+        "end": 8499,
+        "tagName": "Button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3831:3837:Card": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 8650,
+        "end": 8706,
+        "tagName": "Card",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3848:3904:h3": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 8717,
+        "end": 8821,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3929:3954:p": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 8846,
+        "end": 8918,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:4116:4147:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 9080,
+        "end": 9160,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:4160:4190:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 9173,
+        "end": 9252,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:4242:4272:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 9304,
+        "end": 9383,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:4310:4340:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 9421,
+        "end": 9500,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:4397:4427:div": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/5-react-project/App.jsx",
+        "start": 9557,
+        "end": 9636,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 4
+  },
+  "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx": {
+    "timestamp": "2025-12-20T20:07:06.803Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 4298,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 132,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:487:524:ScrollView": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 345,
+        "end": 436,
+        "tagName": "ScrollView",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:531:560:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 443,
+        "end": 520,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:569:596:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 529,
+        "end": 604,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:637:664:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 645,
+        "end": 720,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:675:706:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 731,
+        "end": 810,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:746:772:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 850,
+        "end": 924,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:794:820:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 946,
+        "end": 1020,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:887:1008:TouchableOpacity": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 1087,
+        "end": 1269,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1022:1054:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 1283,
+        "end": 1365,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1134:1160:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 1445,
+        "end": 1521,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1171:1202:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 1532,
+        "end": 1613,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1232:1258:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 1643,
+        "end": 1719,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1346:1372:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 1807,
+        "end": 1883,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1385:1415:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 1896,
+        "end": 1976,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1455:1485:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 2016,
+        "end": 2096,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1529:1559:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 2140,
+        "end": 2220,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1598:1628:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 2259,
+        "end": 2339,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1707:1733:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 2418,
+        "end": 2494,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1744:1775:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 2505,
+        "end": 2586,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1802:1828:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/App.jsx",
+        "start": 2613,
+        "end": 2689,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  },
+  "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/AppAnonymous.jsx": {
+    "timestamp": "2025-12-20T20:18:44.573Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 1883,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 57,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:AppAnonymous.jsx:351:382:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/AppAnonymous.jsx",
+        "start": 205,
+        "end": 293,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppAnonymous.jsx:389:416:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/AppAnonymous.jsx",
+        "start": 300,
+        "end": 384,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppAnonymous.jsx:461:487:View": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/AppAnonymous.jsx",
+        "start": 429,
+        "end": 512,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppAnonymous.jsx:496:527:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/AppAnonymous.jsx",
+        "start": 521,
+        "end": 609,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppAnonymous.jsx:559:655:TouchableOpacity": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/AppAnonymous.jsx",
+        "start": 641,
+        "end": 806,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppAnonymous.jsx:667:699:Text": {
+        "filePath": "/Users/deu/Projects/no-code-ui/tests/3-simple-react-native/AppAnonymous.jsx",
+        "start": 818,
+        "end": 907,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  }
+}

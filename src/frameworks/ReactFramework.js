@@ -1,5 +1,9 @@
 import { Framework } from './Framework';
 import { instrumentJsx } from '../blockEditor/JsxInstrumenter';
+import { instrumentJsxWithAst } from '../blockEditor/AstJsxInstrumenter';
+import { isJavaScriptFile } from '../blockEditor/AstUtils';
+import { applyStylePatchWithAst } from '../blockEditor/PatchEngine/applyAstStylePatch';
+import { applyDeleteWithAst, applyInsertWithAst } from '../blockEditor/PatchEngine/applyAstInsertDelete';
 import { 
   applyStylePatch, 
   applyJsxDelete, 
@@ -35,8 +39,23 @@ export class ReactFramework extends Framework {
 
   /**
    * Инструментирует JSX код, добавляя data-no-code-ui-id атрибуты
+   * Использует AST парсинг для .js, .jsx, .ts, .tsx файлов с fallback на ручной парсинг
+   * @param {string} code - код для инструментации
+   * @param {string} filePath - путь к файлу
+   * @param {Object} opts - опции (projectRoot?: string)
    */
-  instrument(code, filePath) {
+  instrument(code, filePath, opts = {}) {
+    // Используем AST парсинг для JavaScript/TypeScript файлов
+    if (isJavaScriptFile(filePath)) {
+      try {
+        return instrumentJsxWithAst(code, filePath, { projectRoot: opts.projectRoot });
+      } catch (error) {
+        // Fallback на ручной парсинг при ошибках AST
+        console.warn('[ReactFramework] AST instrumentation failed, falling back to manual parser:', error.message);
+        return instrumentJsx(code, filePath);
+      }
+    }
+    // Для других типов файлов используем ручной парсинг
     return instrumentJsx(code, filePath);
   }
 
@@ -1405,9 +1424,10 @@ export class ReactFramework extends Framework {
    */
   async generateHTML(code, filePath, options = {}) {
     const viewMode = options.viewMode || 'preview';
+    const projectRoot = options.projectRoot || null;
     
     // ВАЖНО: сначала инструментируем ИСХОДНЫЙ код, чтобы data-no-code-ui-id были стабильны
-    const instOriginal = instrumentJsx(code, filePath);
+    const instOriginal = this.instrument(code, filePath, { projectRoot });
     
     // Обрабатываем код (загружаем зависимости, заменяем импорты)
     const processed = await this.processReactCode(instOriginal.code, filePath);
@@ -1417,7 +1437,7 @@ export class ReactFramework extends Framework {
     const defaultExportInfo = processed.defaultExportInfo || null;
     
     // Собираем карту для превью/редактора на обработанном коде
-    const instProcessed = instrumentJsx(processedCodeBeforeInst, filePath);
+    const instProcessed = this.instrument(processedCodeBeforeInst, filePath, { projectRoot });
     const processedCode = instProcessed.code;
     
     // Детектируем компоненты в обработанном коде
@@ -1947,15 +1967,44 @@ export class ReactFramework extends Framework {
       .filter(x => x !== null)
       .sort((a, b) => (b.entry.start || 0) - (a.entry.start || 0)); // с конца к началу
 
+    // Пробуем использовать AST-based патчи для более точного применения
+    const useAstPatches = isJavaScriptFile(filePath);
+    
     for (const { id, patch, entry } of sortedEntries) {
-      const res = this.applyStylePatch({
-        code: newContent,
-        mapEntry: entry,
-        patch,
-        externalStylesMap
-      });
-      if (!res?.ok) {
-        throw new Error(res?.error || `Не удалось применить изменения для блока ${id}`);
+      let res = null;
+      
+      // Пробуем AST-based патч для JS/TS файлов
+      if (useAstPatches) {
+        try {
+          res = applyStylePatchWithAst({
+            code: newContent,
+            target: { id },
+            patch,
+            filePath,
+          });
+          
+          // Если AST патч успешен, используем его
+          if (res?.ok && res.code) {
+            newContent = res.code;
+            continue;
+          }
+        } catch (error) {
+          console.warn('[ReactFramework] AST style patch failed, falling back to manual:', error);
+        }
+      }
+      
+      // Fallback на ручной патч
+      if (!res || !res.ok) {
+        res = this.applyStylePatch({
+          code: newContent,
+          mapEntry: entry,
+          patch,
+          externalStylesMap
+        });
+        
+        if (!res?.ok) {
+          throw new Error(res?.error || `Не удалось применить изменения для блока ${id}`);
+        }
       }
 
       if (res.needsExternalPatch && res.externalStylePath && res.styleKey && res.styleReference) {
@@ -1986,6 +2035,30 @@ export class ReactFramework extends Framework {
 
     for (const op of jsxOps) {
       if (op.type === 'delete') {
+        // Пробуем AST-based удаление для JS/TS файлов
+        let deleteRes = null;
+        if (useAstPatches) {
+          try {
+            deleteRes = applyDeleteWithAst({
+              code: workCode,
+              id: op.blockId,
+              filePath,
+            });
+            
+            if (deleteRes?.ok && deleteRes.code) {
+              workCode = deleteRes.code;
+              // Переинструментируем после удаления
+              const instAfterDel = this.instrument(workCode, filePath);
+              workCode = instAfterDel.code;
+              instMapAfterStyles = instAfterDel.map;
+              continue;
+            }
+          } catch (error) {
+            console.warn('[ReactFramework] AST delete failed, falling back to manual:', error);
+          }
+        }
+        
+        // Fallback на ручное удаление
         let entry = findOpeningTagEntryById(workCode, op.blockId);
         if (!entry && op.mapEntry && typeof op.mapEntry.start === 'number' && typeof op.mapEntry.end === 'number') {
           const openTag = workCode.slice(op.mapEntry.start, op.mapEntry.end);

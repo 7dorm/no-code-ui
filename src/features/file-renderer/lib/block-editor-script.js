@@ -454,13 +454,134 @@ export function generateBlockEditorScript(type, mode = 'preview') {
             if (!drag || !selected) return;
             const dx = ev.clientX - drag.sx;
             const dy = ev.clientY - drag.sy;
+            const id = ensureId(selected);
+            
             if (drag.mode === 'move') {
               selected.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+              
+              // Отправляем промежуточные изменения при каждом движении
+              const parent = getOffsetParent(selected);
+              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+              const ps = parent ? window.getComputedStyle(parent) : null;
+              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
+              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
+              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
+              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
+              
+              if (moveMode === 'relative') {
+                const cs = window.getComputedStyle(selected);
+                const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
+                const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
+                const left = snap(baseLeft + dx);
+                const top = snap(baseTop + dy);
+                
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left + 'px', top: top + 'px' }, isIntermediate: true });
+                } else {
+                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left, top: top }, isIntermediate: true });
+                }
+              } else {
+                const startLeft = drag.rect.left - parentRect.left - padLeft;
+                const startTop = drag.rect.top - parentRect.top - padTop;
+                
+                let left = snap(startLeft + dx);
+                let top = snap(startTop + dy);
+                
+                const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
+                const maxTop = parentRect.height - padBottom - snap(drag.rect.height);
+                const minLeft = padLeft;
+                const minTop = padTop;
+                left = Math.min(Math.max(left, minLeft), maxLeft);
+                top = Math.min(Math.max(top, minTop), maxTop);
+                
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left + 'px', top: top + 'px' }, isIntermediate: true });
+                } else {
+                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left, top: top }, isIntermediate: true });
+                }
+              }
             } else {
-              selected.style.width = Math.max(1, drag.rect.width + dx) + 'px';
-              selected.style.height = Math.max(1, drag.rect.height + dy) + 'px';
+              const w = snap(Math.max(1, drag.rect.width + dx));
+              const h = snap(Math.max(1, drag.rect.height + dy));
+              selected.style.width = w + 'px';
+              selected.style.height = h + 'px';
+              
+              // Отправляем промежуточные изменения при каждом движении
+              if ('${type}' === 'html') {
+                post(MSG_APPLY, { id, patch: { width: w + 'px', height: h + 'px' }, isIntermediate: true });
+              } else {
+                post(MSG_APPLY, { id, patch: { width: w, height: h }, isIntermediate: true });
+              }
             }
           }, true);
+
+          // Touch события для мобильных устройств
+          document.addEventListener('touchmove', (ev) => {
+            if (!drag || !selected) return;
+            const touch = ev.touches[0];
+            if (!touch) return;
+            const dx = touch.clientX - drag.sx;
+            const dy = touch.clientY - drag.sy;
+            const id = ensureId(selected);
+            
+            if (drag.mode === 'move') {
+              selected.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+              
+              // Отправляем промежуточные изменения при каждом движении
+              const parent = getOffsetParent(selected);
+              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+              const ps = parent ? window.getComputedStyle(parent) : null;
+              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
+              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
+              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
+              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
+              
+              if (moveMode === 'relative') {
+                const cs = window.getComputedStyle(selected);
+                const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
+                const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
+                const left = snap(baseLeft + dx);
+                const top = snap(baseTop + dy);
+                
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left + 'px', top: top + 'px' }, isIntermediate: true });
+                } else {
+                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left, top: top }, isIntermediate: true });
+                }
+              } else {
+                const startLeft = drag.rect.left - parentRect.left - padLeft;
+                const startTop = drag.rect.top - parentRect.top - padTop;
+                
+                let left = snap(startLeft + dx);
+                let top = snap(startTop + dy);
+                
+                const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
+                const maxTop = parentRect.height - padBottom - snap(drag.rect.height);
+                const minLeft = padLeft;
+                const minTop = padTop;
+                left = Math.min(Math.max(left, minLeft), maxLeft);
+                top = Math.min(Math.max(top, minTop), maxTop);
+                
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left + 'px', top: top + 'px' }, isIntermediate: true });
+                } else {
+                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left, top: top }, isIntermediate: true });
+                }
+              }
+            } else {
+              const w = snap(Math.max(1, drag.rect.width + dx));
+              const h = snap(Math.max(1, drag.rect.height + dy));
+              selected.style.width = w + 'px';
+              selected.style.height = h + 'px';
+              
+              // Отправляем промежуточные изменения при каждом движении
+              if ('${type}' === 'html') {
+                post(MSG_APPLY, { id, patch: { width: w + 'px', height: h + 'px' }, isIntermediate: true });
+              } else {
+                post(MSG_APPLY, { id, patch: { width: w, height: h }, isIntermediate: true });
+              }
+            }
+          }, { passive: false });
 
           document.addEventListener('mouseup', (ev) => {
             // reparent drag (Ctrl/Cmd + drag)
@@ -504,9 +625,9 @@ export function generateBlockEditorScript(type, mode = 'preview') {
                 selected.style.top = top + 'px';
 
                 if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left + 'px', top: top + 'px' } });
+                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left + 'px', top: top + 'px' }, isIntermediate: false });
                 } else {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left, top: top } });
+                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left, top: top }, isIntermediate: false });
                 }
               } else {
                 // absolute с ограничением по padding-box
@@ -529,9 +650,9 @@ export function generateBlockEditorScript(type, mode = 'preview') {
                 selected.style.top = top + 'px';
 
                 if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left + 'px', top: top + 'px' } });
+                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left + 'px', top: top + 'px' }, isIntermediate: false });
                 } else {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left, top: top } });
+                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left, top: top }, isIntermediate: false });
                 }
               }
             } else {
@@ -546,9 +667,9 @@ export function generateBlockEditorScript(type, mode = 'preview') {
               selected.style.width = cw + 'px';
               selected.style.height = ch + 'px';
               if ('${type}' === 'html') {
-                post(MSG_APPLY, { id, patch: { width: cw + 'px', height: ch + 'px' } });
+                post(MSG_APPLY, { id, patch: { width: cw + 'px', height: ch + 'px' }, isIntermediate: false });
               } else {
-                post(MSG_APPLY, { id, patch: { width: cw, height: ch } });
+                post(MSG_APPLY, { id, patch: { width: cw, height: ch }, isIntermediate: false });
               }
             }
 

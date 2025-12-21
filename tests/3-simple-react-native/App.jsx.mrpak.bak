@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     color: '#764ba2',
     marginBottom: 12
   },
-  text: { fontSize: 16, color: '#495057', lineHeight: 24, marginBottom: 12, width: 243, height: 58, position: "absolute", left: 50, top: 597 },
+  text: { fontSize: 16, color: '#495057', lineHeight: 24, marginBottom: 12, width: 237, height: 230, position: "absolute", left: 52, top: 396 },
   button: {
     backgroundColor: '#667eea',
     paddingVertical: 12,

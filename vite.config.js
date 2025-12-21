@@ -18,5 +18,18 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
       'react-native': 'react-native-web'
     }
+  },
+  define: {
+    // Полифилл для process, который используется в @babel/types и других Node.js модулях
+    'process.env': '{}',
+    'global': 'globalThis',
+    'process': JSON.stringify({
+      env: {},
+      version: '',
+      versions: {},
+      browser: true,
+      nextTick: (fn) => setTimeout(fn, 0),
+      cwd: () => '/'
+    })
   }
 });

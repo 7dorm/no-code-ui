@@ -47,6 +47,7 @@ export default function BlockEditorPanel({
   onRedo,
   canUndo,
   canRedo,
+  livePosition,
 }) {
   const [left, setLeft] = useState(null);
   const [top, setTop] = useState(null);
@@ -652,10 +653,15 @@ export default function BlockEditorPanel({
             <option value="relative">Relative</option>
             <option value="grid8">GridSnap(8)</option>
           </select>
-          <NumberField label="left" value={left} onChange={setLeft} />
-          <NumberField label="top" value={top} onChange={setTop} />
-          <NumberField label="width" value={width} onChange={setWidth} />
-          <NumberField label="height" value={height} onChange={setHeight} />
+          <NumberField label="left" value={livePosition?.left !== null && livePosition?.left !== undefined ? livePosition.left : left} onChange={setLeft} />
+          <NumberField label="top" value={livePosition?.top !== null && livePosition?.top !== undefined ? livePosition.top : top} onChange={setTop} />
+          <NumberField label="width" value={livePosition?.width !== null && livePosition?.width !== undefined ? livePosition.width : width} onChange={setWidth} />
+          <NumberField label="height" value={livePosition?.height !== null && livePosition?.height !== undefined ? livePosition.height : height} onChange={setHeight} />
+          {livePosition && (livePosition.left !== null || livePosition.top !== null || livePosition.width !== null || livePosition.height !== null) && (
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginTop: '6px', fontStyle: 'italic' }}>
+              ● Обновляется в реальном времени
+            </Text>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -853,6 +859,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     width: '100%',
+    height: '100%',
     minHeight: 600,
     backgroundColor: '#ffffff',
   },
@@ -1082,11 +1089,13 @@ const styles = StyleSheet.create({
   preview: {
     flex: 1,
     backgroundColor: '#ffffff',
+    minHeight: 0,
   },
   webview: {
     flex: 1,
     width: '100%',
-    minHeight: 600,
+    height: '100%',
+    minHeight: 0,
     backgroundColor: '#ffffff',
   },
   undoRedoContainer: {

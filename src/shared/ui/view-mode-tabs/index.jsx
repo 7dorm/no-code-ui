@@ -35,6 +35,16 @@ export function ViewModeTabs({ viewMode, onModeChange, enableEditor = false }) {
       </TouchableOpacity>
       {enableEditor && (
         <TouchableOpacity
+          style={[styles.tab, viewMode === 'split' && styles.tabActive]}
+          onPress={() => onModeChange('split')}
+        >
+          <Text style={[styles.tabText, viewMode === 'split' && styles.tabTextActive]}>
+            Split
+          </Text>
+        </TouchableOpacity>
+      )}
+      {enableEditor && (
+        <TouchableOpacity
           style={[styles.tab, viewMode === 'changes' && styles.tabActive]}
           onPress={() => onModeChange('changes')}
         >

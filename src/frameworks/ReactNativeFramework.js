@@ -4,6 +4,8 @@
  */
 import { ReactFramework } from './ReactFramework';
 import { instrumentJsx } from '../blockEditor/JsxInstrumenter';
+import { instrumentJsxWithAst } from '../blockEditor/AstJsxInstrumenter';
+import { isJavaScriptFile } from '../blockEditor/AstUtils';
 import { detectComponents } from '../features/file-renderer/lib/react-processor';
 import { generateBlockEditorScript } from '../features/file-renderer/lib/block-editor-script';
 import { toReactStyleObjectText } from '../blockEditor/styleUtils';
@@ -21,7 +23,19 @@ export class ReactNativeFramework extends ReactFramework {
     const viewMode = options.viewMode || 'preview';
     
     // ВАЖНО: сначала инструментируем ИСХОДНЫЙ код, чтобы data-no-code-ui-id были стабильны
-    const instOriginal = instrumentJsx(code, filePath);
+    // Используем AST парсинг для JS/TS файлов с fallback
+    const projectRoot = options.projectRoot || null;
+    let instOriginal;
+    if (isJavaScriptFile(filePath)) {
+      try {
+        instOriginal = instrumentJsxWithAst(code, filePath, { projectRoot });
+      } catch (error) {
+        console.warn('[ReactNativeFramework] AST instrumentation failed, falling back:', error.message);
+        instOriginal = instrumentJsx(code, filePath);
+      }
+    } else {
+      instOriginal = instrumentJsx(code, filePath);
+    }
     
     // Обрабатываем код (загружаем зависимости, заменяем импорты)
     const processed = await this.processReactCode(instOriginal.code, filePath);
@@ -37,7 +51,17 @@ export class ReactNativeFramework extends ReactFramework {
     console.log('[ReactNativeFramework] defaultExportInfo:', defaultExportInfo);
     
     // Собираем карту для превью/редактора на обработанном коде
-    const instProcessed = instrumentJsx(processedCodeBeforeInst, filePath);
+    let instProcessed;
+    if (isJavaScriptFile(filePath)) {
+      try {
+        instProcessed = instrumentJsxWithAst(processedCodeBeforeInst, filePath, { projectRoot });
+      } catch (error) {
+        console.warn('[ReactNativeFramework] AST instrumentation failed for processed code, falling back:', error.message);
+        instProcessed = instrumentJsx(processedCodeBeforeInst, filePath);
+      }
+    } else {
+      instProcessed = instrumentJsx(processedCodeBeforeInst, filePath);
+    }
     const processedCode = instProcessed.code;
     
     // Детектируем компоненты в обработанном коде

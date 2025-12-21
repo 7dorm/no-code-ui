@@ -11,6 +11,9 @@ import { ViewModeTabs } from './shared/ui/view-mode-tabs';
 import { MonacoEditorWrapper } from './shared/ui/monaco-editor-wrapper';
 import { getFileType, getMonacoLanguage } from './shared/lib/file-type-detector';
 import { readFile, writeFile, watchFile, unwatchFile, onFileChanged, readDirectory, readFileBase64 } from './shared/api/electron-api';
+import { syncCodeChangesToEditor, createEditorCommandsFromChanges } from './blockEditor/AstSync';
+import { parse } from '@babel/parser';
+import { AstBidirectionalManager } from './blockEditor/AstBidirectional';
 import { injectBlockEditorScript } from './features/file-renderer/lib/block-editor-script';
 import { findProjectRoot, resolvePath, resolvePathSync } from './features/file-renderer/lib/path-resolver';
 import { extractImports, detectComponents } from './features/file-renderer/lib/react-processor';
@@ -25,6 +28,11 @@ function RenderFile({ filePath }) {
   const [isModified, setIsModified] = useState(false); // Флаг изменений
   const [showSaveIndicator, setShowSaveIndicator] = useState(false); // Индикатор сохранения
   const monacoEditorRef = useRef(null);
+  const autoSaveTimeoutRef = useRef(null); // Таймер для автосохранения
+  const undoHistoryTimeoutRef = useRef(null); // Таймер для debounce истории undo/redo
+  const pendingHistoryOperationRef = useRef(null); // Отложенная операция для истории
+  const isUpdatingFromConstructorRef = useRef(false); // Флаг для предотвращения рекурсии при обновлении из конструктора
+  const isUpdatingFromFileRef = useRef(false); // Флаг для предотвращения рекурсии при обновлении из файла
   
   // Хуки для React и React Native файлов (всегда вызываются)
   const [reactHTML, setReactHTML] = useState('');
@@ -43,6 +51,9 @@ function RenderFile({ filePath }) {
   
   // Режим просмотра: 'preview' или 'code'
   const [viewMode, setViewMode] = useState('preview');
+  const [splitLeftWidth, setSplitLeftWidth] = useState(0.5); // 0.5 = 50% ширины
+  const [isResizing, setIsResizing] = useState(false);
+  const splitContainerRef = useRef(null);
 
   // Состояние редактора блоков
   const [blockMap, setBlockMap] = useState({});
@@ -61,6 +72,11 @@ function RenderFile({ filePath }) {
   const [styleSnapshots, setStyleSnapshots] = useState({}); // { [mrpakId]: { inlineStyle: string, computedStyle?: object } }
   const [textSnapshots, setTextSnapshots] = useState({}); // { [mrpakId]: text }
   const [externalStylesMap, setExternalStylesMap] = useState({}); // { [varName]: { path: string, type: string } }
+  const [livePosition, setLivePosition] = useState({ left: null, top: null, width: null, height: null });
+
+  // Две копии AST для bidirectional editing
+  // Менеджер для bidirectional editing через два AST
+  const astManagerRef = useRef(null);
 
   // История для Undo/Redo
   const [undoStack, setUndoStack] = useState([]); // Стек операций для отмены
@@ -116,6 +132,38 @@ function RenderFile({ filePath }) {
     setRedoStack([]); // Очищаем redo стек при новой операции
     console.log('📝 [History] Добавлена операция в историю:', operation.type);
   }, []);
+
+  // Добавляет операцию в историю с debounce для промежуточных изменений
+  const addToHistoryDebounced = useCallback((operation, isIntermediate = false) => {
+    if (isIntermediate) {
+      // Для промежуточных изменений сохраняем операцию, но не добавляем в историю сразу
+      pendingHistoryOperationRef.current = operation;
+      
+      // Очищаем предыдущий таймер
+      if (undoHistoryTimeoutRef.current) {
+        clearTimeout(undoHistoryTimeoutRef.current);
+      }
+      
+      // Устанавливаем новый таймер (300ms после последнего изменения)
+      undoHistoryTimeoutRef.current = setTimeout(() => {
+        if (pendingHistoryOperationRef.current) {
+          addToHistory(pendingHistoryOperationRef.current);
+          pendingHistoryOperationRef.current = null;
+        }
+      }, 300);
+    } else {
+      // Для финальных изменений добавляем сразу
+      if (undoHistoryTimeoutRef.current) {
+        clearTimeout(undoHistoryTimeoutRef.current);
+        undoHistoryTimeoutRef.current = null;
+      }
+      if (pendingHistoryOperationRef.current) {
+        // Заменяем отложенную операцию на финальную
+        pendingHistoryOperationRef.current = null;
+      }
+      addToHistory(operation);
+    }
+  }, [addToHistory]);
 
   // Функция отмены (Undo)
   const undo = useCallback(() => {
@@ -374,35 +422,237 @@ function RenderFile({ filePath }) {
     updateHasStagedChanges(true);
   }, [redoStack, fileType, filePath, sendIframeCommand, updateStagedPatches, updateStagedOps, updateHasStagedChanges]);
 
+  // Вспомогательная функция для обновления Monaco Editor с сохранением скролла
+  const updateMonacoEditorWithScroll = useCallback((newContent) => {
+    if (!monacoEditorRef?.current) return;
+    
+    try {
+      const editor = monacoEditorRef.current;
+      // Сохраняем полное состояние редактора (курсор, скролл, выделение)
+      const viewState = editor.saveViewState();
+      // Также сохраняем скролл напрямую для более надежного восстановления
+      const scrollTop = editor.getScrollTop();
+      const scrollLeft = editor.getScrollLeft();
+      const position = editor.getPosition();
+      
+      // Обновляем содержимое
+      editor.setValue(newContent);
+      
+      // Восстанавливаем состояние без анимации
+      if (viewState) {
+        // Используем requestAnimationFrame для восстановления после обновления DOM
+        requestAnimationFrame(() => {
+          try {
+            // Восстанавливаем полное состояние (курсор, выделение)
+            editor.restoreViewState(viewState);
+            
+            // Восстанавливаем скролл напрямую без анимации
+            if (scrollTop !== null && scrollTop !== undefined) {
+              editor.setScrollTop(scrollTop);
+            }
+            if (scrollLeft !== null && scrollLeft !== undefined) {
+              editor.setScrollLeft(scrollLeft);
+            }
+            
+            // Восстанавливаем позицию курсора, если она была
+            if (position) {
+              editor.setPosition(position);
+            }
+          } catch (e) {
+            console.warn('[updateMonacoEditorWithScroll] Ошибка восстановления viewState:', e);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[updateMonacoEditorWithScroll] Ошибка обновления Monaco Editor:', e);
+      // Fallback: просто обновляем значение
+      if (monacoEditorRef?.current) {
+        monacoEditorRef.current.setValue(newContent);
+      }
+    }
+  }, []);
+
   const applyBlockPatch = useCallback(
-    async (blockId, patch) => {
+    async (blockId, patch, isIntermediate = false) => {
       try {
-        // Для сохранения прогресса в редакторе мы НЕ применяем изменения сразу.
-        // Вместо этого — накапливаем staged-патчи и применяем их при смене таба или по кнопке.
+        // Bidirectional editing через AST: применяем изменения к constructorAST
         if (!blockId) return;
         
-        // Сохраняем предыдущее значение для undo
+        // Работаем только с JS/TS файлами через AST
+        if (fileType !== 'react' && fileType !== 'react-native') {
+          // Для HTML используем старую логику
+          const currentBlockMapForFile = blockMapForFile || {};
+          if (!isFrameworkSupported(fileType)) {
+            console.warn('applyBlockPatch: Unsupported file type:', fileType);
+            return;
+          }
+          const framework = createFramework(fileType, filePath);
+          const result = await framework.commitPatches({
+            originalCode: String(fileContent ?? ''),
+            stagedPatches: { [blockId]: patch },
+            stagedOps: [],
+            blockMapForFile: currentBlockMapForFile,
+            externalStylesMap,
+            filePath,
+            resolvePath,
+            readFile,
+            writeFile
+          });
+          if (!result.ok) throw new Error(result.error || 'Ошибка применения изменений');
+          const newContent = result.code || String(fileContent ?? '');
+          if (!newContent || typeof newContent !== 'string' || newContent.length === 0) {
+            throw new Error('Результат применения изменений пуст или некорректен');
+          }
+          const writeRes = await writeFile(filePath, newContent, { backup: true });
+          if (!writeRes?.success) throw new Error(writeRes?.error || 'Ошибка записи файла');
+          setFileContent(newContent);
+          setRenderVersion((v) => v + 1);
+          return;
+        }
+        
+        // Для React/React Native: работаем через AstBidirectionalManager
+        const manager = astManagerRef.current;
+        
+        if (!manager) {
+          // Если менеджер не инициализирован, создаем его
+          if (projectRoot) {
+            const newManager = new AstBidirectionalManager(filePath, projectRoot);
+            const initResult = await newManager.initializeFromCode(String(fileContent ?? ''));
+            if (!initResult.ok) {
+              throw new Error('Failed to initialize AstBidirectionalManager');
+            }
+            astManagerRef.current = newManager;
+            // Продолжаем с новым менеджером
+            return await applyBlockPatch(blockId, patch);
+          } else {
+            throw new Error('projectRoot not available for AST bidirectional editing');
+          }
+        }
+        
+        // Обновляем codeAST при изменении в конструкторе (не трогаем constructorAST)
+        console.log('[applyBlockPatch] Updating codeAST:', { blockId, patch, hasCodeAST: !!manager.getCodeAST(), isIntermediate });
+        const updateResult = manager.updateCodeAST(blockId, {
+          type: 'style',
+          patch,
+        });
+        
+        if (!updateResult.ok) {
+          console.error('[applyBlockPatch] Failed to update codeAST:', updateResult.error);
+          // Fallback: используем старый метод через framework
+          console.log('[applyBlockPatch] Falling back to framework.commitPatches');
+          
+          // Для промежуточных изменений НЕ используем fallback - просто возвращаемся
+          if (isIntermediate) {
+            return;
+          }
+          const currentBlockMapForFile = blockMapForFile || {};
+          const framework = createFramework(fileType, filePath);
+          const result = await framework.commitPatches({
+            originalCode: String(fileContent ?? ''),
+            stagedPatches: { [blockId]: patch },
+            stagedOps: [],
+            blockMapForFile: currentBlockMapForFile,
+            externalStylesMap,
+            filePath,
+            resolvePath,
+            readFile,
+            writeFile
+          });
+          if (!result.ok) throw new Error(result.error || 'Ошибка применения изменений');
+          const newContent = result.code || String(fileContent ?? '');
+          if (!newContent || typeof newContent !== 'string' || newContent.length === 0) {
+            throw new Error('Результат применения изменений пуст или некорректен');
+          }
+          // Устанавливаем флаг, чтобы предотвратить рекурсию при обновлении из конструктора
+          isUpdatingFromConstructorRef.current = true;
+          
+          try {
+            // Автосохранение
+            await writeFile(filePath, newContent, { backup: true });
+            setFileContent(newContent);
+            // Обновляем codeAST из нового кода без синхронизации constructorAST (чтобы избежать рекурсии)
+            await manager.updateCodeASTFromCode(newContent, true);
+            // Обновляем Monaco Editor без перезагрузки с сохранением скролла
+            updateMonacoEditorWithScroll(newContent);
+            setRenderVersion((v) => v + 1);
+          } finally {
+            // Сбрасываем флаг после небольшой задержки
+            setTimeout(() => {
+              isUpdatingFromConstructorRef.current = false;
+            }, 100);
+          }
+          return;
+        }
+        
+        // Генерируем код из codeAST
+        const generateResult = manager.generateCodeFromCodeAST();
+        
+        if (!generateResult.ok) {
+          throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
+        }
+        
+        const newContent = generateResult.code;
+        
+        // Для промежуточных изменений НЕ сохраняем файл и НЕ обновляем fileContent
+        // Обновление fileContent триггерит useEffect, который перегенерирует HTML и обновляет конструктор
+        // Файл будет сохранен только при финальном изменении (isIntermediate: false)
+        if (isIntermediate) {
+          // Обновляем только Monaco Editor напрямую, БЕЗ обновления fileContent
+          // Это предотвращает перегенерацию HTML и обновление конструктора
+          // Используем функцию с сохранением скролла
+          updateMonacoEditorWithScroll(newContent);
+          
+          // ВАЖНО: Обновляем codeAST из сгенерированного кода, чтобы он был синхронизирован
+          // для следующих промежуточных изменений. Но НЕ обновляем fileContent, чтобы не триггерить useEffect
+          await manager.updateCodeASTFromCode(newContent, true);
+          
+          // НЕ вызываем setFileContent и setRenderVersion для промежуточных изменений
+          
+          // Добавляем в историю для undo (с debounce для промежуточных изменений)
         const previousValue = stagedPatchesRef.current[blockId] || null;
+          addToHistoryDebounced({
+            type: 'patch',
+            blockId,
+            patch,
+            previousValue,
+          }, isIntermediate);
+          return;
+        }
         
-        updateStagedPatches((prev) => ({
+        // Устанавливаем флаг ДО writeFile, чтобы предотвратить рекурсию
+        isUpdatingFromConstructorRef.current = true;
+        
+        // Автосохранение в файл (только для финальных изменений)
+        await writeFile(filePath, newContent, { backup: true });
+        
+        // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
+        setFileContent(newContent);
+        updateMonacoEditorWithScroll(newContent);
+        setRenderVersion((v) => v + 1);
+        setChangesLog((prev) => [
+          { ts: Date.now(), filePath, blockId, patch },
           ...prev,
-          [blockId]: { ...(prev?.[blockId] || {}), ...(patch || {}) },
-        }));
-        updateHasStagedChanges(true);
+        ]);
         
-        // Добавляем в историю для undo
-        addToHistory({
+        // Добавляем в историю для undo (с debounce для промежуточных изменений)
+        const previousValue = stagedPatchesRef.current[blockId] || null;
+        addToHistoryDebounced({
           type: 'patch',
           blockId,
           patch,
           previousValue,
-        });
+        }, isIntermediate);
+        
+        // Сбрасываем флаг после небольшой задержки, чтобы файловый watcher успел обработать изменение
+        setTimeout(() => {
+          isUpdatingFromConstructorRef.current = false;
+        }, 100);
       } catch (e) {
         console.error('BlockEditor apply error:', e);
         setError(`Ошибка применения изменений: ${e.message}`);
       }
     },
-    [updateStagedPatches, updateHasStagedChanges, addToHistory]
+    [fileContent, fileType, filePath, blockMapForFile, externalStylesMap, resolvePath, readFile, writeFile, addToHistory, projectRoot]
   );
 
   const commitStagedPatches = useCallback(async () => {
@@ -572,31 +822,10 @@ function RenderFile({ filePath }) {
 
   const applyAndCommitPatch = useCallback(
     async (blockId, patch) => {
-      if (!blockId) {
-        console.warn('applyAndCommitPatch: blockId is missing');
-        return;
-      }
-      console.log('applyAndCommitPatch called:', { blockId, patch });
-      
-      // Stage текущий patch и сразу планируем коммит с актуальными рефами
-      updateStagedPatches((prev) => {
-        const next = {
-          ...prev,
-          [blockId]: { ...(prev?.[blockId] || {}), ...(patch || {}) },
-        };
-        console.log('applyAndCommitPatch: staged patches updated', {
-          blockId,
-          patch,
-          allPatches: Object.keys(next),
-        });
-        return next;
-      });
-      updateHasStagedChanges(true);
-      setTimeout(() => {
-        commitStagedPatches();
-      }, 0);
+      // Bidirectional editing: применяем сразу через applyBlockPatch
+      await applyBlockPatch(blockId, patch);
     },
-    [commitStagedPatches, updateStagedPatches, updateHasStagedChanges]
+    [applyBlockPatch]
   );
 
   const handleEditorMessage = useCallback(
@@ -606,6 +835,8 @@ function RenderFile({ filePath }) {
 
       if (data.type === MRPAK_MSG.SELECT) {
         setSelectedBlock({ id: data.id, meta: data.meta });
+        // Сбрасываем livePosition при выборе нового блока
+        setLivePosition({ left: null, top: null, width: null, height: null });
         return;
       }
 
@@ -639,6 +870,7 @@ function RenderFile({ filePath }) {
       if (data.type === MRPAK_MSG.APPLY) {
         const id = data.id;
         const patch = data.patch || {};
+        const isIntermediate = data.isIntermediate === true; // Промежуточное изменение (при перетаскивании)
         if (!id) return;
 
         // Если из iframe пришло reparent, используем ref на stageReparentBlock
@@ -656,8 +888,33 @@ function RenderFile({ filePath }) {
           return;
         }
 
-        // Не применяем сразу — накапливаем.
-        await applyBlockPatch(id, patch);
+        // Обновляем livePosition для отображения в реальном времени (только для промежуточных изменений)
+        if (isIntermediate && selectedBlock?.id === id) {
+          setLivePosition((prev) => {
+            const newPos = { ...prev };
+            // Извлекаем числовые значения из patch
+            if (patch.left !== undefined) {
+              const leftVal = typeof patch.left === 'string' ? parseFloat(patch.left.replace('px', '')) : patch.left;
+              if (!isNaN(leftVal)) newPos.left = leftVal;
+            }
+            if (patch.top !== undefined) {
+              const topVal = typeof patch.top === 'string' ? parseFloat(patch.top.replace('px', '')) : patch.top;
+              if (!isNaN(topVal)) newPos.top = topVal;
+            }
+            if (patch.width !== undefined) {
+              const widthVal = typeof patch.width === 'string' ? parseFloat(patch.width.replace('px', '')) : patch.width;
+              if (!isNaN(widthVal)) newPos.width = widthVal;
+            }
+            if (patch.height !== undefined) {
+              const heightVal = typeof patch.height === 'string' ? parseFloat(patch.height.replace('px', '')) : patch.height;
+              if (!isNaN(heightVal)) newPos.height = heightVal;
+            }
+            return newPos;
+          });
+        }
+
+        // Bidirectional editing: применяем сразу (даже промежуточные изменения)
+        await applyBlockPatch(id, patch, isIntermediate);
         return;
       }
 
@@ -737,12 +994,70 @@ function RenderFile({ filePath }) {
       }
       lastDeleteOperationRef.current = { blockId, timestamp: now };
       
+      // Bidirectional editing через AST: применяем сразу к constructorAST
+      if (fileType === 'react' || fileType === 'react-native') {
+        (async () => {
+          try {
+            const manager = astManagerRef.current;
+            
+            if (!manager) {
+              if (projectRoot) {
+                const newManager = new AstBidirectionalManager(filePath, projectRoot);
+                const initResult = await newManager.initializeFromCode(String(fileContent ?? ''));
+                if (!initResult.ok) {
+                  throw new Error('Failed to initialize AstBidirectionalManager');
+                }
+                astManagerRef.current = newManager;
+                // Продолжаем с новым менеджером
+                return await stageDeleteBlock({ blockId });
+              } else {
+                throw new Error('projectRoot not available for AST bidirectional editing');
+              }
+            }
+            
+            // Обновляем codeAST при удалении (не трогаем constructorAST)
+            const updateResult = manager.updateCodeAST(blockId, {
+              type: 'delete',
+            });
+            
+            if (!updateResult.ok) {
+              throw new Error(updateResult.error || 'Ошибка удаления из codeAST');
+            }
+            
+            // Генерируем код из codeAST
+            const generateResult = manager.generateCodeFromCodeAST();
+            
+            if (!generateResult.ok) {
+              throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
+            }
+            
+            const newContent = generateResult.code;
+            
+            // Автосохранение в файл
+            await writeFile(filePath, newContent, { backup: true });
+            
+            // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
+            setFileContent(newContent);
+            updateMonacoEditorWithScroll(newContent);
+            setRenderVersion((v) => v + 1);
+            
+            // Добавляем в историю для undo
+            addToHistory({
+              type: 'delete',
+              blockId,
+            });
+          } catch (e) {
+            console.error('stageDeleteBlock error:', e);
+            setError(`Ошибка удаления блока: ${e.message}`);
+          }
+        })();
+        // Локально удаляем в iframe
+        sendIframeCommand({ type: MRPAK_CMD.DELETE, id: blockId });
+        return;
+      }
+      
+      // Для HTML используем старую логику через stagedOps
       const entry = blockMapForFile ? blockMapForFile[blockId] : null;
-      
-      // Для undo сохраняем информацию об удаляемом блоке
-      // Пытаемся получить HTML элемента из iframe для восстановления
-      // (это упрощенная версия, в production нужно сохранять полную информацию)
-      
       updateStagedOps((prev) => [
         ...prev,
         {
@@ -766,7 +1081,7 @@ function RenderFile({ filePath }) {
       // Локально удаляем в iframe
       sendIframeCommand({ type: MRPAK_CMD.DELETE, id: blockId });
     },
-    [blockMapForFile, fileType, filePath, layersTree, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory]
+    [blockMapForFile, fileType, filePath, layersTree, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory, projectRoot]
   );
 
   const stageInsertBlock = useCallback(
@@ -799,6 +1114,82 @@ function RenderFile({ filePath }) {
       
       const snippetWithId = ensureSnippetHasMrpakId(snippet, newId);
       console.log('[stageInsertBlock] Сниппет с ID:', snippetWithId);
+      
+      // Bidirectional editing через AST для React/React Native
+      if (fileType === 'react' || fileType === 'react-native') {
+        (async () => {
+          try {
+            const manager = astManagerRef.current;
+            
+            if (!manager) {
+              if (projectRoot) {
+                const newManager = new AstBidirectionalManager(filePath, projectRoot);
+                const initResult = await newManager.initializeFromCode(String(fileContent ?? ''));
+                if (!initResult.ok) {
+                  throw new Error('Failed to initialize AstBidirectionalManager');
+                }
+                astManagerRef.current = newManager;
+                // Продолжаем с новым менеджером
+                return await stageInsertBlock({ targetId, mode, snippet: snippetWithId });
+              } else {
+                throw new Error('projectRoot not available for AST bidirectional editing');
+              }
+            }
+            
+            // Обновляем codeAST при вставке (не трогаем constructorAST)
+            const updateResult = manager.updateCodeAST(targetId, {
+              type: 'insert',
+              targetId,
+              mode: mode === 'sibling' ? 'sibling' : 'child',
+              snippet: String(snippetWithId || ''),
+            });
+            
+            if (!updateResult.ok) {
+              throw new Error(updateResult.error || 'Ошибка вставки в codeAST');
+            }
+            
+            // Генерируем код из codeAST
+            const generateResult = manager.generateCodeFromCodeAST();
+            
+            if (!generateResult.ok) {
+              throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
+            }
+            
+            const newContent = generateResult.code;
+            
+            // Автосохранение в файл
+            await writeFile(filePath, newContent, { backup: true });
+            
+            // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
+            setFileContent(newContent);
+            updateMonacoEditorWithScroll(newContent);
+            setRenderVersion((v) => v + 1);
+            
+            // Добавляем в историю для undo
+            addToHistory({
+              type: 'insert',
+              blockId: newId,
+              targetId,
+              mode: mode === 'sibling' ? 'sibling' : 'child',
+              snippet: String(snippetWithId || ''),
+            });
+          } catch (e) {
+            console.error('stageInsertBlock error:', e);
+            setError(`Ошибка вставки блока: ${e.message}`);
+          }
+        })();
+        
+        // Локально вставляем в iframe
+        sendIframeCommand({
+          type: MRPAK_CMD.INSERT,
+          targetId,
+          mode: mode === 'sibling' ? 'sibling' : 'child',
+          html: String(snippetWithId || ''),
+        });
+        return;
+      }
+      
+      // Для HTML используем старую логику
       updateStagedOps((prev) => [
         ...prev,
         {
@@ -806,7 +1197,7 @@ function RenderFile({ filePath }) {
           targetId,
           mode: mode === 'sibling' ? 'sibling' : 'child',
           snippet: String(snippetWithId || ''),
-          blockId: newId, // чтобы история/патчи могли ссылаться на вставленный элемент
+          blockId: newId,
           fileType,
           filePath,
           mapEntry: entry || null,
@@ -823,7 +1214,7 @@ function RenderFile({ filePath }) {
         snippet: String(snippetWithId || ''),
       });
       
-      // Локально вставляем в iframe (html для DOM вставки)
+      // Локально вставляем в iframe
       sendIframeCommand({
         type: MRPAK_CMD.INSERT,
         targetId,
@@ -831,7 +1222,7 @@ function RenderFile({ filePath }) {
         html: String(snippetWithId || ''),
       });
     },
-    [blockMapForFile, ensureSnippetHasMrpakId, fileType, filePath, makeTempMrpakId, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory]
+    [blockMapForFile, ensureSnippetHasMrpakId, fileType, filePath, makeTempMrpakId, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory, projectRoot]
   );
 
   const stageReparentBlock = useCallback(
@@ -854,17 +1245,75 @@ function RenderFile({ filePath }) {
       }
       lastReparentOperationRef.current = { key: operationKey, timestamp: now };
       
+      // Bidirectional editing через AST для React/React Native
+      if (fileType === 'react' || fileType === 'react-native') {
+        (async () => {
+          try {
+            const manager = astManagerRef.current;
+            
+            if (!manager) {
+              if (projectRoot) {
+                const newManager = new AstBidirectionalManager(filePath, projectRoot);
+                const initResult = await newManager.initializeFromCode(String(fileContent ?? ''));
+                if (!initResult.ok) {
+                  throw new Error('Failed to initialize AstBidirectionalManager');
+                }
+                astManagerRef.current = newManager;
+                // Продолжаем с новым менеджером
+                return await stageReparentBlock({ sourceId, targetParentId });
+              } else {
+                throw new Error('projectRoot not available for AST bidirectional editing');
+              }
+            }
+            
+            // Обновляем codeAST при перемещении (не трогаем constructorAST)
+            const updateResult = manager.updateCodeAST(sourceId, {
+              type: 'reparent',
+              sourceId,
+              targetParentId,
+            });
+            
+            if (!updateResult.ok) {
+              throw new Error(updateResult.error || 'Ошибка перемещения в codeAST');
+            }
+            
+            // Генерируем код из codeAST
+            const generateResult = manager.generateCodeFromCodeAST();
+            
+            if (!generateResult.ok) {
+              throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
+            }
+            
+            const newContent = generateResult.code;
+            
+            // Автосохранение в файл
+            await writeFile(filePath, newContent, { backup: true });
+            
+            // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
+            setFileContent(newContent);
+            updateMonacoEditorWithScroll(newContent);
+            setRenderVersion((v) => v + 1);
+            
+            // Добавляем в историю для undo
+            addToHistory({
+              type: 'reparent',
+              sourceId,
+              targetParentId,
+            });
+          } catch (e) {
+            console.error('stageReparentBlock error:', e);
+            setError(`Ошибка перемещения блока: ${e.message}`);
+          }
+        })();
+        
+        // Локально переносим в iframe
+        sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
+        return;
+      }
+      
+      // Для HTML используем старую логику
       const sourceEntry = blockMapForFile ? blockMapForFile[sourceId] : null;
       const targetEntry = blockMapForFile ? blockMapForFile[targetParentId] : null;
-      console.log('stageReparentBlock: entries found', { 
-        hasSourceEntry: !!sourceEntry, 
-        hasTargetEntry: !!targetEntry,
-        sourceEntry,
-        targetEntry,
-        blockMapKeys: Object.keys(blockMapForFile || {}), // все ключи для отладки
-        sourceIdInBlockMap: sourceId in (blockMapForFile || {}),
-        targetIdInBlockMap: targetParentId in (blockMapForFile || {})
-      });
       updateStagedOps((prev) => {
         const newOps = [
           ...prev,
@@ -878,15 +1327,14 @@ function RenderFile({ filePath }) {
             mapEntryTarget: targetEntry || null,
           },
         ];
-        console.log('stageReparentBlock: ops updated, count:', newOps.length);
         return newOps;
       });
       updateHasStagedChanges(true);
-      console.log('stageReparentBlock: sending iframe command');
+      
       // Локально переносим в iframe
       sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
     },
-    [blockMapForFile, fileType, filePath, sendIframeCommand, updateStagedOps, updateHasStagedChanges]
+    [blockMapForFile, fileType, filePath, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory, projectRoot]
   );
   
   // Обновляем ref для использования в handleEditorMessage
@@ -899,6 +1347,73 @@ function RenderFile({ filePath }) {
       // Сохраняем предыдущий текст для undo
       const previousText = textSnapshots[blockId] || '';
       
+      // Bidirectional editing через AST для React/React Native
+      if (fileType === 'react' || fileType === 'react-native') {
+        (async () => {
+          try {
+            const manager = astManagerRef.current;
+            
+            if (!manager) {
+              if (projectRoot) {
+                const newManager = new AstBidirectionalManager(filePath, projectRoot);
+                const initResult = await newManager.initializeFromCode(String(fileContent ?? ''));
+                if (!initResult.ok) {
+                  throw new Error('Failed to initialize AstBidirectionalManager');
+                }
+                astManagerRef.current = newManager;
+                // Продолжаем с новым менеджером
+                return await stageSetText({ blockId, text });
+              } else {
+                throw new Error('projectRoot not available for AST bidirectional editing');
+              }
+            }
+            
+            // Обновляем codeAST при изменении текста (не трогаем constructorAST)
+            const updateResult = manager.updateCodeAST(blockId, {
+              type: 'text',
+              text: String(text ?? ''),
+            });
+            
+            if (!updateResult.ok) {
+              throw new Error(updateResult.error || 'Ошибка обновления текста в codeAST');
+            }
+            
+            // Генерируем код из codeAST
+            const generateResult = manager.generateCodeFromCodeAST();
+            
+            if (!generateResult.ok) {
+              throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
+            }
+            
+            const newContent = generateResult.code;
+            
+            // Автосохранение в файл
+            await writeFile(filePath, newContent, { backup: true });
+            
+            // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
+            setFileContent(newContent);
+            updateMonacoEditorWithScroll(newContent);
+            setRenderVersion((v) => v + 1);
+            
+            // Добавляем в историю для undo
+            addToHistory({
+              type: 'setText',
+              blockId,
+              text: String(text ?? ''),
+              previousText,
+            });
+          } catch (e) {
+            console.error('stageSetText error:', e);
+            setError(`Ошибка изменения текста: ${e.message}`);
+          }
+        })();
+        
+        // Локально обновляем в iframe
+        sendIframeCommand({ type: MRPAK_CMD.SET_TEXT, id: blockId, text: String(text ?? '') });
+        return;
+      }
+      
+      // Для HTML используем старую логику
       const entry = blockMapForFile ? blockMapForFile[blockId] : null;
       updateStagedOps((prev) => [
         ...prev,
@@ -1004,11 +1519,52 @@ function RenderFile({ filePath }) {
     }
   }, [filePath, unsavedContent, fileContent, fileType]);
 
-  // Обработка изменений в редакторе (без автосохранения)
+  // Обработка изменений в редакторе с автосохранением
   const handleEditorChange = useCallback((newValue) => {
     setUnsavedContent(newValue);
     setIsModified(true);
-  }, []);
+    
+    // Автосохранение с debounce (1 секунда)
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      if (!filePath || !newValue) return;
+      
+      try {
+        // Устанавливаем флаг, чтобы предотвратить рекурсию при обновлении из редактора кода
+        isUpdatingFromFileRef.current = true;
+        
+        try {
+          // Для React/React Native: обновляем codeAST из кода и синхронизируем constructorAST
+          if ((fileType === 'react' || fileType === 'react-native') && projectRoot) {
+            const manager = astManagerRef.current;
+            if (manager) {
+              // Обновляем codeAST из нового кода и синхронизируем constructorAST
+              // НЕ обновляем конструктор напрямую - он работает только через constructorAST
+              await manager.updateCodeASTFromCode(newValue, false);
+            }
+          }
+          
+          // Автосохранение в файл
+          await writeFile(filePath, newValue, { backup: true });
+          setFileContent(newValue);
+          setUnsavedContent(null);
+          setIsModified(false);
+          console.log('[handleEditorChange] Автосохранение выполнено');
+        } finally {
+          // Сбрасываем флаг после небольшой задержки
+          setTimeout(() => {
+            isUpdatingFromFileRef.current = false;
+          }, 100);
+        }
+      } catch (e) {
+        console.error('[handleEditorChange] Ошибка автосохранения:', e);
+        isUpdatingFromFileRef.current = false;
+      }
+    }, 1000);
+  }, [filePath, fileType, projectRoot]);
 
   // Обработка Ctrl+S (глобальный обработчик)
   useEffect(() => {
@@ -1043,37 +1599,36 @@ function RenderFile({ filePath }) {
         }
         
         // В режиме конструктора (edit) сохраняем staged изменения
-        if (viewMode === 'edit') {
-          if (hasStagedChanges) {
-            console.log('💾 [Global Ctrl+S] Сохраняю staged изменения из конструктора...');
-            commitStagedPatches();
-          } else {
-            console.log('💾 [Global Ctrl+S] В режиме edit нет staged изменений');
-          }
-          return;
-        }
-        
-        // В режиме редактора кода всегда сохраняем (даже если не было изменений)
-        if (viewMode === 'code') {
-          // Получаем текущее значение из редактора, если доступно
+        // В режиме edit/split изменения применяются сразу (bidirectional editing)
+        // Ctrl+S здесь только для сохранения кода из Monaco Editor в split режиме
+        if (viewMode === 'split' && isModified) {
           let contentToSave = null;
           if (monacoEditorRef?.current) {
             try {
               contentToSave = monacoEditorRef.current.getValue();
-              console.log('💾 [Global Ctrl+S] Получено содержимое из Monaco Editor, длина:', contentToSave?.length);
             } catch (e) {
               console.warn('💾 [Global Ctrl+S] Ошибка получения значения из редактора:', e);
             }
           }
-          
-          // Если не удалось получить из редактора, используем текущее состояние
           if (!contentToSave) {
             contentToSave = unsavedContent !== null ? unsavedContent : fileContent;
-            console.log('💾 [Global Ctrl+S] Использую содержимое из состояния, длина:', contentToSave?.length);
           }
-          
-          console.log('💾 [Global Ctrl+S] Вызываю saveFile для режима code...');
+          if (contentToSave) {
+            console.log('💾 [Global Ctrl+S] Сохраняю изменения кода в режиме split...');
           saveFile(contentToSave);
+          }
+          return;
+        }
+        
+        // В режиме edit изменения уже применены (bidirectional editing)
+        if (viewMode === 'edit') {
+          console.log('💾 [Global Ctrl+S] В режиме edit изменения применяются автоматически');
+          return;
+        }
+        
+        // В режиме code автосохранение работает автоматически, Ctrl+S отключен
+        if (viewMode === 'code') {
+          console.log('💾 [Global Ctrl+S] В режиме code автосохранение работает автоматически');
           return;
         }
         
@@ -1096,8 +1651,8 @@ function RenderFile({ filePath }) {
   // Обработка Ctrl+Z (Undo) и Ctrl+Shift+Z (Redo)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Только в режиме конструктора
-      if (viewMode !== 'edit') return;
+      // Только в режиме конструктора (edit или split)
+      if (viewMode !== 'edit' && viewMode !== 'split') return;
       
       // Ctrl+Z или Cmd+Z (без Shift) - Undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -1133,6 +1688,93 @@ function RenderFile({ filePath }) {
     };
   }, [viewMode, undo, redo]);
 
+  // Обработчики для изменения размера split панелей
+  const handleSplitResizeStart = useCallback((e) => {
+    setIsResizing(true);
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+  }, []);
+
+  const handleSplitResize = useCallback((e) => {
+    if (!isResizing) return;
+    
+    // Для React Native Web используем DOM API
+    let container = splitContainerRef.current;
+    
+    // Пробуем получить DOM элемент разными способами
+    if (container) {
+      if (typeof container.getBoundingClientRect === 'function') {
+        // Уже DOM элемент
+      } else if (container._nativeNode) {
+        container = container._nativeNode;
+      } else if (container._internalInstanceHandle?.stateNode) {
+        container = container._internalInstanceHandle.stateNode;
+      } else if (container._owner?.stateNode) {
+        container = container._owner.stateNode;
+      }
+    }
+    
+    // Пробуем найти через document.querySelector если ref не работает
+    if (!container || typeof container.getBoundingClientRect !== 'function') {
+      // Используем глобальный поиск по классу или data-атрибуту
+      const splitContainers = document.querySelectorAll('[data-split-container]');
+      if (splitContainers.length > 0) {
+        container = splitContainers[0];
+      }
+    }
+    
+    if (!container || typeof container.getBoundingClientRect !== 'function') {
+      return;
+    }
+    
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
+    const relativeX = x - rect.left;
+    const newWidth = Math.max(0.2, Math.min(0.8, relativeX / rect.width));
+    
+    setSplitLeftWidth(newWidth);
+  }, [isResizing]);
+
+  const handleSplitResizeEnd = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  // Эффект для обработки изменения размера
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e) => {
+      handleSplitResize(e);
+      if (e.preventDefault) e.preventDefault();
+    };
+    const handleMouseUp = () => {
+      handleSplitResizeEnd();
+    };
+    const handleTouchMove = (e) => {
+      handleSplitResize(e);
+      if (e.preventDefault) e.preventDefault();
+    };
+    const handleTouchEnd = () => {
+      handleSplitResizeEnd();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mousemove', handleMouseMove, { passive: false });
+      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleTouchEnd);
+      }
+    };
+  }, [isResizing, handleSplitResize, handleSplitResizeEnd]);
+
   const loadFile = useCallback(async (path) => {
     setLoading(true);
     setError(null);
@@ -1157,6 +1799,10 @@ function RenderFile({ filePath }) {
             const imports = parseStyleImports(result.content);
             setExternalStylesMap(imports);
             console.log('RenderFile: Parsed style imports:', imports);
+            
+            // Инициализируем менеджер AST для bidirectional editing
+            // Менеджер будет инициализирован позже, когда projectRoot будет доступен
+            // (в useEffect для загрузки projectRoot)
           } else {
             setExternalStylesMap({});
           }
@@ -1177,7 +1823,7 @@ function RenderFile({ filePath }) {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (viewMode !== 'edit' || !filePath) return;
+      if ((viewMode !== 'edit' && viewMode !== 'split') || !filePath) return;
       try {
         const root = await findProjectRoot(filePath);
         if (cancelled) return;
@@ -1187,6 +1833,21 @@ function RenderFile({ filePath }) {
           if (!cancelled && res?.ok) {
             setLayerNames(res.names || {});
           }
+          
+          // Инициализируем AstBidirectionalManager если это React/React Native файл
+          if ((fileType === 'react' || fileType === 'react-native') && fileContent) {
+            const manager = new AstBidirectionalManager(filePath, root);
+            const initResult = await manager.initializeFromCode(String(fileContent));
+            if (initResult.ok) {
+              astManagerRef.current = manager;
+              console.log('[RenderFile] Initialized AstBidirectionalManager');
+            } else {
+              console.warn('[RenderFile] Failed to initialize AstBidirectionalManager:', initResult.error);
+              astManagerRef.current = null;
+            }
+          }
+        } else {
+          astManagerRef.current = null;
         }
       } catch (e) {
         // ignore
@@ -1265,12 +1926,108 @@ function RenderFile({ filePath }) {
     });
     
     // Обработчик изменений файла
-    const handleFileChanged = (changedFilePath) => {
+    const handleFileChanged = async (changedFilePath) => {
       if (changedFilePath === currentFilePath) {
+        console.log('RenderFile: File changed, syncing with AST:', changedFilePath);
+        
+        // Сохраняем текущий фокус (selectedBlock) перед обновлением
+        const savedSelectedBlock = selectedBlock;
+        
+        // Bidirectional editing через AST: синхронизируем код -> constructorAST
+        if ((fileType === 'react' || fileType === 'react-native') && (viewMode === 'edit' || viewMode === 'split')) {
+          try {
+            // Загружаем новый код
+            const readResult = await readFile(changedFilePath);
+            if (readResult?.success && readResult.content) {
+              const newCode = readResult.content;
+              
+              // Обновляем codeAST из нового кода и синхронизируем constructorAST
+              const manager = astManagerRef.current;
+              
+              if (!manager) {
+                // Если менеджер не инициализирован, создаем его
+                const newManager = new AstBidirectionalManager(changedFilePath, projectRoot);
+                const initResult = await newManager.initializeFromCode(newCode);
+                if (initResult.ok) {
+                  astManagerRef.current = newManager;
+                  setFileContent(newCode);
+                  
+                  // Восстанавливаем фокус
+                  if (savedSelectedBlock) {
+                    setTimeout(() => {
+                      setSelectedBlock(savedSelectedBlock);
+                      sendIframeCommand({ type: MRPAK_CMD.SELECT, id: savedSelectedBlock.id });
+                    }, 100);
+                  }
+                  return;
+                } else {
+                  console.warn('[RenderFile] Failed to initialize AstBidirectionalManager, falling back');
+                }
+              } else {
+                // Проверяем, не обновляется ли это из конструктора (чтобы избежать рекурсии)
+                if (isUpdatingFromConstructorRef.current) {
+                  console.log('[RenderFile] Skipping file update - update is from constructor');
+                  // Обновляем только codeAST без синхронизации constructorAST
+                  const updateResult = await manager.updateCodeASTFromCode(newCode, true);
+                  if (updateResult.ok) {
+                    setFileContent(newCode);
+                    updateMonacoEditorWithScroll(newCode);
+                  }
+                  return;
+                }
+                
+                // Устанавливаем флаг для предотвращения рекурсии
+                isUpdatingFromFileRef.current = true;
+                
+                try {
+                  // Обновляем codeAST из нового кода и синхронизируем constructorAST
+                  // НЕ обновляем конструктор напрямую - он работает только через constructorAST
+                  const updateResult = await manager.updateCodeASTFromCode(newCode, false);
+                  
+                  if (updateResult.ok) {
+                    console.log('[RenderFile] Updated codeAST and synced constructorAST from new code');
+                    
+                    // Обновляем fileContent для Monaco Editor
+                    setFileContent(newCode);
+                    
+                    // Обновляем Monaco Editor без перезагрузки с сохранением скролла
+                    updateMonacoEditorWithScroll(newCode);
+                    
+                    // Восстанавливаем фокус после синхронизации
+                    if (savedSelectedBlock) {
+                      setTimeout(() => {
+                        setSelectedBlock(savedSelectedBlock);
+                        sendIframeCommand({ type: MRPAK_CMD.SELECT, id: savedSelectedBlock.id });
+                      }, 100);
+                    }
+                    return;
+                  } else {
+                    console.warn('[RenderFile] Failed to update codeAST from code:', updateResult.error);
+                  }
+                } finally {
+                  // Сбрасываем флаг
+                  setTimeout(() => {
+                    isUpdatingFromFileRef.current = false;
+                  }, 100);
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('[RenderFile] AST bidirectional sync failed, falling back to full reload:', error);
+          }
+        }
+        
+        // Fallback на полную перезагрузку
         console.log('RenderFile: File changed, reloading:', changedFilePath);
-        // Небольшая задержка для гарантии, что файл записан
         setTimeout(() => {
           loadFile(changedFilePath);
+          // Восстанавливаем фокус после перезагрузки
+          if (savedSelectedBlock) {
+            setTimeout(() => {
+              setSelectedBlock(savedSelectedBlock);
+              sendIframeCommand({ type: MRPAK_CMD.SELECT, id: savedSelectedBlock.id });
+            }, 200);
+          }
         }, 100);
       }
     };
@@ -1301,7 +2058,7 @@ function RenderFile({ filePath }) {
         try {
           console.log('RenderFile: Rendering React file, content length:', fileContent.length);
           const framework = createFramework('react', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode });
+          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot });
           console.log('RenderFile: Generated React HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
           setReactHTML(result.html);
@@ -1333,7 +2090,7 @@ function RenderFile({ filePath }) {
         try {
           console.log('RenderFile: Rendering React Native file, content length:', fileContent.length);
           const framework = createFramework('react-native', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode });
+          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot });
           console.log('RenderFile: Generated React Native HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
           setReactNativeHTML(result.html);
@@ -1561,7 +2318,7 @@ function RenderFile({ filePath }) {
         try {
           console.log('RenderFile: Processing HTML with dependencies');
           const framework = createFramework('html', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode });
+          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot });
           setProcessedHTML(result.html);
           setHtmlDependencyPaths(result.dependencyPaths);
           setBlockMap(result.blockMapForEditor || {});
@@ -1643,9 +2400,9 @@ function RenderFile({ filePath }) {
     };
   }, [htmlDependencyPaths, filePath, fileType]);
 
-  // Подготовка HTML для режима "Редактор"
+  // Подготовка HTML для режима "Редактор" и "Split"
   useEffect(() => {
-    if (viewMode !== 'edit') {
+    if (viewMode !== 'edit' && viewMode !== 'split') {
       setEditorHTML('');
       return;
     }
@@ -1656,24 +2413,24 @@ function RenderFile({ filePath }) {
         const inst = instrumentHtml(base, filePath);
         setBlockMap(inst.map || {});
         setBlockMapForFile(inst.map || {});
-        // Передаем режим в скрипт блочного редактора
-        setEditorHTML(injectBlockEditorScript(inst.html, 'html', viewMode === 'edit' ? 'edit' : 'preview'));
+        // Передаем режим в скрипт блочного редактора (edit или split)
+        setEditorHTML(injectBlockEditorScript(inst.html, 'html', (viewMode === 'edit' || viewMode === 'split') ? 'edit' : 'preview'));
         return;
       }
 
       if (fileType === 'react' && reactHTML) {
         // Для React файлов blockMap уже установлен при генерации reactHTML через createReactHTML
         // Используем готовый blockMap, который содержит правильные позиции для обработанного кода
-        // Передаем режим в скрипт блочного редактора
-        setEditorHTML(injectBlockEditorScript(reactHTML, 'react', viewMode === 'edit' ? 'edit' : 'preview'));
+        // Передаем режим в скрипт блочного редактора (edit или split)
+        setEditorHTML(injectBlockEditorScript(reactHTML, 'react', (viewMode === 'edit' || viewMode === 'split') ? 'edit' : 'preview'));
         return;
       }
 
       if (fileType === 'react-native' && reactNativeHTML) {
         // Для React Native файлов blockMap уже установлен при генерации reactNativeHTML через createReactNativeHTML
         // Используем готовый blockMap, который содержит правильные позиции для обработанного кода
-        // Передаем режим в скрипт блочного редактора
-        setEditorHTML(injectBlockEditorScript(reactNativeHTML, 'react-native', viewMode === 'edit' ? 'edit' : 'preview'));
+        // Передаем режим в скрипт блочного редактора (edit или split)
+        setEditorHTML(injectBlockEditorScript(reactNativeHTML, 'react-native', (viewMode === 'edit' || viewMode === 'split') ? 'edit' : 'preview'));
         return;
       }
     } catch (e) {
@@ -4085,6 +4842,77 @@ function RenderFile({ filePath }) {
               </View>
             )}
           </View>
+        ) : viewMode === 'split' ? (
+          <View 
+            style={styles.splitContainer}
+            ref={splitContainerRef}
+            onLayout={(e) => {
+              if (splitContainerRef.current && !splitContainerRef.current.getBoundingClientRect) {
+                // Для React Native Web используем DOM API
+                const element = splitContainerRef.current;
+                if (element && typeof element.getBoundingClientRect === 'function') {
+                  // Элемент уже доступен
+                }
+              }
+            }}
+          >
+            <View style={[styles.splitLeft, { width: `${splitLeftWidth * 100}%`, maxWidth: '80%', minWidth: '20%' }]}>
+              <View style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+                <BlockEditorPanel
+                  fileType="html"
+                  html={editorHTML || htmlToRender}
+                  selectedBlock={selectedBlock}
+                  onMessage={handleEditorMessage}
+                  onApplyPatch={applyAndCommitPatch}
+                  onStagePatch={applyBlockPatch}
+                  layersTree={layersTree}
+                  layerNames={layerNames}
+                  onRenameLayer={handleRenameLayer}
+                  outgoingMessage={iframeCommand}
+                  onSendCommand={sendIframeCommand}
+                  onInsertBlock={stageInsertBlock}
+                  onDeleteBlock={stageDeleteBlock}
+                  styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
+                  textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
+                  onReparentBlock={stageReparentBlock}
+                  onSetText={stageSetText}
+                  framework={framework}
+                  onUndo={undo}
+                  onRedo={redo}
+                  canUndo={undoStack.length > 0}
+                  canRedo={redoStack.length > 0}
+                  livePosition={livePosition}
+                />
+                {hasStagedChanges && (
+                  <View style={styles.saveIndicator} pointerEvents="none">
+                    <Text style={styles.saveIndicatorText}>● Несохраненные изменения</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View 
+              style={[styles.splitDivider, isResizing && styles.splitDividerActive]}
+              onMouseDown={handleSplitResizeStart}
+              onTouchStart={handleSplitResizeStart}
+            />
+            <View style={[styles.splitRight, { width: `${(1 - splitLeftWidth) * 100}%`, maxWidth: '80%', minWidth: '20%' }]}>
+              <View style={styles.editorContainer}>
+                <MonacoEditorWrapper
+                  value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+                  language={getMonacoLanguage(fileType, filePath)}
+                  filePath={filePath}
+                  onChange={handleEditorChange}
+                  onSave={saveFile}
+                  editorRef={monacoEditorRef}
+                />
+                {isModified && (
+                  <View style={styles.saveIndicator} pointerEvents="none">
+                    <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S)</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>История изменений</Text>
@@ -4218,6 +5046,87 @@ function RenderFile({ filePath }) {
               </View>
             )}
           </View>
+        ) : viewMode === 'split' ? (
+          <View 
+            style={styles.splitContainer}
+            data-split-container="true"
+            ref={(ref) => {
+              if (ref) {
+                // Для React Native Web пробуем получить DOM элемент
+                if (ref._nativeNode) {
+                  splitContainerRef.current = ref._nativeNode;
+                } else if (typeof ref.getBoundingClientRect === 'function') {
+                  splitContainerRef.current = ref;
+                } else {
+                  splitContainerRef.current = ref;
+                  // Пробуем найти через setTimeout (когда элемент уже в DOM)
+                  setTimeout(() => {
+                    const element = document.querySelector('[data-split-container]');
+                    if (element) {
+                      splitContainerRef.current = element;
+                    }
+                  }, 0);
+                }
+              }
+            }}
+          >
+            <View style={[styles.splitLeft, { width: `${splitLeftWidth * 100}%`, maxWidth: '80%', minWidth: '20%' }]}>
+              <View style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+                <BlockEditorPanel
+                  fileType="react"
+                  html={editorHTML || reactHTML}
+                  selectedBlock={selectedBlock}
+                  onMessage={handleEditorMessage}
+                  onApplyPatch={applyAndCommitPatch}
+                  onStagePatch={applyBlockPatch}
+                  layersTree={layersTree}
+                  layerNames={layerNames}
+                  onRenameLayer={handleRenameLayer}
+                  outgoingMessage={iframeCommand}
+                  onSendCommand={sendIframeCommand}
+                  onInsertBlock={stageInsertBlock}
+                  onDeleteBlock={stageDeleteBlock}
+                  styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
+                  textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
+                  onReparentBlock={stageReparentBlock}
+                  onSetText={stageSetText}
+                  framework={framework}
+                  onUndo={undo}
+                  onRedo={redo}
+                  canUndo={undoStack.length > 0}
+                  canRedo={redoStack.length > 0}
+                  livePosition={livePosition}
+                />
+                {hasStagedChanges && (
+                  <View style={styles.saveIndicator} pointerEvents="none">
+                    <Text style={styles.saveIndicatorText}>● Несохраненные изменения</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View 
+              style={[styles.splitDivider, isResizing && styles.splitDividerActive]}
+              onMouseDown={handleSplitResizeStart}
+              onTouchStart={handleSplitResizeStart}
+            />
+            <View style={[styles.splitRight, { width: `${(1 - splitLeftWidth) * 100}%`, maxWidth: '80%', minWidth: '20%' }]}>
+              <View style={styles.editorContainer}>
+                <MonacoEditorWrapper
+                  value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+                  language={getMonacoLanguage(fileType, filePath)}
+                  filePath={filePath}
+                  onChange={handleEditorChange}
+                  onSave={saveFile}
+                  editorRef={monacoEditorRef}
+                />
+                {isModified && (
+                  <View style={styles.saveIndicator} pointerEvents="none">
+                    <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S)</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>История изменений</Text>
@@ -4345,6 +5254,87 @@ function RenderFile({ filePath }) {
                 <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S для сохранения)</Text>
               </View>
             )}
+          </View>
+        ) : viewMode === 'split' ? (
+          <View 
+            style={styles.splitContainer}
+            data-split-container="true"
+            ref={(ref) => {
+              if (ref) {
+                // Для React Native Web пробуем получить DOM элемент
+                if (ref._nativeNode) {
+                  splitContainerRef.current = ref._nativeNode;
+                } else if (typeof ref.getBoundingClientRect === 'function') {
+                  splitContainerRef.current = ref;
+                } else {
+                  splitContainerRef.current = ref;
+                  // Пробуем найти через setTimeout (когда элемент уже в DOM)
+                  setTimeout(() => {
+                    const element = document.querySelector('[data-split-container]');
+                    if (element) {
+                      splitContainerRef.current = element;
+                    }
+                  }, 0);
+                }
+              }
+            }}
+          >
+            <View style={[styles.splitLeft, { width: `${splitLeftWidth * 100}%`, maxWidth: '80%', minWidth: '20%' }]}>
+              <View style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+                <BlockEditorPanel
+                  fileType="react-native"
+                  html={editorHTML || reactNativeHTML}
+                  selectedBlock={selectedBlock}
+                  onMessage={handleEditorMessage}
+                  onApplyPatch={applyAndCommitPatch}
+                  onStagePatch={applyBlockPatch}
+                  layersTree={layersTree}
+                  layerNames={layerNames}
+                  onRenameLayer={handleRenameLayer}
+                  outgoingMessage={iframeCommand}
+                  onSendCommand={sendIframeCommand}
+                  onInsertBlock={stageInsertBlock}
+                  onDeleteBlock={stageDeleteBlock}
+                  styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
+                  textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
+                  onReparentBlock={stageReparentBlock}
+                  onSetText={stageSetText}
+                  framework={framework}
+                  onUndo={undo}
+                  onRedo={redo}
+                  canUndo={undoStack.length > 0}
+                  canRedo={redoStack.length > 0}
+                  livePosition={livePosition}
+                />
+                {hasStagedChanges && (
+                  <View style={styles.saveIndicator} pointerEvents="none">
+                    <Text style={styles.saveIndicatorText}>● Несохраненные изменения</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View 
+              style={[styles.splitDivider, isResizing && styles.splitDividerActive]}
+              onMouseDown={handleSplitResizeStart}
+              onTouchStart={handleSplitResizeStart}
+            />
+            <View style={[styles.splitRight, { width: `${(1 - splitLeftWidth) * 100}%`, maxWidth: '80%', minWidth: '20%' }]}>
+              <View style={styles.editorContainer}>
+                <MonacoEditorWrapper
+                  value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+                  language={getMonacoLanguage(fileType, filePath)}
+                  filePath={filePath}
+                  onChange={handleEditorChange}
+                  onSave={saveFile}
+                  editorRef={monacoEditorRef}
+                />
+                {isModified && (
+                  <View style={styles.saveIndicator} pointerEvents="none">
+                    <Text style={styles.saveIndicatorText}>● Несохраненные изменения (Ctrl+S)</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
@@ -4608,6 +5598,35 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 600,
     backgroundColor: '#1e1e1e',
+  },
+  splitContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    width: '100%',
+    backgroundColor: '#1e1e1e',
+    overflow: 'hidden',
+  },
+  splitLeft: {
+    minWidth: 300,
+    backgroundColor: '#1e1e1e',
+    overflow: 'hidden',
+    height: '100%',
+  },
+  splitRight: {
+    minWidth: 300,
+    backgroundColor: '#1e1e1e',
+    overflow: 'hidden',
+    height: '100%',
+  },
+  splitDivider: {
+    width: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    cursor: 'col-resize',
+    position: 'relative',
+    zIndex: 10,
+  },
+  splitDividerActive: {
+    backgroundColor: 'rgba(102, 126, 234, 0.5)',
   },
   changesContainer: {
     flex: 1,
