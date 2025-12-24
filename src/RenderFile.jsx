@@ -2359,31 +2359,30 @@ function RenderFile({ filePath }) {
       // Перезагружаем HTML файл при изменении зависимости
       // Используем текущий filePath из замыкания
       const currentPath = filePath;
-      if (window.electronAPI && window.electronAPI.readFile) {
-        window.electronAPI.readFile(currentPath).then((result) => {
-          if (result.success) {
-            setFileContent(result.content);
-          }
-        });
-      }
+      // Используем readFile из filesystem-api
+      readFile(currentPath).then((result) => {
+        if (result.success) {
+          setFileContent(result.content);
+        }
+      });
     };
 
-    if (window.electronAPI && window.electronAPI.watchFile && window.electronAPI.onFileChanged) {
-      htmlDependencyPaths.forEach((depPath) => {
-        window.electronAPI.watchFile(depPath).then((result) => {
-          if (result.success) {
-            console.log('RenderFile: Started watching HTML dependency:', depPath);
-          }
-        });
-
-        const unsubscribe = window.electronAPI.onFileChanged((changedFilePath) => {
-          if (changedFilePath === depPath) {
-            handleDependencyChanged(changedFilePath);
-          }
-        });
-        unsubscribers.push(unsubscribe);
+    // File System API не поддерживает watch, но вызываем для совместимости
+    htmlDependencyPaths.forEach((depPath) => {
+      watchFile(depPath).then((result) => {
+        if (result.success) {
+          console.log('RenderFile: Started watching HTML dependency:', depPath);
+        }
       });
-    }
+
+      // File System API не поддерживает события изменения файлов
+      const unsubscribe = onFileChanged((changedFilePath) => {
+        if (changedFilePath === depPath) {
+          handleDependencyChanged(changedFilePath);
+        }
+      });
+      unsubscribers.push(unsubscribe);
+    });
 
     return () => {
       unsubscribers.forEach((unsubscribe) => {
@@ -2393,9 +2392,8 @@ function RenderFile({ filePath }) {
       });
 
       htmlDependencyPaths.forEach((depPath) => {
-        if (window.electronAPI && window.electronAPI.unwatchFile) {
-          window.electronAPI.unwatchFile(depPath);
-        }
+        // File System API не поддерживает unwatch
+        unwatchFile(depPath);
       });
     };
   }, [htmlDependencyPaths, filePath, fileType]);

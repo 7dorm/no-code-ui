@@ -1,0 +1,101 @@
+{
+  "2-simple-react/App.jsx": {
+    "timestamp": "2025-12-24T06:44:17.925Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 3029,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 86,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:369:671:div": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 312,
+        "end": 661,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:678:861:div": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 668,
+        "end": 898,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:880:1062:div": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 917,
+        "end": 1147,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1073:1167:h2": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1158,
+        "end": 1300,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1190:1310:p": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1323,
+        "end": 1502,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1341:1349:strong": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1533,
+        "end": 1593,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1391:1739:button": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1635,
+        "end": 2035,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1823:1939:p": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2119,
+        "end": 2282,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2017:2199:div": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2360,
+        "end": 2591,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2210:2257:h3": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2602,
+        "end": 2697,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2280:2331:p": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2720,
+        "end": 2818,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  }
+}

@@ -88,14 +88,15 @@ export async function createFolder(folderPath) {
 
 /**
  * Создание нового проекта с базовыми файлами
- * @param {string} parentPath - родительская директория
+ * @param {string} parentPath - родительская директория (относительный путь, игнорируется в File System API)
  * @param {string} projectName - название проекта
  * @param {string} projectType - тип проекта ('react', 'react-native', 'html')
  * @returns {Promise<{success: boolean, projectPath?: string, error?: string}>}
  */
 export async function createProject(parentPath, projectName, projectType = 'react') {
   try {
-    const projectPath = `${parentPath}/${projectName}`;
+    // В File System API мы работаем с относительными путями от корневой директории
+    const projectPath = projectName;
     
     // Создаем папку проекта
     const folderResult = await ensureDir(projectPath);

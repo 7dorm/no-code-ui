@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import RenderFile from './RenderFile';
 import FileTree from './FileTree';
-import { openDirectoryDialog } from './shared/api/electron-api';
+import { openDirectoryDialog, setRootDirectory, isFileSystemAPIAvailable } from './shared/api/filesystem-api';
 import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
 import { createProject } from './features/file-operations/lib/file-operations';
 
@@ -15,14 +15,53 @@ function AppRN() {
 
   const handleSelectProject = async () => {
     try {
-      const result = await openDirectoryDialog();
+      setError(null);
       
-      if (!result.canceled && result.directoryPath) {
-        setProjectPath(result.directoryPath);
+      // Проверяем доступность File System API
+      if (!isFileSystemAPIAvailable()) {
+        const isSecureContext = window.isSecureContext;
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const hasDirectoryPicker = 'showDirectoryPicker' in window;
+        const hasFilePicker = 'showOpenFilePicker' in window;
+        
+        let errorMsg = `File System API недоступен. `;
+        if (!hasDirectoryPicker || !hasFilePicker) {
+          errorMsg += `Ваш браузер не поддерживает File System API. Требуется Chrome 86+, Edge 86+ или Opera 72+. `;
+        } else {
+          errorMsg += `Убедитесь, что вы используете HTTPS или localhost. `;
+        }
+        errorMsg += `Протокол: ${protocol}, hostname: ${hostname}, secure context: ${isSecureContext}`;
+        setError(errorMsg);
+        return;
+      }
+      
+      console.log('Открываем диалог выбора папки...');
+      const result = await openDirectoryDialog();
+      console.log('Результат выбора папки:', result);
+      
+      if (result.error) {
+        setError(`Ошибка при открытии диалога: ${result.error}`);
+        return;
+      }
+      
+      if (!result.canceled && result.directoryHandle) {
+        // Устанавливаем корневую директорию для File System API
+        console.log('Устанавливаем корневую директорию:', result.directoryHandle.name);
+        setRootDirectory(result.directoryHandle);
+        setProjectPath(result.directoryHandle.name);
         setSelectedFilePath(null); // Сбрасываем выбранный файл при смене проекта
+        setError(null); // Очищаем ошибки при успешном открытии
+      } else if (result.canceled) {
+        // Пользователь отменил выбор - это нормально, не показываем ошибку
+        console.log('Выбор папки отменен пользователем');
+      } else {
+        console.warn('Неожиданный результат выбора папки:', result);
+        setError('Не удалось получить доступ к выбранной папке');
       }
     } catch (error) {
       console.error('Ошибка при выборе папки:', error);
+      setError(`Ошибка при выборе папки: ${error.message || error.toString()}`);
     }
   };
 
@@ -37,17 +76,27 @@ function AppRN() {
       // Открываем диалог выбора родительской папки
       const result = await openDirectoryDialog();
       
-      if (!result.canceled && result.directoryPath) {
-        // Создаем проект
-        const createResult = await createProject(result.directoryPath, projectName, projectType);
-        
-        if (createResult.success) {
-          // Устанавливаем путь к созданному проекту
-          setProjectPath(createResult.projectPath);
-          setSelectedFilePath(null);
-          setCreateProjectDialogVisible(false);
-        } else {
-          setError(`Ошибка создания проекта: ${createResult.error}`);
+      if (!result.canceled && result.directoryHandle) {
+        // Создаем проект внутри выбранной директории
+        // Сначала создаем папку проекта внутри выбранной директории
+        try {
+          const projectDirHandle = await result.directoryHandle.getDirectoryHandle(projectName, { create: true });
+          // Устанавливаем корневую директорию для File System API как папку проекта
+          setRootDirectory(projectDirHandle);
+          
+          // Создаем проект (передаем пустую строку как parentPath, так как мы уже в корне проекта)
+          const createResult = await createProject('', projectName, projectType);
+          
+          if (createResult.success) {
+            // Устанавливаем путь к созданному проекту
+            setProjectPath(projectName);
+            setSelectedFilePath(null);
+            setCreateProjectDialogVisible(false);
+          } else {
+            setError(`Ошибка создания проекта: ${createResult.error}`);
+          }
+        } catch (dirError) {
+          setError(`Ошибка создания папки проекта: ${dirError.message}`);
         }
       }
     } catch (err) {

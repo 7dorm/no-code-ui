@@ -1,0 +1,326 @@
+{
+  "3-simple-react-native/App.jsx": {
+    "timestamp": "2025-12-24T06:43:30.025Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 3437,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 135,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:487:524:ScrollView": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 487,
+        "end": 524,
+        "tagName": "ScrollView",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:531:560:View": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 531,
+        "end": 560,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:569:596:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 569,
+        "end": 596,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:637:664:View": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 637,
+        "end": 664,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:675:706:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 675,
+        "end": 706,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:746:772:View": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 746,
+        "end": 772,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:794:820:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 794,
+        "end": 820,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:887:1008:TouchableOpacity": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 887,
+        "end": 1008,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1022:1054:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1022,
+        "end": 1054,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1134:1160:View": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1134,
+        "end": 1160,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1171:1202:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1171,
+        "end": 1202,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1232:1258:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1232,
+        "end": 1258,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1346:1372:View": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1346,
+        "end": 1372,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1385:1415:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1385,
+        "end": 1415,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1455:1485:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1455,
+        "end": 1485,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1529:1559:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1529,
+        "end": 1559,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1598:1628:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1598,
+        "end": 1628,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1707:1733:View": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1707,
+        "end": 1733,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1744:1775:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1744,
+        "end": 1775,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1802:1828:Text": {
+        "filePath": "3-simple-react-native/App.jsx",
+        "start": 1802,
+        "end": 1828,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 4
+  },
+  "2-simple-react/App.jsx": {
+    "timestamp": "2025-12-24T06:43:31.152Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 4298,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 132,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:487:524:ScrollView": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 345,
+        "end": 436,
+        "tagName": "ScrollView",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:531:560:View": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 443,
+        "end": 520,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:569:596:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 529,
+        "end": 604,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:637:664:View": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 645,
+        "end": 720,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:675:706:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 731,
+        "end": 810,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:746:772:View": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 850,
+        "end": 924,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:794:820:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 946,
+        "end": 1020,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:887:1008:TouchableOpacity": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1087,
+        "end": 1269,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1022:1054:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1283,
+        "end": 1365,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1134:1160:View": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1445,
+        "end": 1521,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1171:1202:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1532,
+        "end": 1613,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1232:1258:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1643,
+        "end": 1719,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1346:1372:View": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1807,
+        "end": 1883,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1385:1415:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 1896,
+        "end": 1976,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1455:1485:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2016,
+        "end": 2096,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1529:1559:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2140,
+        "end": 2220,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1598:1628:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2259,
+        "end": 2339,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1707:1733:View": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2418,
+        "end": 2494,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1744:1775:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2505,
+        "end": 2586,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1802:1828:Text": {
+        "filePath": "2-simple-react/App.jsx",
+        "start": 2613,
+        "end": 2689,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  }
+}

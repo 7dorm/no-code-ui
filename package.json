@@ -1,18 +1,16 @@
 {
   "name": "render-mrpak",
   "version": "1.0.0",
-  "description": "Electron + React приложение",
-  "main": "electron/main.js",
+  "description": "Веб-приложение для визуального редактирования кода",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "preview": "vite preview"
   },
   "keywords": [
-    "electron",
-    "react"
+    "react",
+    "web",
+    "code-editor"
   ],
   "author": "",
   "license": "MIT",
@@ -22,11 +20,7 @@
     "@types/react-dom": "^18.2.18",
     "@types/react-native": "^0.73.0",
     "@vitejs/plugin-react": "^4.2.1",
-    "concurrently": "^8.2.2",
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1",
-    "vite": "^5.0.8",
-    "wait-on": "^7.2.0"
+    "vite": "^5.0.8"
   },
   "dependencies": {
     "@babel/generator": "^7.23.0",
@@ -39,26 +33,5 @@
     "react-dom": "^18.2.0",
     "react-native-web": "^0.19.10",
     "ts-morph": "^21.0.0"
-  },
-  "build": {
-    "appId": "com.rendermrpak.app",
-    "productName": "No-code UI",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "category": "public.app-category.utilities"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "linux": {
-      "target": "AppImage"
-    }
   }
 }

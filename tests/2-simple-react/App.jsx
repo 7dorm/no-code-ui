@@ -40,7 +40,7 @@ export default function App() {
           border: '2px solid #e9ecef'
         }} data-no-code-ui-id="mrpak:App.jsx:880:1062:div">
           <h2 style={{ color: '#764ba2', marginTop: 0, position: "relative", left: 3.5, top: -61.922 }} data-no-code-ui-id="mrpak:App.jsx:1073:1167:h2">Счетчик</h2>
-          <p style={{ color: '#495057', fontSize: '18px', position: "relative", left: 45, top: -34.078, width: 125, height: 80 }} data-no-code-ui-id="mrpak:App.jsx:1190:1310:p">
+          <p style={{ color: '#495057', fontSize: '18px', position: "relative", left: 31, top: -23.078000000000003, width: 125, height: 80 }} data-no-code-ui-id="mrpak:App.jsx:1190:1310:p">
             Текущее значение: <strong data-no-code-ui-id="mrpak:App.jsx:1341:1349:strong">{count}</strong>
           </p>
           <button

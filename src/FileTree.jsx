@@ -5,6 +5,7 @@ import { RenameDialog } from './shared/ui/dialogs/rename-dialog';
 import { CreateFileDialog } from './shared/ui/dialogs/create-file-dialog';
 import { CreateFolderDialog } from './shared/ui/dialogs/create-folder-dialog';
 import { loadDirectory, renameItem, deleteItem, deleteDir, createFile, createFolder } from './features/file-operations/lib/file-operations';
+import { readDirectory, deleteFile, deleteDirectory } from './shared/api/filesystem-api';
 
 // Диалоги вынесены в shared/ui/dialogs
 
@@ -322,6 +323,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
   const [itemToRename, setItemToRename] = useState(null);
 
   const loadDirectory = useCallback(async (dirPath, isRoot = false) => {
+    // dirPath - это относительный путь внутри проекта (пустая строка для корня)
     if (loadedPaths.has(dirPath) && !isRoot) {
       return; // Уже загружено (кроме корня)
     }
@@ -332,38 +334,32 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
     setError(null);
 
     try {
-      if (window.electronAPI && window.electronAPI.readDirectory) {
-        const result = await window.electronAPI.readDirectory(dirPath);
+      const result = await readDirectory(dirPath);
 
-        if (result.success) {
-          setLoadedPaths(prev => new Set([...prev, dirPath]));
+      if (result.success) {
+        setLoadedPaths(prev => new Set([...prev, dirPath]));
 
-          // Обновляем дерево
-          const updateTree = (items, targetPath, newItems) => {
-            return items.map(item => {
-              if (item.path === targetPath && item.isDirectory) {
-                return { ...item, children: newItems };
-              }
-              if (item.children) {
-                return { ...item, children: updateTree(item.children, targetPath, newItems) };
-              }
-              return item;
-            });
-          };
+        // Обновляем дерево
+        const updateTree = (items, targetPath, newItems) => {
+          return items.map(item => {
+            if (item.path === targetPath && item.isDirectory) {
+              return { ...item, children: newItems };
+            }
+            if (item.children) {
+              return { ...item, children: updateTree(item.children, targetPath, newItems) };
+            }
+            return item;
+          });
+        };
 
-          if (isRoot || dirPath === rootPath) {
-            setTree(result.items);
-          } else {
-            setTree(prev => updateTree(prev, dirPath, result.items));
-          }
+        if (isRoot) {
+          setTree(result.items);
         } else {
-          if (isRoot) {
-            setError(`Ошибка загрузки: ${result.error}`);
-          }
+          setTree(prev => updateTree(prev, dirPath, result.items));
         }
       } else {
         if (isRoot) {
-          setError('Electron API не доступен');
+          setError(`Ошибка загрузки: ${result.error}`);
         }
       }
     } catch (err) {
@@ -375,18 +371,20 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
         setLoading(false);
       }
     }
-  }, [rootPath, loadedPaths]);
+  }, [loadedPaths]);
 
   useEffect(() => {
     if (rootPath) {
       setTree([]);
       setExpandedPaths(new Set());
       setLoadedPaths(new Set());
-      loadDirectory(rootPath, true);
+      // Используем пустую строку для корневой директории в File System API
+      loadDirectory('', true);
     }
   }, [rootPath]);
 
   const handleToggleExpand = (path) => {
+    // path - это относительный путь (уже нормализован из item.path)
     const newExpanded = new Set(expandedPaths);
     if (newExpanded.has(path)) {
       newExpanded.delete(path);
@@ -422,12 +420,13 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
   };
 
   const handleRenameConfirm = async (newName) => {
-    if (!itemToRename || !newName || !rootPath) return;
+    if (!itemToRename || !newName) return;
 
     try {
-      // Определяем родительскую директорию
-      const parentPath = itemToRename.path.split(/[/\\]/).slice(0, -1).join('/');
-      const newPath = `${parentPath}/${newName}`;
+        // Определяем родительскую директорию (itemToRename.path уже относительный)
+        const parts = itemToRename.path.split(/[/\\]/);
+        const parentPath = parts.slice(0, -1).join('/');
+        const newPath = parentPath ? `${parentPath}/${newName}` : newName;
 
       const result = await renameItem(itemToRename.path, newPath);
 
@@ -451,7 +450,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
           });
 
           // Перезагружаем родительскую директорию
-          await loadDirectory(parentPath, parentPath === rootPath);
+          await loadDirectory(parentPath, parentPath === '');
 
           setRenameDialogVisible(false);
           setItemToRename(null);
@@ -468,28 +467,14 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!itemToDelete || !rootPath) return;
+    if (!itemToDelete) return;
 
     try {
       let result;
       if (itemToDelete.isDirectory) {
-        if (window.electronAPI && window.electronAPI.deleteDirectory) {
-          result = await window.electronAPI.deleteDirectory(itemToDelete.path);
-        } else {
-          setError('API удаления директории не доступен');
-          setDeleteDialogVisible(false);
-          setItemToDelete(null);
-          return;
-        }
+        result = await deleteDirectory(itemToDelete.path);
       } else {
-        if (window.electronAPI && window.electronAPI.deleteFile) {
-          result = await window.electronAPI.deleteFile(itemToDelete.path);
-        } else {
-          setError('API удаления файла не доступен');
-          setDeleteDialogVisible(false);
-          setItemToDelete(null);
-          return;
-        }
+        result = await deleteFile(itemToDelete.path);
       }
 
       if (result.success) {
@@ -498,9 +483,9 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
           onSelectFile(null);
         }
 
-        // Определяем родительскую директорию для перезагрузки
-        const parentPath = itemToDelete.path.split(/[/\\]/).slice(0, -1).join('/');
-        const parentDir = parentPath || rootPath;
+        // Определяем родительскую директорию для перезагрузки (itemToDelete.path уже относительный)
+        const parts = itemToDelete.path.split(/[/\\]/);
+        const parentDir = parts.slice(0, -1).join('/') || '';
 
         // Сбрасываем кэш для родительской директории
         setLoadedPaths(prev => {
@@ -516,7 +501,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
         });
 
         // Перезагружаем родительскую директорию
-        await loadDirectory(parentDir, parentDir === rootPath);
+        await loadDirectory(parentDir, parentDir === '');
 
         setDeleteDialogVisible(false);
         setItemToDelete(null);
@@ -536,7 +521,8 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
     if (!createDialogPath || !fileName) return;
 
     try {
-      const filePath = `${createDialogPath}/${fileName}`;
+      // createDialogPath - это относительный путь директории
+      const filePath = createDialogPath ? `${createDialogPath}/${fileName}` : fileName;
 
       // Определяем начальное содержимое по расширению
       const ext = fileName.split('.').pop()?.toLowerCase();
@@ -606,7 +592,7 @@ export default ${componentName};`;
           return newSet;
         });
         // Перезагружаем директорию
-        await loadDirectory(parentDir, parentDir === rootPath);
+        await loadDirectory(parentDir, parentDir === '');
         // Автоматически выбираем созданный файл
         if (onSelectFile) {
           onSelectFile(filePath);
@@ -623,7 +609,8 @@ export default ${componentName};`;
     if (!createFolderDialogPath || !folderName) return;
 
     try {
-      const folderPath = `${createFolderDialogPath}/${folderName}`;
+      // createFolderDialogPath - это относительный путь директории
+      const folderPath = createFolderDialogPath ? `${createFolderDialogPath}/${folderName}` : folderName;
 
       const result = await createFolder(folderPath);
       if (result.success) {
@@ -635,7 +622,7 @@ export default ${componentName};`;
           return newSet;
         });
         // Перезагружаем директорию
-        await loadDirectory(parentDir, parentDir === rootPath);
+        await loadDirectory(parentDir, parentDir === '');
       } else {
         setError(`Ошибка создания папки: ${result.error}`);
       }
@@ -673,6 +660,8 @@ export default ${componentName};`;
     });
   };
 
+  // rootPath используется только для отображения, реальная проверка - это наличие rootDirectoryHandle
+  // Для File System API мы всегда показываем дерево, если rootPath установлен
   if (!rootPath) {
     return (
       <View style={styles.emptyContainer}>
@@ -708,13 +697,13 @@ export default ${componentName};`;
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.createFileButton}
-            onPress={() => handleCreateFile(rootPath)}
+            onPress={() => handleCreateFile('')}
           >
             <Text style={styles.createFileButtonText}>+ Создать файл</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.createFolderButton}
-            onPress={() => handleCreateFolder(rootPath)}
+            onPress={() => handleCreateFolder('')}
           >
             <Text style={styles.createFolderButtonText}>📁 Создать папку</Text>
           </TouchableOpacity>
@@ -730,7 +719,7 @@ export default ${componentName};`;
           setCreateDialogPath(null);
         }}
         onCreate={handleCreateFileConfirm}
-        parentPath={createDialogPath || rootPath}
+        parentPath={createDialogPath || ''}
       />
       <CreateFolderDialog
         visible={createFolderDialogVisible}
@@ -739,7 +728,7 @@ export default ${componentName};`;
           setCreateFolderDialogPath(null);
         }}
         onCreate={handleCreateFolderConfirm}
-        parentPath={createFolderDialogPath || rootPath}
+        parentPath={createFolderDialogPath || ''}
       />
       <DeleteConfirmDialog
         visible={deleteDialogVisible}
