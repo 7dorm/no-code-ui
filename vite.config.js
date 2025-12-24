@@ -15,10 +15,16 @@ export default defineConfig(({ mode }) => {
 
     server: {
       host: isProd ? '0.0.0.0' : 'localhost',
-      port: isProd
-        ? Number(process.env.PORT)
-        : 5173,
+      port: isProd ? Number(process.env.PORT) : 5173,
       allowedHosts: isProd ? 'all' : undefined
+    },
+
+    preview: {
+      host: '0.0.0.0',
+      port: Number(process.env.PORT),
+      allowedHosts: ['no-code-ui.onrender.com']
+      // или для теста можно:
+      // allowedHosts: 'all'
     },
 
     resolve: {
