@@ -47,7 +47,7 @@ export function applyHtmlStylePatch({ html, selector, patch }) {
   el.setAttribute('style', serializeStyleAttr(current));
 
   const hasDoctype = /^\s*<!doctype/i.test(source);
-  const serialized = `${hasDoctype ? '<!DOCTYPE html>\\n' : ''}${doc.documentElement.outerHTML}`;
+  const serialized = `${hasDoctype ? '<!DOCTYPE html>' : ''}${doc.documentElement.outerHTML}`;
   return { ok: true, html: serialized, changed: true };
 }
 
