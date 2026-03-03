@@ -1,9 +1,9 @@
 /**
  * Фабрика для создания экземпляров Framework по типу файла
  */
-import { HtmlFramework } from './HtmlFramework';
-import { ReactFramework } from './ReactFramework';
-import { ReactNativeFramework } from './ReactNativeFramework';
+ import { HtmlFramework } from './html';
+ import { ReactFramework } from './react';
+ import { ReactNativeFramework } from './react-native';
 
 /**
  * Создает экземпляр Framework для указанного типа файла
