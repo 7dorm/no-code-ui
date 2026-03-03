@@ -33,22 +33,22 @@ function RenderFile({ filePath }) {
   const pendingHistoryOperationRef = useRef(null); // Отложенная операция для истории
   const isUpdatingFromConstructorRef = useRef(false); // Флаг для предотвращения рекурсии при обновлении из конструктора
   const isUpdatingFromFileRef = useRef(false); // Флаг для предотвращения рекурсии при обновлении из файла
-  
+
   // Хуки для React и React Native файлов (всегда вызываются)
   const [reactHTML, setReactHTML] = useState('');
   const [isProcessingReact, setIsProcessingReact] = useState(false);
   const [reactNativeHTML, setReactNativeHTML] = useState('');
   const [isProcessingReactNative, setIsProcessingReactNative] = useState(false);
   const [renderVersion, setRenderVersion] = useState(0); // увеличиваем, чтобы форсировать перерисовку WebView
-  
+
   // Пути к зависимым файлам для отслеживания изменений
   const [dependencyPaths, setDependencyPaths] = useState([]);
-  
+
   // Хуки для HTML файлов (всегда вызываются)
   const [processedHTML, setProcessedHTML] = useState('');
   const [htmlDependencyPaths, setHtmlDependencyPaths] = useState([]);
   const [isProcessingHTML, setIsProcessingHTML] = useState(false);
-  
+
   // Режим просмотра: 'preview' или 'code'
   const [viewMode, setViewMode] = useState('preview');
   const [splitLeftWidth, setSplitLeftWidth] = useState(0.5); // 0.5 = 50% ширины
@@ -86,12 +86,12 @@ function RenderFile({ filePath }) {
   const stagedPatchesRef = useRef(stagedPatches);
   const stagedOpsRef = useRef(stagedOps);
   const hasStagedChangesRef = useRef(hasStagedChanges);
-  
+
   // Защита от дублирования операций
   const lastInsertOperationRef = useRef(null);
   const lastDeleteOperationRef = useRef(null);
   const lastReparentOperationRef = useRef(null);
-  
+
   // Хелперы для синхронного обновления state + ref одновременно
   const updateStagedPatches = useCallback((updater) => {
     setStagedPatches((prev) => {
@@ -100,7 +100,7 @@ function RenderFile({ filePath }) {
       return next;
     });
   }, []);
-  
+
   const updateStagedOps = useCallback((updater) => {
     setStagedOps((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -108,7 +108,7 @@ function RenderFile({ filePath }) {
       return next;
     });
   }, []);
-  
+
   const updateHasStagedChanges = useCallback((value) => {
     setHasStagedChanges(value);
     hasStagedChangesRef.current = value; // СИНХРОННО обновляем ref
@@ -138,12 +138,12 @@ function RenderFile({ filePath }) {
     if (isIntermediate) {
       // Для промежуточных изменений сохраняем операцию, но не добавляем в историю сразу
       pendingHistoryOperationRef.current = operation;
-      
+
       // Очищаем предыдущий таймер
       if (undoHistoryTimeoutRef.current) {
         clearTimeout(undoHistoryTimeoutRef.current);
       }
-      
+
       // Устанавливаем новый таймер (300ms после последнего изменения)
       undoHistoryTimeoutRef.current = setTimeout(() => {
         if (pendingHistoryOperationRef.current) {
@@ -187,7 +187,7 @@ function RenderFile({ filePath }) {
           previousValue: operation.previousValue,
           currentPatch: operation.patch
         });
-        
+
         // Отменяем патч - возвращаем предыдущее значение
         updateStagedPatches((prev) => {
           const next = { ...prev };
@@ -199,7 +199,7 @@ function RenderFile({ filePath }) {
           console.log('⏮️ [Undo] Обновлены stagedPatches:', next);
           return next;
         });
-        
+
         // Формируем патч для отмены в iframe
         let patchToApply;
         if (operation.previousValue) {
@@ -212,7 +212,7 @@ function RenderFile({ filePath }) {
             patchToApply[key] = null; // null означает удалить стиль
           }
         }
-        
+
         console.log('⏮️ [Undo] Отправляю команду SET_STYLE в iframe:', patchToApply);
         sendIframeCommand({
           type: MRPAK_CMD.SET_STYLE,
@@ -290,7 +290,7 @@ function RenderFile({ filePath }) {
     // Проверяем, остались ли изменения после отмены
     // Используем setTimeout чтобы получить обновленные значения после setState
     setTimeout(() => {
-      const hasChanges = undoStack.length > 0 || 
+      const hasChanges = undoStack.length > 0 ||
                          Object.keys(stagedPatchesRef.current || {}).length > 0 ||
                          (stagedOpsRef.current || []).length > 0;
       console.log('⏮️ [Undo] Проверка наличия изменений:', {
@@ -425,7 +425,7 @@ function RenderFile({ filePath }) {
   // Вспомогательная функция для обновления Monaco Editor с сохранением скролла
   const updateMonacoEditorWithScroll = useCallback((newContent) => {
     if (!monacoEditorRef?.current) return;
-    
+
     try {
       const editor = monacoEditorRef.current;
       // Сохраняем полное состояние редактора (курсор, скролл, выделение)
@@ -434,10 +434,10 @@ function RenderFile({ filePath }) {
       const scrollTop = editor.getScrollTop();
       const scrollLeft = editor.getScrollLeft();
       const position = editor.getPosition();
-      
+
       // Обновляем содержимое
       editor.setValue(newContent);
-      
+
       // Восстанавливаем состояние без анимации
       if (viewState) {
         // Используем requestAnimationFrame для восстановления после обновления DOM
@@ -445,7 +445,7 @@ function RenderFile({ filePath }) {
           try {
             // Восстанавливаем полное состояние (курсор, выделение)
             editor.restoreViewState(viewState);
-            
+
             // Восстанавливаем скролл напрямую без анимации
             if (scrollTop !== null && scrollTop !== undefined) {
               editor.setScrollTop(scrollTop);
@@ -453,7 +453,7 @@ function RenderFile({ filePath }) {
             if (scrollLeft !== null && scrollLeft !== undefined) {
               editor.setScrollLeft(scrollLeft);
             }
-            
+
             // Восстанавливаем позицию курсора, если она была
             if (position) {
               editor.setPosition(position);
@@ -477,7 +477,7 @@ function RenderFile({ filePath }) {
       try {
         // Bidirectional editing через AST: применяем изменения к constructorAST
         if (!blockId) return;
-        
+
         // Работаем только с JS/TS файлами через AST
         if (fileType !== 'react' && fileType !== 'react-native') {
           // Для HTML используем старую логику
@@ -509,10 +509,10 @@ function RenderFile({ filePath }) {
           setRenderVersion((v) => v + 1);
           return;
         }
-        
+
         // Для React/React Native: работаем через AstBidirectionalManager
         const manager = astManagerRef.current;
-        
+
         if (!manager) {
           // Если менеджер не инициализирован, создаем его
           if (projectRoot) {
@@ -528,19 +528,19 @@ function RenderFile({ filePath }) {
             throw new Error('projectRoot not available for AST bidirectional editing');
           }
         }
-        
+
         // Обновляем codeAST при изменении в конструкторе (не трогаем constructorAST)
         console.log('[applyBlockPatch] Updating codeAST:', { blockId, patch, hasCodeAST: !!manager.getCodeAST(), isIntermediate });
         const updateResult = manager.updateCodeAST(blockId, {
           type: 'style',
           patch,
         });
-        
+
         if (!updateResult.ok) {
           console.error('[applyBlockPatch] Failed to update codeAST:', updateResult.error);
           // Fallback: используем старый метод через framework
           console.log('[applyBlockPatch] Falling back to framework.commitPatches');
-          
+
           // Для промежуточных изменений НЕ используем fallback - просто возвращаемся
           if (isIntermediate) {
             return;
@@ -565,7 +565,7 @@ function RenderFile({ filePath }) {
           }
           // Устанавливаем флаг, чтобы предотвратить рекурсию при обновлении из конструктора
           isUpdatingFromConstructorRef.current = true;
-          
+
           try {
             // Автосохранение
             await writeFile(filePath, newContent, { backup: true });
@@ -583,16 +583,16 @@ function RenderFile({ filePath }) {
           }
           return;
         }
-        
+
         // Генерируем код из codeAST
         const generateResult = manager.generateCodeFromCodeAST();
-        
+
         if (!generateResult.ok) {
           throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
         }
-        
+
         const newContent = generateResult.code;
-        
+
         // Для промежуточных изменений НЕ сохраняем файл и НЕ обновляем fileContent
         // Обновление fileContent триггерит useEffect, который перегенерирует HTML и обновляет конструктор
         // Файл будет сохранен только при финальном изменении (isIntermediate: false)
@@ -601,13 +601,13 @@ function RenderFile({ filePath }) {
           // Это предотвращает перегенерацию HTML и обновление конструктора
           // Используем функцию с сохранением скролла
           updateMonacoEditorWithScroll(newContent);
-          
+
           // ВАЖНО: Обновляем codeAST из сгенерированного кода, чтобы он был синхронизирован
           // для следующих промежуточных изменений. Но НЕ обновляем fileContent, чтобы не триггерить useEffect
           await manager.updateCodeASTFromCode(newContent, true);
-          
+
           // НЕ вызываем setFileContent и setRenderVersion для промежуточных изменений
-          
+
           // Добавляем в историю для undo (с debounce для промежуточных изменений)
         const previousValue = stagedPatchesRef.current[blockId] || null;
           addToHistoryDebounced({
@@ -618,13 +618,13 @@ function RenderFile({ filePath }) {
           }, isIntermediate);
           return;
         }
-        
+
         // Устанавливаем флаг ДО writeFile, чтобы предотвратить рекурсию
         isUpdatingFromConstructorRef.current = true;
-        
+
         // Автосохранение в файл (только для финальных изменений)
         await writeFile(filePath, newContent, { backup: true });
-        
+
         // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
         setFileContent(newContent);
         updateMonacoEditorWithScroll(newContent);
@@ -633,7 +633,7 @@ function RenderFile({ filePath }) {
           { ts: Date.now(), filePath, blockId, patch },
           ...prev,
         ]);
-        
+
         // Добавляем в историю для undo (с debounce для промежуточных изменений)
         const previousValue = stagedPatchesRef.current[blockId] || null;
         addToHistoryDebounced({
@@ -642,7 +642,7 @@ function RenderFile({ filePath }) {
           patch,
           previousValue,
         }, isIntermediate);
-        
+
         // Сбрасываем флаг после небольшой задержки, чтобы файловый watcher успел обработать изменение
         setTimeout(() => {
           isUpdatingFromConstructorRef.current = false;
@@ -660,12 +660,12 @@ function RenderFile({ filePath }) {
     const currentStagedPatches = stagedPatchesRef.current || {};
     const currentStagedOps = stagedOpsRef.current || [];
     const currentHasStagedChanges = hasStagedChangesRef.current;
-    
+
     const entries = Object.entries(currentStagedPatches).filter(
       ([id, p]) => id && p && Object.keys(p).length > 0
     );
     const ops = Array.isArray(currentStagedOps) ? currentStagedOps : [];
-    
+
     console.log('commitStagedPatches called:', {
       hasStagedChanges: currentHasStagedChanges,
       entriesCount: entries.length,
@@ -673,7 +673,7 @@ function RenderFile({ filePath }) {
       fileType,
       filePath
     });
-    
+
     try {
       if (!currentHasStagedChanges) {
         if (entries.length === 0 && ops.length === 0) {
@@ -687,11 +687,11 @@ function RenderFile({ filePath }) {
         updateHasStagedChanges(false);
         return;
       }
-      
+
       // Получаем актуальный blockMap для поиска элементов
       const currentBlockMap = blockMap || {};
       const currentBlockMapForFile = blockMapForFile || {};
-      
+
       console.log('commitStagedPatches: committing changes', {
         entries: entries.map(([id]) => id),
         ops: ops.map(o => ({ type: o.type, blockId: o.blockId || o.targetId })),
@@ -735,20 +735,20 @@ function RenderFile({ filePath }) {
 
       // Проверяем, что newContent не пустой и не undefined
       if (!newContent || typeof newContent !== 'string') {
-        console.error('commitStagedPatches: newContent is invalid', { 
-          type: typeof newContent, 
-          isNull: newContent === null, 
+        console.error('commitStagedPatches: newContent is invalid', {
+          type: typeof newContent,
+          isNull: newContent === null,
           isUndefined: newContent === undefined,
-          length: newContent?.length 
+          length: newContent?.length
         });
         throw new Error('Результат применения изменений пуст или некорректен');
       }
-      
+
       if (newContent.length === 0) {
         console.error('commitStagedPatches: newContent is empty string');
         throw new Error('Результат применения изменений пуст');
       }
-      
+
       // Проверяем, что новый контент не короче оригинального более чем на 90%
       // (это может указывать на ошибку в логике)
       const originalLength = String(fileContent ?? '').length;
@@ -782,21 +782,21 @@ function RenderFile({ filePath }) {
       updateStagedPatches({});
       updateStagedOps([]);
       updateHasStagedChanges(false);
-      
+
       // Очищаем историю undo/redo после успешного коммита
       setUndoStack([]);
       setRedoStack([]);
-      
+
       // Показываем индикатор успешного сохранения
       setShowSaveIndicator(true);
       setTimeout(() => setShowSaveIndicator(false), 2000);
-      
+
       console.log('💾 commitStagedPatches: Изменения успешно сохранены в файл', {
         filePath,
         patchesCount: entries.length,
         opsCount: ops.length
       });
-      
+
       // После сохранения нужно обновить blockMap и editorHTML, так как файл изменился
       // Это произойдет автоматически через useEffect, который зависит от fileContent
     } catch (e) {
@@ -875,10 +875,10 @@ function RenderFile({ filePath }) {
 
         // Если из iframe пришло reparent, используем ref на stageReparentBlock
         if (patch.__reparentTo) {
-          console.log('handleEditorMessage: reparent detected', { 
-            sourceId: id, 
+          console.log('handleEditorMessage: reparent detected', {
+            sourceId: id,
             targetParentId: patch.__reparentTo,
-            hasRef: !!stageReparentBlockRef.current 
+            hasRef: !!stageReparentBlockRef.current
           });
           if (stageReparentBlockRef.current) {
             stageReparentBlockRef.current({ sourceId: id, targetParentId: patch.__reparentTo });
@@ -982,7 +982,7 @@ function RenderFile({ filePath }) {
   const stageDeleteBlock = useCallback(
     (blockId) => {
       if (!blockId) return;
-      
+
       // Защита от дублирования
       const now = Date.now();
       if (lastDeleteOperationRef.current) {
@@ -993,13 +993,13 @@ function RenderFile({ filePath }) {
         }
       }
       lastDeleteOperationRef.current = { blockId, timestamp: now };
-      
+
       // Bidirectional editing через AST: применяем сразу к constructorAST
       if (fileType === 'react' || fileType === 'react-native') {
         (async () => {
           try {
             const manager = astManagerRef.current;
-            
+
             if (!manager) {
               if (projectRoot) {
                 const newManager = new AstBidirectionalManager(filePath, projectRoot);
@@ -1014,33 +1014,33 @@ function RenderFile({ filePath }) {
                 throw new Error('projectRoot not available for AST bidirectional editing');
               }
             }
-            
+
             // Обновляем codeAST при удалении (не трогаем constructorAST)
             const updateResult = manager.updateCodeAST(blockId, {
               type: 'delete',
             });
-            
+
             if (!updateResult.ok) {
               throw new Error(updateResult.error || 'Ошибка удаления из codeAST');
             }
-            
+
             // Генерируем код из codeAST
             const generateResult = manager.generateCodeFromCodeAST();
-            
+
             if (!generateResult.ok) {
               throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
             }
-            
+
             const newContent = generateResult.code;
-            
+
             // Автосохранение в файл
             await writeFile(filePath, newContent, { backup: true });
-            
+
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
             setFileContent(newContent);
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
-            
+
             // Добавляем в историю для undo
             addToHistory({
               type: 'delete',
@@ -1055,7 +1055,7 @@ function RenderFile({ filePath }) {
         sendIframeCommand({ type: MRPAK_CMD.DELETE, id: blockId });
         return;
       }
-      
+
       // Для HTML используем старую логику через stagedOps
       const entry = blockMapForFile ? blockMapForFile[blockId] : null;
       updateStagedOps((prev) => [
@@ -1069,7 +1069,7 @@ function RenderFile({ filePath }) {
         },
       ]);
       updateHasStagedChanges(true);
-      
+
       // Добавляем в историю для undo
       addToHistory({
         type: 'delete',
@@ -1077,7 +1077,7 @@ function RenderFile({ filePath }) {
         parentId: layersTree?.nodes[blockId]?.parentId || null,
         snippet: `<div data-no-code-ui-id="${blockId}">Удаленный блок</div>`, // Упрощенная версия
       });
-      
+
       // Локально удаляем в iframe
       sendIframeCommand({ type: MRPAK_CMD.DELETE, id: blockId });
     },
@@ -1087,40 +1087,40 @@ function RenderFile({ filePath }) {
   const stageInsertBlock = useCallback(
     ({ targetId, mode, snippet }) => {
       console.log('[stageInsertBlock] Вызван', { targetId, mode, snippetPreview: snippet?.substring(0, 100) });
-      
+
       if (!targetId) return;
-      
+
       // Защита от дублирования: проверяем, не была ли такая же операция только что
       const operationKey = `${targetId}:${mode}:${snippet}`;
       const now = Date.now();
       if (lastInsertOperationRef.current) {
         const { key, timestamp } = lastInsertOperationRef.current;
         if (key === operationKey && (now - timestamp) < 500) {
-          console.warn('❌ [stageInsertBlock] ДУБЛИРОВАНИЕ ПРЕДОТВРАЩЕНО!', { 
-            targetId, 
-            mode, 
-            timeDiff: now - timestamp 
+          console.warn('❌ [stageInsertBlock] ДУБЛИРОВАНИЕ ПРЕДОТВРАЩЕНО!', {
+            targetId,
+            mode,
+            timeDiff: now - timestamp
           });
           return;
         }
       }
       lastInsertOperationRef.current = { key: operationKey, timestamp: now };
-      
+
       console.log('[stageInsertBlock] ✅ Операция разрешена, создаю ID...');
-      
+
       const entry = blockMapForFile ? blockMapForFile[targetId] : null;
       const newId = makeTempMrpakId();
       console.log('[stageInsertBlock] Сгенерирован новый ID:', newId);
-      
+
       const snippetWithId = ensureSnippetHasMrpakId(snippet, newId);
       console.log('[stageInsertBlock] Сниппет с ID:', snippetWithId);
-      
+
       // Bidirectional editing через AST для React/React Native
       if (fileType === 'react' || fileType === 'react-native') {
         (async () => {
           try {
             const manager = astManagerRef.current;
-            
+
             if (!manager) {
               if (projectRoot) {
                 const newManager = new AstBidirectionalManager(filePath, projectRoot);
@@ -1135,7 +1135,7 @@ function RenderFile({ filePath }) {
                 throw new Error('projectRoot not available for AST bidirectional editing');
               }
             }
-            
+
             // Обновляем codeAST при вставке (не трогаем constructorAST)
             const updateResult = manager.updateCodeAST(targetId, {
               type: 'insert',
@@ -1143,28 +1143,28 @@ function RenderFile({ filePath }) {
               mode: mode === 'sibling' ? 'sibling' : 'child',
               snippet: String(snippetWithId || ''),
             });
-            
+
             if (!updateResult.ok) {
               throw new Error(updateResult.error || 'Ошибка вставки в codeAST');
             }
-            
+
             // Генерируем код из codeAST
             const generateResult = manager.generateCodeFromCodeAST();
-            
+
             if (!generateResult.ok) {
               throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
             }
-            
+
             const newContent = generateResult.code;
-            
+
             // Автосохранение в файл
             await writeFile(filePath, newContent, { backup: true });
-            
+
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
             setFileContent(newContent);
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
-            
+
             // Добавляем в историю для undo
             addToHistory({
               type: 'insert',
@@ -1178,7 +1178,7 @@ function RenderFile({ filePath }) {
             setError(`Ошибка вставки блока: ${e.message}`);
           }
         })();
-        
+
         // Локально вставляем в iframe
         sendIframeCommand({
           type: MRPAK_CMD.INSERT,
@@ -1188,7 +1188,7 @@ function RenderFile({ filePath }) {
         });
         return;
       }
-      
+
       // Для HTML используем старую логику
       updateStagedOps((prev) => [
         ...prev,
@@ -1204,7 +1204,7 @@ function RenderFile({ filePath }) {
         },
       ]);
       updateHasStagedChanges(true);
-      
+
       // Добавляем в историю для undo
       addToHistory({
         type: 'insert',
@@ -1213,7 +1213,7 @@ function RenderFile({ filePath }) {
         mode: mode === 'sibling' ? 'sibling' : 'child',
         snippet: String(snippetWithId || ''),
       });
-      
+
       // Локально вставляем в iframe
       sendIframeCommand({
         type: MRPAK_CMD.INSERT,
@@ -1232,7 +1232,7 @@ function RenderFile({ filePath }) {
         console.log('stageReparentBlock: skipping - invalid ids');
         return;
       }
-      
+
       // Защита от дублирования
       const operationKey = `${sourceId}:${targetParentId}`;
       const now = Date.now();
@@ -1244,13 +1244,13 @@ function RenderFile({ filePath }) {
         }
       }
       lastReparentOperationRef.current = { key: operationKey, timestamp: now };
-      
+
       // Bidirectional editing через AST для React/React Native
       if (fileType === 'react' || fileType === 'react-native') {
         (async () => {
           try {
             const manager = astManagerRef.current;
-            
+
             if (!manager) {
               if (projectRoot) {
                 const newManager = new AstBidirectionalManager(filePath, projectRoot);
@@ -1265,35 +1265,35 @@ function RenderFile({ filePath }) {
                 throw new Error('projectRoot not available for AST bidirectional editing');
               }
             }
-            
+
             // Обновляем codeAST при перемещении (не трогаем constructorAST)
             const updateResult = manager.updateCodeAST(sourceId, {
               type: 'reparent',
               sourceId,
               targetParentId,
             });
-            
+
             if (!updateResult.ok) {
               throw new Error(updateResult.error || 'Ошибка перемещения в codeAST');
             }
-            
+
             // Генерируем код из codeAST
             const generateResult = manager.generateCodeFromCodeAST();
-            
+
             if (!generateResult.ok) {
               throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
             }
-            
+
             const newContent = generateResult.code;
-            
+
             // Автосохранение в файл
             await writeFile(filePath, newContent, { backup: true });
-            
+
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
             setFileContent(newContent);
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
-            
+
             // Добавляем в историю для undo
             addToHistory({
               type: 'reparent',
@@ -1305,12 +1305,12 @@ function RenderFile({ filePath }) {
             setError(`Ошибка перемещения блока: ${e.message}`);
           }
         })();
-        
+
         // Локально переносим в iframe
         sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
         return;
       }
-      
+
       // Для HTML используем старую логику
       const sourceEntry = blockMapForFile ? blockMapForFile[sourceId] : null;
       const targetEntry = blockMapForFile ? blockMapForFile[targetParentId] : null;
@@ -1330,29 +1330,29 @@ function RenderFile({ filePath }) {
         return newOps;
       });
       updateHasStagedChanges(true);
-      
+
       // Локально переносим в iframe
       sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
     },
     [blockMapForFile, fileType, filePath, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory, projectRoot]
   );
-  
+
   // Обновляем ref для использования в handleEditorMessage
   stageReparentBlockRef.current = stageReparentBlock;
 
   const stageSetText = useCallback(
     ({ blockId, text }) => {
       if (!blockId) return;
-      
+
       // Сохраняем предыдущий текст для undo
       const previousText = textSnapshots[blockId] || '';
-      
+
       // Bidirectional editing через AST для React/React Native
       if (fileType === 'react' || fileType === 'react-native') {
         (async () => {
           try {
             const manager = astManagerRef.current;
-            
+
             if (!manager) {
               if (projectRoot) {
                 const newManager = new AstBidirectionalManager(filePath, projectRoot);
@@ -1367,34 +1367,34 @@ function RenderFile({ filePath }) {
                 throw new Error('projectRoot not available for AST bidirectional editing');
               }
             }
-            
+
             // Обновляем codeAST при изменении текста (не трогаем constructorAST)
             const updateResult = manager.updateCodeAST(blockId, {
               type: 'text',
               text: String(text ?? ''),
             });
-            
+
             if (!updateResult.ok) {
               throw new Error(updateResult.error || 'Ошибка обновления текста в codeAST');
             }
-            
+
             // Генерируем код из codeAST
             const generateResult = manager.generateCodeFromCodeAST();
-            
+
             if (!generateResult.ok) {
               throw new Error(generateResult.error || 'Ошибка генерации кода из codeAST');
             }
-            
+
             const newContent = generateResult.code;
-            
+
             // Автосохранение в файл
             await writeFile(filePath, newContent, { backup: true });
-            
+
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
             setFileContent(newContent);
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
-            
+
             // Добавляем в историю для undo
             addToHistory({
               type: 'setText',
@@ -1407,12 +1407,12 @@ function RenderFile({ filePath }) {
             setError(`Ошибка изменения текста: ${e.message}`);
           }
         })();
-        
+
         // Локально обновляем в iframe
         sendIframeCommand({ type: MRPAK_CMD.SET_TEXT, id: blockId, text: String(text ?? '') });
         return;
       }
-      
+
       // Для HTML используем старую логику
       const entry = blockMapForFile ? blockMapForFile[blockId] : null;
       updateStagedOps((prev) => [
@@ -1427,7 +1427,7 @@ function RenderFile({ filePath }) {
         },
       ]);
       updateHasStagedChanges(true);
-      
+
       // Добавляем в историю для undo
       addToHistory({
         type: 'setText',
@@ -1435,7 +1435,7 @@ function RenderFile({ filePath }) {
         text: String(text ?? ''),
         previousText,
       });
-      
+
       // Локально применяем в iframe
       sendIframeCommand({ type: MRPAK_CMD.SET_TEXT, id: blockId, text: String(text ?? '') });
     },
@@ -1448,14 +1448,14 @@ function RenderFile({ filePath }) {
       console.warn('💾 saveFile: Нет пути к файлу');
       return;
     }
-    
+
     console.log('💾 saveFile: Начинаю сохранение файла', {
       hasContentToSave: contentToSave !== null && contentToSave !== undefined,
       hasMonacoRef: !!monacoEditorRef?.current,
       hasUnsavedContent: unsavedContent !== null,
       fileType
     });
-    
+
     // Приоритет получения содержимого:
     // 1. Явно переданный contentToSave
     // 2. Текущее значение из редактора (самое актуальное)
@@ -1478,7 +1478,7 @@ function RenderFile({ filePath }) {
         console.log('💾 saveFile: Использую содержимое из состояния');
       }
     }
-    
+
     if (content === null || content === undefined) {
       console.warn('💾 saveFile: content is null or undefined, сохранение прервано');
       return;
@@ -1492,17 +1492,17 @@ function RenderFile({ filePath }) {
           setFileContent(content);
           setUnsavedContent(null);
           setIsModified(false);
-          
+
           // Показываем индикатор сохранения
           setShowSaveIndicator(true);
           setTimeout(() => setShowSaveIndicator(false), 2000);
-          
+
           // Обновляем парсинг импортов стилей для React/React Native файлов
           if (fileType === 'react' || fileType === 'react-native') {
             const imports = parseStyleImports(content);
             setExternalStylesMap(imports);
           }
-          
+
           console.log('💾 saveFile: ✅ Файл успешно сохранён!', {
             path: filePath,
             size: content.length,
@@ -1523,19 +1523,19 @@ function RenderFile({ filePath }) {
   const handleEditorChange = useCallback((newValue) => {
     setUnsavedContent(newValue);
     setIsModified(true);
-    
+
     // Автосохранение с debounce (1 секунда)
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
-    
+
     autoSaveTimeoutRef.current = setTimeout(async () => {
       if (!filePath || !newValue) return;
-      
+
       try {
         // Устанавливаем флаг, чтобы предотвратить рекурсию при обновлении из редактора кода
         isUpdatingFromFileRef.current = true;
-        
+
         try {
           // Для React/React Native: обновляем codeAST из кода и синхронизируем constructorAST
           if ((fileType === 'react' || fileType === 'react-native') && projectRoot) {
@@ -1546,7 +1546,7 @@ function RenderFile({ filePath }) {
               await manager.updateCodeASTFromCode(newValue, false);
             }
           }
-          
+
           // Автосохранение в файл
           await writeFile(filePath, newValue, { backup: true });
           setFileContent(newValue);
@@ -1574,7 +1574,7 @@ function RenderFile({ filePath }) {
       hasStagedChanges,
       hasFilePath: !!filePath
     });
-    
+
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         console.log('💾 [Global Ctrl+S] ✅ ОБРАБОТЧИК ВЫЗВАН!', {
@@ -1582,22 +1582,22 @@ function RenderFile({ filePath }) {
           currentTarget: e.currentTarget,
           phase: e.eventPhase === 1 ? 'CAPTURE' : e.eventPhase === 2 ? 'TARGET' : 'BUBBLE'
         });
-        
+
         e.preventDefault();
         e.stopPropagation();
-        
+
         console.log('💾 [Global Ctrl+S] Нажата комбинация для сохранения', {
           isModified,
           viewMode,
           hasStagedChanges,
           hasFilePath: !!filePath
         });
-        
+
         if (!filePath) {
           console.log('💾 [Global Ctrl+S] Нет файла для сохранения');
           return;
         }
-        
+
         // В режиме конструктора (edit) сохраняем staged изменения
         // В режиме edit/split изменения применяются сразу (bidirectional editing)
         // Ctrl+S здесь только для сохранения кода из Monaco Editor в split режиме
@@ -1619,19 +1619,19 @@ function RenderFile({ filePath }) {
           }
           return;
         }
-        
+
         // В режиме edit изменения уже применены (bidirectional editing)
         if (viewMode === 'edit') {
           console.log('💾 [Global Ctrl+S] В режиме edit изменения применяются автоматически');
           return;
         }
-        
+
         // В режиме code автосохранение работает автоматически, Ctrl+S отключен
         if (viewMode === 'code') {
           console.log('💾 [Global Ctrl+S] В режиме code автосохранение работает автоматически');
           return;
         }
-        
+
         // В режиме preview сохраняем только если есть несохраненные изменения
         if (viewMode === 'preview' && isModified) {
           console.log('💾 [Global Ctrl+S] Сохраняю изменения в режиме preview...');
@@ -1653,7 +1653,7 @@ function RenderFile({ filePath }) {
     const handleKeyDown = (e) => {
       // Только в режиме конструктора (edit или split)
       if (viewMode !== 'edit' && viewMode !== 'split') return;
-      
+
       // Ctrl+Z или Cmd+Z (без Shift) - Undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -1662,7 +1662,7 @@ function RenderFile({ filePath }) {
         undo();
         return;
       }
-      
+
       // Ctrl+Shift+Z или Cmd+Shift+Z - Redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
         e.preventDefault();
@@ -1671,7 +1671,7 @@ function RenderFile({ filePath }) {
         redo();
         return;
       }
-      
+
       // Альтернативная комбинация для Redo: Ctrl+Y
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
@@ -1697,10 +1697,10 @@ function RenderFile({ filePath }) {
 
   const handleSplitResize = useCallback((e) => {
     if (!isResizing) return;
-    
+
     // Для React Native Web используем DOM API
     let container = splitContainerRef.current;
-    
+
     // Пробуем получить DOM элемент разными способами
     if (container) {
       if (typeof container.getBoundingClientRect === 'function') {
@@ -1713,7 +1713,7 @@ function RenderFile({ filePath }) {
         container = container._owner.stateNode;
       }
     }
-    
+
     // Пробуем найти через document.querySelector если ref не работает
     if (!container || typeof container.getBoundingClientRect !== 'function') {
       // Используем глобальный поиск по классу или data-атрибуту
@@ -1722,16 +1722,16 @@ function RenderFile({ filePath }) {
         container = splitContainers[0];
       }
     }
-    
+
     if (!container || typeof container.getBoundingClientRect !== 'function') {
       return;
     }
-    
+
     const rect = container.getBoundingClientRect();
     const x = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
     const relativeX = x - rect.left;
     const newWidth = Math.max(0.2, Math.min(0.8, relativeX / rect.width));
-    
+
     setSplitLeftWidth(newWidth);
   }, [isResizing]);
 
@@ -1786,20 +1786,20 @@ function RenderFile({ filePath }) {
       console.log('RenderFile: Loading file:', path);
       const result = await readFile(path);
         console.log('RenderFile: File read result:', result);
-        
+
         if (result.success) {
           console.log('RenderFile: File content loaded, length:', result.content?.length);
           setFileContent(result.content);
           setUnsavedContent(null);
           setIsModified(false);
-          
+
           // Парсим импорты стилей для React/React Native файлов
           const type = getFileType(path, result.content);
           if (type === 'react' || type === 'react-native') {
             const imports = parseStyleImports(result.content);
             setExternalStylesMap(imports);
             console.log('RenderFile: Parsed style imports:', imports);
-            
+
             // Инициализируем менеджер AST для bidirectional editing
             // Менеджер будет инициализирован позже, когда projectRoot будет доступен
             // (в useEffect для загрузки projectRoot)
@@ -1833,7 +1833,7 @@ function RenderFile({ filePath }) {
           if (!cancelled && res?.ok) {
             setLayerNames(res.names || {});
           }
-          
+
           // Инициализируем AstBidirectionalManager если это React/React Native файл
           if ((fileType === 'react' || fileType === 'react-native') && fileContent) {
             const manager = new AstBidirectionalManager(filePath, root);
@@ -1873,7 +1873,7 @@ function RenderFile({ filePath }) {
 
   useEffect(() => {
     let currentFilePath = filePath;
-    
+
     if (!filePath) {
       console.log('RenderFile: No file path provided');
       setFileContent(null);
@@ -1915,7 +1915,7 @@ function RenderFile({ filePath }) {
     setUndoStack([]);
     setRedoStack([]);
     loadFile(filePath);
-    
+
     // Начинаем отслеживание изменений файла
     watchFile(filePath).then((result) => {
       if (result.success) {
@@ -1924,15 +1924,15 @@ function RenderFile({ filePath }) {
         console.warn('RenderFile: Failed to watch file:', result.error);
       }
     });
-    
+
     // Обработчик изменений файла
     const handleFileChanged = async (changedFilePath) => {
       if (changedFilePath === currentFilePath) {
         console.log('RenderFile: File changed, syncing with AST:', changedFilePath);
-        
+
         // Сохраняем текущий фокус (selectedBlock) перед обновлением
         const savedSelectedBlock = selectedBlock;
-        
+
         // Bidirectional editing через AST: синхронизируем код -> constructorAST
         if ((fileType === 'react' || fileType === 'react-native') && (viewMode === 'edit' || viewMode === 'split')) {
           try {
@@ -1940,10 +1940,10 @@ function RenderFile({ filePath }) {
             const readResult = await readFile(changedFilePath);
             if (readResult?.success && readResult.content) {
               const newCode = readResult.content;
-              
+
               // Обновляем codeAST из нового кода и синхронизируем constructorAST
               const manager = astManagerRef.current;
-              
+
               if (!manager) {
                 // Если менеджер не инициализирован, создаем его
                 const newManager = new AstBidirectionalManager(changedFilePath, projectRoot);
@@ -1951,7 +1951,7 @@ function RenderFile({ filePath }) {
                 if (initResult.ok) {
                   astManagerRef.current = newManager;
                   setFileContent(newCode);
-                  
+
                   // Восстанавливаем фокус
                   if (savedSelectedBlock) {
                     setTimeout(() => {
@@ -1975,24 +1975,24 @@ function RenderFile({ filePath }) {
                   }
                   return;
                 }
-                
+
                 // Устанавливаем флаг для предотвращения рекурсии
                 isUpdatingFromFileRef.current = true;
-                
+
                 try {
                   // Обновляем codeAST из нового кода и синхронизируем constructorAST
                   // НЕ обновляем конструктор напрямую - он работает только через constructorAST
                   const updateResult = await manager.updateCodeASTFromCode(newCode, false);
-                  
+
                   if (updateResult.ok) {
                     console.log('[RenderFile] Updated codeAST and synced constructorAST from new code');
-                    
+
                     // Обновляем fileContent для Monaco Editor
                     setFileContent(newCode);
-                    
+
                     // Обновляем Monaco Editor без перезагрузки с сохранением скролла
                     updateMonacoEditorWithScroll(newCode);
-                    
+
                     // Восстанавливаем фокус после синхронизации
                     if (savedSelectedBlock) {
                       setTimeout(() => {
@@ -2016,7 +2016,7 @@ function RenderFile({ filePath }) {
             console.warn('[RenderFile] AST bidirectional sync failed, falling back to full reload:', error);
           }
         }
-        
+
         // Fallback на полную перезагрузку
         console.log('RenderFile: File changed, reloading:', changedFilePath);
         setTimeout(() => {
@@ -2031,7 +2031,7 @@ function RenderFile({ filePath }) {
         }, 100);
       }
     };
-    
+
     // Подписываемся на события изменения файла
     const unsubscribe = onFileChanged(handleFileChanged);
 
@@ -2041,7 +2041,7 @@ function RenderFile({ filePath }) {
       if (unsubscribe && typeof unsubscribe === 'function') {
         unsubscribe();
       }
-      
+
       // Останавливаем watcher
       if (currentFilePath) {
         unwatchFile(currentFilePath);
@@ -2158,7 +2158,7 @@ function RenderFile({ filePath }) {
     // Cleanup: останавливаем отслеживание всех зависимых файлов
     return () => {
       console.log('RenderFile: Cleaning up dependency watchers');
-      
+
       // Отписываемся от событий
       unsubscribers.forEach((unsubscribe) => {
         if (typeof unsubscribe === 'function') {
@@ -2185,7 +2185,7 @@ function RenderFile({ filePath }) {
     try {
       // Разрешаем путь к зависимому файлу (теперь асинхронно для поддержки @ путей)
       let resolvedPath = await resolvePathMemo(basePath, importPath);
-      
+
       // Если файл без расширения, пробуем добавить .js, .jsx, .css и т.д.
       const extMatch = resolvedPath.match(/\.([^.]+)$/);
       if (!extMatch) {
@@ -2196,7 +2196,7 @@ function RenderFile({ filePath }) {
           resolvedPath + '/index.js',
           resolvedPath + '/index.jsx'
         ];
-        
+
         for (const tryPath of tryPaths) {
           try {
             const result = await readFile(tryPath);
@@ -2214,7 +2214,7 @@ function RenderFile({ filePath }) {
           return { success: true, content: result.content, path: resolvedPath };
         }
       }
-      
+
       return { success: false, error: `Файл не найден: ${importPath}` };
     } catch (error) {
       console.error('RenderFile: Error loading dependency:', error);
@@ -2241,7 +2241,7 @@ function RenderFile({ filePath }) {
       if (cssPath.startsWith('http://') || cssPath.startsWith('https://') || cssPath.startsWith('//')) {
         continue;
       }
-      
+
       const depResult = await loadDependency(basePath, cssPath);
       if (depResult.success) {
         dependencyPaths.push(depResult.path);
@@ -2262,7 +2262,7 @@ function RenderFile({ filePath }) {
       if (scriptPath.startsWith('http://') || scriptPath.startsWith('https://') || scriptPath.startsWith('//')) {
         continue;
       }
-      
+
       const depResult = await loadDependency(basePath, scriptPath);
       if (depResult.success) {
         dependencyPaths.push(depResult.path);
@@ -2283,10 +2283,10 @@ function RenderFile({ filePath }) {
       if (imgPath.startsWith('http://') || imgPath.startsWith('https://') || imgPath.startsWith('//') || imgPath.startsWith('data:')) {
         continue;
       }
-      
+
       // Разрешаем путь к изображению
       const resolvedPath = await resolvePathMemo(basePath, imgPath);
-      
+
       // Читаем изображение как base64
       try {
         const result = await readFileBase64(resolvedPath);
@@ -2455,16 +2455,16 @@ function RenderFile({ filePath }) {
     if (pathMap[importPath]) {
       return pathMap[importPath];
     }
-    
+
     // Ищем в dependencyModules
     if (dependencyModules[importPath]) {
       return dependencyModules[importPath];
     }
-    
+
     // Разрешаем относительный путь синхронно (для путей без @)
     if (!importPath.startsWith('@/') && !importPath.startsWith('http')) {
       const resolvedPath = resolvePathSync(basePath, importPath);
-      
+
       console.log('RenderFile: findModulePath resolving:', {
         importPath,
         basePath,
@@ -2472,39 +2472,39 @@ function RenderFile({ filePath }) {
         pathMapHasResolved: !!pathMap[resolvedPath],
         pathMapKeys: Object.keys(pathMap).filter(k => k.includes(importPath) || k.includes(resolvedPath.split('/').pop())).slice(0, 5)
       });
-      
+
       // Пробуем найти по разрешенному пути
       if (pathMap[resolvedPath]) {
         return pathMap[resolvedPath];
       }
-      
+
       if (dependencyModules[resolvedPath]) {
         return dependencyModules[resolvedPath];
       }
-      
+
       // Извлекаем имя файла из разрешенного пути для более гибкого поиска
       const fileName = resolvedPath.split('/').pop().replace(/\.(js|jsx|ts|tsx)$/, '');
       const pathWithoutExt = resolvedPath.replace(/\.(js|jsx|ts|tsx)$/, '');
       const lastPart = resolvedPath.split('/').slice(-2).join('/'); // Последние 2 части пути
-      
+
       // Также пробуем найти по разрешенному пути в ключах
       // Нормализуем пути для сравнения (убираем начальные/конечные слеши)
       const normalizedResolved = resolvedPath.replace(/^\/+|\/+$/g, '');
       const normalizedPathWithoutExt = pathWithoutExt.replace(/^\/+|\/+$/g, '');
       const normalizedLastPart = lastPart.replace(/^\/+|\/+$/g, '');
-      
+
       // Ищем по всем значениям в pathMap (абсолютным путям)
       for (const [key, value] of Object.entries(pathMap)) {
         const normalizedKey = key.replace(/^\/+|\/+$/g, '');
         const normalizedValue = String(value).replace(/^\/+|\/+$/g, '');
-        
+
         // Точное совпадение
         if (normalizedKey === normalizedResolved || normalizedKey === normalizedPathWithoutExt) {
           return value;
         }
-        
+
         // Проверяем, заканчивается ли ключ или значение на разрешенный путь
-        if (normalizedKey.endsWith('/' + normalizedResolved) || 
+        if (normalizedKey.endsWith('/' + normalizedResolved) ||
             normalizedResolved.endsWith('/' + normalizedKey) ||
             normalizedKey.endsWith('/' + normalizedPathWithoutExt) ||
             normalizedPathWithoutExt.endsWith('/' + normalizedKey) ||
@@ -2512,9 +2512,9 @@ function RenderFile({ filePath }) {
             normalizedLastPart.endsWith('/' + normalizedKey)) {
           return value;
         }
-        
+
         // Проверяем значение (абсолютный путь)
-        if (normalizedValue.endsWith('/' + normalizedResolved) || 
+        if (normalizedValue.endsWith('/' + normalizedResolved) ||
             normalizedResolved.endsWith('/' + normalizedValue) ||
             normalizedValue.endsWith('/' + normalizedPathWithoutExt) ||
             normalizedPathWithoutExt.endsWith('/' + normalizedValue) ||
@@ -2523,17 +2523,17 @@ function RenderFile({ filePath }) {
             normalizedLastPart.endsWith('/' + normalizedValue)) {
           return value;
         }
-        
+
         // Проверяем по имени файла
         if (normalizedKey.includes('/' + fileName) || normalizedValue.includes('/' + fileName + '.')) {
           return value;
         }
       }
-      
+
       // Пробуем найти в dependencyModules по разрешенному пути
       for (const [key, value] of Object.entries(dependencyModules)) {
         const normalizedKey = String(key).replace(/^\/+|\/+$/g, '');
-        if (normalizedKey === normalizedResolved || 
+        if (normalizedKey === normalizedResolved ||
             normalizedKey === normalizedPathWithoutExt ||
             normalizedKey.endsWith('/' + normalizedResolved) ||
             normalizedResolved.endsWith('/' + normalizedKey) ||
@@ -2544,11 +2544,11 @@ function RenderFile({ filePath }) {
           return value;
         }
       }
-      
+
       // Последняя попытка: ищем по всем значениям в pathMap, которые заканчиваются на имя файла
       for (const [key, value] of Object.entries(pathMap)) {
         const valueStr = String(value);
-        if (valueStr.includes(fileName + '.js') || valueStr.includes(fileName + '.jsx') || 
+        if (valueStr.includes(fileName + '.js') || valueStr.includes(fileName + '.jsx') ||
             valueStr.endsWith('/' + fileName) || valueStr.endsWith('/' + fileName + '.js') ||
             valueStr.endsWith('/' + fileName + '.jsx')) {
           // Проверяем, что это действительно нужный файл по последним частям пути
@@ -2564,17 +2564,17 @@ function RenderFile({ filePath }) {
           }
         }
       }
-      
+
       // Еще одна попытка: ищем по всем ключам, которые содержат последние части пути
       const resolvedParts = resolvedPath.split('/');
       if (resolvedParts.length >= 2) {
         const targetLast2 = resolvedParts.slice(-2).join('/');
         const targetLast2NoExt = targetLast2.replace(/\.(js|jsx|ts|tsx)$/, '');
-        
+
         for (const [key, value] of Object.entries(pathMap)) {
           const keyStr = String(key);
           const valueStr = String(value);
-          
+
           // Проверяем, содержит ли ключ или значение последние части пути
           if (keyStr.includes(targetLast2) || keyStr.includes(targetLast2NoExt) ||
               valueStr.includes(targetLast2) || valueStr.includes(targetLast2NoExt) ||
@@ -2594,7 +2594,7 @@ function RenderFile({ filePath }) {
         }
       }
     }
-    
+
     // Если путь с @, пробуем найти его разрешенную версию
     if (importPath.startsWith('@/')) {
       // Ищем все ключи, которые могут соответствовать этому @ пути
@@ -2610,13 +2610,13 @@ function RenderFile({ filePath }) {
         }
       }
     }
-    
+
     console.warn('RenderFile: findModulePath failed to find:', {
       importPath,
       basePath,
       resolvedPath: !importPath.startsWith('@/') && !importPath.startsWith('http') ? resolvePathSync(basePath, importPath) : 'N/A'
     });
-    
+
     // Возвращаем оригинальный путь как fallback
     return importPath;
   };
@@ -2624,23 +2624,23 @@ function RenderFile({ filePath }) {
   // Рекурсивная функция для загрузки всех зависимостей
   const loadAllDependencies = async (importPath, basePath, loadedDeps = new Set(), dependencyMap = {}, dependencyPaths = [], pathMap = {}, actualPathMap = {}) => {
     const baseFileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
-    
+
     console.log(`[LoadAllDependencies] Starting to load dependency:`, {
       importPath,
       fromFile: baseFileName,
       basePath,
       alreadyLoaded: loadedDeps.has(importPath)
     });
-    
+
     // Разрешаем путь (теперь асинхронно для поддержки @ путей)
     const resolvedPath = await resolvePathMemo(basePath, importPath);
-    
+
     console.log(`[LoadAllDependencies] Resolved path:`, {
       importPath,
       fromFile: baseFileName,
       resolvedPath
     });
-    
+
     // Используем абсолютный путь как ключ для предотвращения дублирования
     if (loadedDeps.has(resolvedPath)) {
       // Если файл уже загружен, добавляем только маппинг относительного пути
@@ -2649,7 +2649,7 @@ function RenderFile({ filePath }) {
       return { pathMap, actualPathMap };
     }
     loadedDeps.add(resolvedPath);
-    
+
     // Загружаем зависимость по разрешенному пути
     const depResult = await loadDependency(basePath, importPath);
     if (!depResult.success) {
@@ -2661,7 +2661,7 @@ function RenderFile({ filePath }) {
       });
       return { pathMap, actualPathMap };
     }
-    
+
     console.log(`[LoadAllDependencies] Successfully loaded file:`, {
       importPath,
       resolvedPath,
@@ -2669,15 +2669,15 @@ function RenderFile({ filePath }) {
       fromFile: baseFileName,
       contentLength: depResult.content?.length || 0
     });
-    
+
     // Сохраняем фактический путь файла для разрешенного пути
     actualPathMap[resolvedPath] = depResult.path;
     actualPathMap[depResult.path] = depResult.path;
-    
+
     // Сохраняем по абсолютному пути как основному ключу
     dependencyMap[resolvedPath] = depResult.content;
     dependencyPaths.push(depResult.path);
-    
+
     // Сохраняем маппинг: относительный путь -> абсолютный путь
     pathMap[importPath] = resolvedPath;
     // Также сохраняем маппинг разрешенного пути (если он отличается от фактического пути файла)
@@ -2686,7 +2686,7 @@ function RenderFile({ filePath }) {
     }
     // Сохраняем маппинг фактического пути файла к самому себе
     pathMap[depResult.path] = depResult.path;
-    
+
     // Для относительных путей также сохраняем разрешенный путь как ключ
     // Это поможет найти модуль, когда мы разрешаем относительный путь в findModulePath
     if (importPath.startsWith('./') || importPath.startsWith('../')) {
@@ -2713,13 +2713,13 @@ function RenderFile({ filePath }) {
         }
       }
     }
-    
+
     // Также сохраняем путь без расширения для фактического пути файла
     const depPathNoExt = depResult.path.replace(/\.(js|jsx|ts|tsx)$/, '');
     if (depPathNoExt !== depResult.path && !pathMap[depPathNoExt]) {
       pathMap[depPathNoExt] = depResult.path;
     }
-    
+
     // Сохраняем последние 2 части фактического пути файла
     const depPathParts = depResult.path.split('/');
     if (depPathParts.length >= 2) {
@@ -2732,43 +2732,43 @@ function RenderFile({ filePath }) {
         pathMap[depLast2PartsNoExt] = depResult.path;
       }
     }
-    
+
     console.log('RenderFile: Saved path mappings for:', {
       importPath,
       resolvedPath,
       actualPath: depResult.path,
       savedKeys: Object.keys(pathMap).filter(k => pathMap[k] === depResult.path).slice(0, 10)
     });
-    
+
     // Извлекаем импорты из загруженной зависимости
     const depFileName = depResult.path.split('/').pop() || depResult.path.split('\\').pop() || 'unknown';
     const depImports = extractImports(depResult.content, depFileName);
-    
+
     console.log(`[LoadAllDependencies] Found ${depImports.length} imports in ${depFileName}:`, {
       file: depResult.path,
       fileName: depFileName,
       imports: depImports.map(i => ({ path: i.path, line: i.line }))
     });
-    
+
     // Рекурсивно загружаем зависимости зависимостей
     const depBasePath = depResult.path; // Используем фактический путь файла как базовый
     for (const depImp of depImports) {
       // Пропускаем только внешние библиотеки (npm пакеты)
       // Теперь обрабатываем локальные импорты, включая @ пути
-      if ((depImp.path.startsWith('react') && !depImp.path.startsWith('react/') && !depImp.path.startsWith('@')) || 
-          depImp.path.startsWith('react-native') || 
+      if ((depImp.path.startsWith('react') && !depImp.path.startsWith('react/') && !depImp.path.startsWith('@')) ||
+          depImp.path.startsWith('react-native') ||
           depImp.path.startsWith('http')) {
         console.log(`[LoadAllDependencies] Skipping external library in ${depFileName}: ${depImp.path}`);
         continue;
       }
-      
+
       console.log(`[LoadAllDependencies] Recursively loading dependency from ${depFileName}:`, {
         importPath: depImp.path,
         fromFile: depFileName,
         importLine: depImp.line,
         basePath: depBasePath
       });
-      
+
       // Рекурсивно загружаем с правильным базовым путем (фактический путь файла)
       const result = await loadAllDependencies(depImp.path, depBasePath, loadedDeps, dependencyMap, dependencyPaths, pathMap, actualPathMap);
       if (result) {
@@ -2779,7 +2779,7 @@ function RenderFile({ filePath }) {
         console.warn(`[LoadAllDependencies] Failed to load recursive dependency: ${depImp.path} from ${depFileName}`);
       }
     }
-    
+
     return { pathMap, actualPathMap };
   };
 
@@ -2794,33 +2794,33 @@ function RenderFile({ filePath }) {
       importsCount: imports.length,
       imports: imports.map(i => ({ path: i.path, line: i.line }))
     });
-    
+
     const dependencies = {};
     const dependencyModules = {};
     const dependencyPaths = []; // Массив путей к зависимым файлам
     const loadedDeps = new Set(); // Для предотвращения циклических зависимостей
     const pathMap = {}; // Маппинг: относительный путь -> абсолютный путь
     const actualPathMap = {}; // Маппинг: разрешенный путь -> фактический путь файла
-    
+
     // Загружаем все зависимости рекурсивно
     for (const imp of imports) {
       // Пропускаем только внешние библиотеки (npm пакеты)
       // Теперь обрабатываем локальные импорты, включая @ пути
-      if (imp.path.startsWith('react') && !imp.path.startsWith('react/') && 
-          !imp.path.startsWith('react-dom') && 
-          !imp.path.startsWith('react-native') && 
+      if (imp.path.startsWith('react') && !imp.path.startsWith('react/') &&
+          !imp.path.startsWith('react-dom') &&
+          !imp.path.startsWith('react-native') &&
           !imp.path.startsWith('http')) {
         console.log(`[ProcessReactCode] Skipping external library: ${imp.path} from ${fileName}`);
         continue;
       }
-      
+
       console.log(`[ProcessReactCode] Loading dependency from ${fileName}:`, {
         sourceFile: fileName,
         importPath: imp.path,
         importLine: imp.line,
         basePath
       });
-      
+
       const result = await loadAllDependencies(imp.path, basePath, loadedDeps, dependencies, dependencyPaths, pathMap, actualPathMap);
       // Объединяем результаты
       if (result) {
@@ -2831,7 +2831,7 @@ function RenderFile({ filePath }) {
         console.warn(`[ProcessReactCode] Failed to load dependency: ${imp.path} from ${fileName}`);
       }
     }
-    
+
     // Используем pathMap для заполнения dependencyModules
     // Основной ключ - абсолютный путь, но также сохраняем маппинг относительных путей
     for (const [relativePath, absolutePath] of Object.entries(pathMap)) {
@@ -2842,7 +2842,7 @@ function RenderFile({ filePath }) {
         dependencyModules[absolutePath] = absolutePath;
       }
     }
-    
+
     // Обрабатываем код - удаляем импорты React, но сохраняем локальные
     // Сначала сохраняем информацию о default export перед удалением
     let defaultExportInfo = null;
@@ -2853,7 +2853,7 @@ function RenderFile({ filePath }) {
         type: 'default-export'
       };
     }
-    
+
     let processedCode = code
       // Удаляем import React from 'react'
       .replace(/import\s+React\s+from\s+['"]react['"];?\s*/gi, '')
@@ -2862,24 +2862,24 @@ function RenderFile({ filePath }) {
       // Удаляем export default, оставляем только определение
       .replace(/export\s+default\s+/g, '')
       .trim();
-    
+
     // Создаем код для модулей зависимостей
     let modulesCode = '';
     let importReplacements = {};
-    
+
     // Собираем уникальные абсолютные пути из pathMap
     const uniqueAbsolutePaths = new Set(Object.values(pathMap));
     const processedDeps = new Set(); // Для отслеживания уже обработанных абсолютных путей
-    
+
     // Собираем информацию о зависимостях каждого модуля для сортировки
     const moduleDependencies = new Map(); // absolutePath -> Set of absolute paths of dependencies
-    
+
     // Сначала собираем зависимости для каждого модуля
     for (const absolutePath of uniqueAbsolutePaths) {
       if (processedDeps.has(absolutePath)) {
         continue;
       }
-      
+
       const content = dependencies[absolutePath] || (() => {
         for (const [relPath, absPath] of Object.entries(pathMap)) {
           if (absPath === absolutePath) {
@@ -2888,34 +2888,34 @@ function RenderFile({ filePath }) {
         }
         return null;
       })();
-      
+
       if (!content) continue;
-      
+
       // Извлекаем импорты из модуля
       const depImports = extractImports(content, absolutePath);
       const depSet = new Set();
-      
+
       for (const imp of depImports) {
         // Пропускаем внешние библиотеки
         if (!imp.path.startsWith('.') && !imp.path.startsWith('/') && !imp.path.startsWith('@')) {
           continue;
         }
-        
+
         // Находим абсолютный путь зависимости
         const depResolvedPath = pathMap[imp.path] || dependencyModules[imp.path];
         if (depResolvedPath && uniqueAbsolutePaths.has(depResolvedPath)) {
           depSet.add(depResolvedPath);
         }
       }
-      
+
       moduleDependencies.set(absolutePath, depSet);
     }
-    
+
     // Топологическая сортировка модулей по зависимостям
     const sortedModules = [];
     const visited = new Set();
     const visiting = new Set();
-    
+
     const visit = (modulePath) => {
       if (visiting.has(modulePath)) {
         // Циклическая зависимость - пропускаем
@@ -2924,7 +2924,7 @@ function RenderFile({ filePath }) {
       if (visited.has(modulePath)) {
         return;
       }
-      
+
       visiting.add(modulePath);
       const deps = moduleDependencies.get(modulePath) || new Set();
       for (const dep of deps) {
@@ -2936,16 +2936,16 @@ function RenderFile({ filePath }) {
       visited.add(modulePath);
       sortedModules.push(modulePath);
     };
-    
+
     // Запускаем топологическую сортировку
     for (const absolutePath of uniqueAbsolutePaths) {
       if (!visited.has(absolutePath)) {
         visit(absolutePath);
       }
     }
-    
+
     console.log('RenderFile: Sorted modules by dependencies:', sortedModules.map(p => p.split('/').pop()));
-    
+
     // Обрабатываем каждую зависимость в отсортированном порядке
     processedDeps.clear(); // Сбрасываем для повторного использования
     for (const absolutePath of sortedModules) {
@@ -2953,7 +2953,7 @@ function RenderFile({ filePath }) {
         continue;
       }
       processedDeps.add(absolutePath);
-      
+
       // Получаем контент по абсолютному пути
       let content = dependencies[absolutePath];
       // Если не найдено по абсолютному пути, ищем по относительному из pathMap
@@ -2965,11 +2965,11 @@ function RenderFile({ filePath }) {
           }
         }
       }
-      
+
       if (!content) {
         continue;
       }
-      
+
       // Используем абсолютный путь как основной ключ для обработки
       const importPath = absolutePath;
       // Обрабатываем зависимость
@@ -2978,13 +2978,13 @@ function RenderFile({ filePath }) {
       let hasDefaultExport = false;
       let defaultExportName = null;
       const namedExports = [];
-      
+
       // Получаем фактический путь файла для текущей зависимости (для разрешения относительных путей)
       // Используем actualPathMap для получения фактического пути файла
       const currentDepResolvedPath = dependencyModules[importPath] || importPath;
       const currentDepActualPath = actualPathMap[currentDepResolvedPath] || currentDepResolvedPath;
       const currentDepBasePath = currentDepActualPath.substring(0, currentDepActualPath.lastIndexOf('/'));
-      
+
       // Отладочная информация
       console.log('RenderFile: Processing dependency:', {
         importPath,
@@ -2993,14 +2993,14 @@ function RenderFile({ filePath }) {
         currentDepBasePath,
         pathMapKeys: Object.keys(pathMap).slice(0, 10) // Первые 10 ключей для отладки
       });
-      
+
       // Обрабатываем экспорты
       let processedDep = content;
-      
+
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:605',message:'Processing dependency before removing imports',data:{importPath,contentLength:processedDep.length,hasImports:processedDep.includes('import'),hasExports:processedDep.includes('export')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
-      
+
       // СНАЧАЛА обрабатываем экспорты, ПОТОМ удаляем импорты
       // Named exports: export const/let/var (обрабатываем ДО удаления импортов)
       const namedConstExports = [];
@@ -3014,7 +3014,7 @@ function RenderFile({ filePath }) {
         }
         return `${keyword} ${name} =`;
       });
-      
+
       // Named exports: export function (обрабатываем ДО удаления импортов)
       const namedFunctionExports = [];
       processedDep = processedDep.replace(/export\s+function\s+(\w+)/g, (match, name) => {
@@ -3024,7 +3024,7 @@ function RenderFile({ filePath }) {
         }
         return `function ${name}`;
       });
-      
+
       // Обрабатываем импорты из зависимого файла перед встраиванием
       // Импорты React и React Native будут доступны глобально
       // Для локальных импортов заменяем их на код доступа к модулям
@@ -3040,22 +3040,22 @@ function RenderFile({ filePath }) {
           // #region agent log
           fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:635',message:'Processing import in dependency',data:{depImportPath,importSpec,importStatement:match.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
           // #endregion
-          
+
           const currentDepFileName = currentDepActualPath.split('/').pop() || currentDepActualPath.split('\\').pop() || 'unknown';
-          
+
           // Пропускаем только внешние библиотеки (npm пакеты)
           // Теперь обрабатываем локальные импорты, включая @ пути
-          if ((depImportPath.startsWith('react') && !depImportPath.startsWith('react/') && !depImportPath.startsWith('@')) || 
-              depImportPath.startsWith('react-native') || 
+          if ((depImportPath.startsWith('react') && !depImportPath.startsWith('react/') && !depImportPath.startsWith('@')) ||
+              depImportPath.startsWith('react-native') ||
               depImportPath.startsWith('http')) {
             console.log(`[ProcessDependency] Skipping external import in ${currentDepFileName}: ${depImportPath}`);
             return ''; // Удаляем импорт
           }
-          
+
           // Для локальных импортов заменяем на код доступа к модулям
           // Используем фактический путь файла зависимости для разрешения относительных путей
           const finalDepPath = findModulePath(depImportPath, currentDepActualPath, pathMap, dependencyModules);
-          
+
           // Разрешаем путь синхронно для генерации всех возможных вариантов ключей
           const resolvedPathSync = resolvePathSync(currentDepActualPath, depImportPath);
           const resolvedPathNoExt = resolvedPathSync.replace(/\.(js|jsx|ts|tsx)$/, '');
@@ -3064,7 +3064,7 @@ function RenderFile({ filePath }) {
           const resolvedLast2NoExt = resolvedLast2.replace(/\.(js|jsx|ts|tsx)$/, '');
           const resolvedFileName = resolvedParts[resolvedParts.length - 1] || '';
           const resolvedFileNameNoExt = resolvedFileName.replace(/\.(js|jsx|ts|tsx)$/, '');
-          
+
           // Создаем список всех возможных ключей для поиска модуля
           const possibleKeys = [
             finalDepPath,
@@ -3076,10 +3076,10 @@ function RenderFile({ filePath }) {
             resolvedFileName,
             resolvedFileNameNoExt
           ].filter(Boolean);
-          
+
           // Сериализуем для использования в шаблонной строке
           const possibleKeysJson = JSON.stringify(possibleKeys);
-          
+
           console.log(`[ProcessDependency] Processing import in ${currentDepFileName}:`, {
             file: currentDepFileName,
             filePath: currentDepActualPath,
@@ -3089,13 +3089,13 @@ function RenderFile({ filePath }) {
             resolvedPathSync,
             possibleKeys,
             foundInPathMap: !!pathMap[depImportPath] || !!pathMap[finalDepPath],
-            pathMapKeys: Object.keys(pathMap).filter(k => 
-              k.includes(depImportPath.replace(/\.\.?\//g, '')) || 
+            pathMapKeys: Object.keys(pathMap).filter(k =>
+              k.includes(depImportPath.replace(/\.\.?\//g, '')) ||
               k.includes('commonStyles') ||
               k.includes(finalDepPath.split('/').pop() || '')
             ).slice(0, 10)
           });
-          
+
           if (importSpec.startsWith('{')) {
             // Named imports: import { a, b as c } from ...
             const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
@@ -3248,11 +3248,11 @@ function RenderFile({ filePath }) {
           }
         })
         .trim();
-      
+
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:650',message:'Dependency processed after removing imports',data:{importPath,processedLength:processedDep.length,hasImports:processedDep.includes('import'),hasExports:processedDep.includes('export'),namedExportsCount:namedExports.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
-      
+
       // Default export: export default ...
       const defaultExportMatch = processedDep.match(/export\s+default\s+(.+?)(;|$)/s);
       if (defaultExportMatch) {
@@ -3268,12 +3268,12 @@ function RenderFile({ filePath }) {
           processedDep = processedDep.replace(/export\s+default\s+/g, 'const __defaultExport = ');
         }
       }
-      
+
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:695',message:'After processing exports',data:{importPath,hasDefaultExport,defaultExportName,hasExports:processedDep.includes('export')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
-      
-      
+
+
       // Named exports: export { ... }
       const namedExportsMatch = processedDep.match(/export\s+\{([^}]+)\}/);
       if (namedExportsMatch) {
@@ -3289,40 +3289,40 @@ function RenderFile({ filePath }) {
         });
         processedDep = processedDep.replace(/export\s+\{([^}]+)\}/g, '');
       }
-      
+
       // Если нет default export, но есть named export 'styles', используем его как default
       if (!hasDefaultExport && namedExports.includes('styles')) {
         defaultExportName = 'styles';
         hasDefaultExport = true;
       }
-      
+
       // Удаляем все оставшиеся экспорты (на случай, если что-то пропустили)
       processedDep = processedDep.replace(/export\s+default\s+.*?;?\s*/g, '');
       processedDep = processedDep.replace(/export\s+\{[^}]+\}\s*;?\s*/g, '');
-      
+
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:740',message:'Before creating module code',data:{importPath,hasExports:processedDep.includes('export'),processedLength:processedDep.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
-      
+
       // Получаем абсолютный путь для этого модуля (importPath уже равен absolutePath из цикла)
       const moduleAbsolutePath = dependencyModules[importPath] || importPath;
-      
+
       // Находим все относительные пути, которые указывают на этот абсолютный путь
       const allRelativePaths = Object.entries(pathMap)
         .filter(([relPath, absPath]) => absPath === moduleAbsolutePath)
         .map(([relPath]) => relPath);
-      
+
       // Также находим все возможные варианты путей, которые могут быть использованы из разных контекстов
       // Это включает пути, которые могут быть разрешены относительно разных базовых путей
       const allPossiblePaths = new Set(allRelativePaths);
-      
+
       // Добавляем абсолютный путь
       allPossiblePaths.add(moduleAbsolutePath);
-      
+
       // Добавляем путь без расширения
       const pathWithoutExt = moduleAbsolutePath.replace(/\.(js|jsx|ts|tsx)$/, '');
       allPossiblePaths.add(pathWithoutExt);
-      
+
       // Добавляем последние 2 части пути (например, styles/commonStyles)
       const pathParts = moduleAbsolutePath.split('/');
       if (pathParts.length >= 2) {
@@ -3331,7 +3331,7 @@ function RenderFile({ filePath }) {
         const last2PartsNoExt = last2Parts.replace(/\.(js|jsx|ts|tsx)$/, '');
         allPossiblePaths.add(last2PartsNoExt);
       }
-      
+
       // Добавляем имя файла
       const fileName = pathParts[pathParts.length - 1];
       if (fileName) {
@@ -3339,22 +3339,22 @@ function RenderFile({ filePath }) {
         const fileNameNoExt = fileName.replace(/\.(js|jsx|ts|tsx)$/, '');
         allPossiblePaths.add(fileNameNoExt);
       }
-      
+
       // Для каждого относительного пути из pathMap, который указывает на этот модуль,
       // генерируем возможные варианты, которые могут быть использованы из других контекстов
       for (const relPath of allRelativePaths) {
         // Добавляем сам относительный путь
         allPossiblePaths.add(relPath);
-        
+
         // Добавляем путь без расширения
         const relPathNoExt = relPath.replace(/\.(js|jsx|ts|tsx)$/, '');
         allPossiblePaths.add(relPathNoExt);
-        
+
         // Если путь начинается с ./, добавляем вариант без ./
         if (relPath.startsWith('./')) {
           allPossiblePaths.add(relPath.substring(2));
         }
-        
+
         // Если путь начинается с ../, добавляем последние части
         if (relPath.startsWith('../')) {
           const relParts = relPath.split('/');
@@ -3366,13 +3366,13 @@ function RenderFile({ filePath }) {
           }
         }
       }
-      
+
       console.log(`[ProcessDependency] All possible paths for module ${moduleAbsolutePath}:`, Array.from(allPossiblePaths));
-      
+
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:752',message:'Creating module code',data:{importPath,absolutePath:moduleAbsolutePath,hasDefaultExport,defaultExportName,namedExportsCount:namedExports.length,namedExports:namedExports.slice(0,5),allRelativePathsCount:allRelativePaths.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
-      
+
       // Создаем модуль
       modulesCode += `
         // Модуль: ${importPath} (absolute: ${moduleAbsolutePath})
@@ -3496,7 +3496,7 @@ function RenderFile({ filePath }) {
           // #endregion
         })();
       `;
-      
+
       // Заменяем импорт на доступ к модулю
       // Ищем импорт по всем возможным путям (относительному и абсолютному)
       let importStatement = imports.find(imp => imp.path === importPath);
@@ -3593,13 +3593,13 @@ function RenderFile({ filePath }) {
             // Default import: import name from ...
             // Получаем абсолютный путь для этого модуля (используем ту же логику, что и для named imports)
             const absolutePath = dependencyModules[importPath] || importPath;
-            
+
             // Получаем информацию о default export из обработанной зависимости
             // Ищем модуль в dependencies по абсолютному пути
             const depContent = dependencies[absolutePath] || dependencies[importPath];
             let hasDefaultExport2 = false;
             let defaultExportName2 = null;
-            
+
             if (depContent) {
               // Проверяем наличие default export в содержимом
               const defaultExportMatch = depContent.match(/export\s+default\s+(.+?)(;|$)/s);
@@ -3613,11 +3613,11 @@ function RenderFile({ filePath }) {
                 }
               }
             }
-            
+
             // #region agent log
             fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:885',message:'Processing default import',data:{importPath,absolutePath,importSpec,hasDefaultExport:hasDefaultExport2,defaultExportName:defaultExportName2},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
             // #endregion
-            
+
             // Создаем код для импорта default значения
             importReplacements[importStatement.fullStatement] = `const ${importSpec} = (() => {
               // #region agent log
@@ -3657,24 +3657,24 @@ function RenderFile({ filePath }) {
         }
       }
     }
-    
+
     // Обрабатываем импорты в основном файле
     for (const imp of imports) {
       // Пропускаем внешние библиотеки
-      if (imp.path.startsWith('react') || imp.path.startsWith('react-native') || 
+      if (imp.path.startsWith('react') || imp.path.startsWith('react-native') ||
           imp.path.startsWith('@') || imp.path.startsWith('http')) {
         continue;
       }
-      
+
       // Получаем абсолютный путь для этого импорта
       const absolutePath = dependencyModules[imp.path] || pathMap[imp.path] || imp.path;
-      
+
       // Парсим, что именно импортируется
       const match = imp.fullStatement.match(/import\s+(.*?)\s+from/);
       if (!match) continue;
-      
+
       const importSpec = match[1].trim();
-      
+
       // Проверяем import * as name from ...
       const starAsMatch = imp.fullStatement.match(/import\s+\*\s+as\s+(\w+)/);
       if (starAsMatch) {
@@ -3753,7 +3753,7 @@ function RenderFile({ filePath }) {
         })();`;
       }
     }
-    
+
     // Заменяем импорты в коде
     console.log('RenderFile: Import replacements:', importReplacements);
     // #region agent log
@@ -3773,14 +3773,14 @@ function RenderFile({ filePath }) {
         // #endregion
       }
     }
-    
+
     // Удаляем оставшиеся локальные импорты (которые не были заменены)
     processedCode = processedCode.replace(/import\s+.*?from\s+['"].*?['"];?\s*/g, '');
-    
+
     console.log('RenderFile: Processed code length:', processedCode.length);
     console.log('RenderFile: Modules code length:', modulesCode.length);
     console.log('RenderFile: Dependency paths:', dependencyPaths);
-    
+
     // Создаем код для предварительной регистрации всех модулей
     // Это гарантирует, что модули будут доступны, даже если они еще не выполнились
     const allModulePaths = new Set();
@@ -3801,7 +3801,7 @@ function RenderFile({ filePath }) {
         allModulePaths.add(parts[parts.length - 1].replace(/\.(js|jsx|ts|tsx)$/, ''));
       }
     }
-    
+
     // Также добавляем все пути из allPossiblePaths для каждого модуля
     for (const absolutePath of uniqueAbsolutePaths) {
       const moduleAbsolutePath = dependencyModules[absolutePath] || absolutePath;
@@ -3815,13 +3815,13 @@ function RenderFile({ filePath }) {
         allModulePaths.add(pathParts[pathParts.length - 1].replace(/\.(js|jsx|ts|tsx)$/, ''));
       }
     }
-    
+
     const preRegisterCode = Array.from(allModulePaths).filter(Boolean).map(path => {
       // Экранируем кавычки в пути
       const escapedPath = path.replace(/'/g, "\\'");
       return `window.__modules__['${escapedPath}'] = window.__modules__['${escapedPath}'] || null;`;
     }).join('\n        ');
-    
+
     // Обертываем modulesCode, чтобы сначала предварительно зарегистрировать модули
     const wrappedModulesCode = `
         // Предварительная регистрация всех модулей (создаем пустые слоты)
@@ -3835,7 +3835,7 @@ function RenderFile({ filePath }) {
         console.log('All modules loaded. Total modules:', Object.keys(window.__modules__ || {}).length);
         console.log('Registered module keys:', Object.keys(window.__modules__ || {}));
     `;
-    
+
     return {
       code: processedCode,
       modulesCode: wrappedModulesCode,
@@ -3869,14 +3869,14 @@ function RenderFile({ filePath }) {
     const modulesCode = processed.modulesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
     const defaultExportInfo = processed.defaultExportInfo || null;
-    
+
     // Собираем карту для превью/редактора на обработанном коде (атрибуты уже есть).
     const instProcessed = instrumentJsx(processedCodeBeforeInst, basePath);
     const processedCode = instProcessed.code;
-    
+
     // Детектируем компоненты в обработанном коде
     const detectedComponents = detectComponents(processedCode);
-    
+
     // Если есть информация о default export, добавляем её с наивысшим приоритетом
     if (defaultExportInfo && !detectedComponents.find(c => c.name === defaultExportInfo.name && c.type === 'default-export')) {
       detectedComponents.unshift({
@@ -3885,11 +3885,11 @@ function RenderFile({ filePath }) {
         priority: 0
       });
     }
-    
+
     // Находим компонент для рендеринга по приоритету
     let componentToRender = null;
     let componentName = null;
-    
+
     // Приоритет: default export > named exports > остальные компоненты
     for (const comp of detectedComponents) {
       // Проверяем, что компонент действительно существует в коде
@@ -3901,7 +3901,7 @@ function RenderFile({ filePath }) {
         break;
       }
     }
-    
+
     // Fallback: пробуем стандартные имена
     if (!componentToRender) {
       const standardNames = ['App', 'MyComponent', 'Component'];
@@ -3913,7 +3913,7 @@ function RenderFile({ filePath }) {
         }
       }
     }
-    
+
     const html = `
 <!DOCTYPE html>
 <html lang="ru">
@@ -4133,14 +4133,14 @@ function RenderFile({ filePath }) {
 </body>
 </html>
     `;
-    
+
     console.log('🔵 createReactHTML: финальный результат', {
       blockMapForEditorKeys: Object.keys(instProcessed.map).length,
       blockMapForFileKeys: Object.keys(instOriginal.map).length,
       blockMapForFileSample: Object.keys(instOriginal.map).slice(0, 5),
       blockMapForEditorSample: Object.keys(instProcessed.map).slice(0, 5)
     });
-    
+
     return {
       html,
       dependencyPaths,
@@ -4160,14 +4160,14 @@ function RenderFile({ filePath }) {
     const modulesCode = processed.modulesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
     const defaultExportInfo = processed.defaultExportInfo || null;
-    
+
     // Собираем карту для превью/редактора на обработанном коде (атрибуты уже есть).
     const instProcessed = instrumentJsx(processedCodeBeforeInst, basePath);
     const processedCode = instProcessed.code;
-    
+
     // Детектируем компоненты в обработанном коде
     const detectedComponents = detectComponents(processedCode);
-    
+
     // Если есть информация о default export, добавляем её с наивысшим приоритетом
     if (defaultExportInfo && !detectedComponents.find(c => c.name === defaultExportInfo.name && c.type === 'default-export')) {
       detectedComponents.unshift({
@@ -4176,11 +4176,11 @@ function RenderFile({ filePath }) {
         priority: 0
       });
     }
-    
+
     // Находим компонент для рендеринга по приоритету
     let componentToRender = null;
     let componentName = null;
-    
+
     // Приоритет: default export > named exports > остальные компоненты
     for (const comp of detectedComponents) {
       // Проверяем, что компонент действительно существует в коде
@@ -4192,7 +4192,7 @@ function RenderFile({ filePath }) {
         break;
       }
     }
-    
+
     // Fallback: пробуем стандартные имена
     if (!componentToRender) {
       const standardNames = ['App', 'MyComponent', 'Component'];
@@ -4204,7 +4204,7 @@ function RenderFile({ filePath }) {
         }
       }
     }
-    
+
     const html = `
 <!DOCTYPE html>
 <html lang="ru">
@@ -4705,7 +4705,7 @@ function RenderFile({ filePath }) {
 </body>
 </html>
     `;
-    
+
     return {
       html,
       dependencyPaths,
@@ -4713,7 +4713,6 @@ function RenderFile({ filePath }) {
       blockMapForFile: instOriginal.map,
     };
   };
-  
 
   if (!filePath) {
     return (
@@ -4777,7 +4776,7 @@ function RenderFile({ filePath }) {
     const htmlToRender = processedHTML || fileContent;
     console.log('RenderFile: Rendering HTML file, content length:', htmlToRender.length);
     console.log('RenderFile: HTML content preview:', htmlToRender.substring(0, 100));
-    
+
     return (
       <View style={styles.htmlContainer}>
         <View style={styles.headerContainer}>
@@ -4841,7 +4840,7 @@ function RenderFile({ filePath }) {
             )}
           </View>
         ) : viewMode === 'split' ? (
-          <View 
+          <View
             style={styles.splitContainer}
             ref={splitContainerRef}
             onLayout={(e) => {
@@ -4888,7 +4887,7 @@ function RenderFile({ filePath }) {
                 )}
               </View>
             </View>
-            <View 
+            <View
               style={[styles.splitDivider, isResizing && styles.splitDividerActive]}
               onMouseDown={handleSplitResizeStart}
               onTouchStart={handleSplitResizeStart}
@@ -4976,7 +4975,7 @@ function RenderFile({ filePath }) {
         </View>
       );
     }
-    
+
     return (
       <View style={styles.htmlContainer}>
         <View style={styles.headerContainer}>
@@ -5045,7 +5044,7 @@ function RenderFile({ filePath }) {
             )}
           </View>
         ) : viewMode === 'split' ? (
-          <View 
+          <View
             style={styles.splitContainer}
             data-split-container="true"
             ref={(ref) => {
@@ -5102,7 +5101,7 @@ function RenderFile({ filePath }) {
                 )}
               </View>
             </View>
-            <View 
+            <View
               style={[styles.splitDivider, isResizing && styles.splitDividerActive]}
               onMouseDown={handleSplitResizeStart}
               onTouchStart={handleSplitResizeStart}
@@ -5185,7 +5184,7 @@ function RenderFile({ filePath }) {
         </View>
       );
     }
-    
+
     return (
       <View style={styles.htmlContainer}>
         <View style={styles.headerContainer}>
@@ -5254,7 +5253,7 @@ function RenderFile({ filePath }) {
             )}
           </View>
         ) : viewMode === 'split' ? (
-          <View 
+          <View
             style={styles.splitContainer}
             data-split-container="true"
             ref={(ref) => {
@@ -5311,7 +5310,7 @@ function RenderFile({ filePath }) {
                 )}
               </View>
             </View>
-            <View 
+            <View
               style={[styles.splitDivider, isResizing && styles.splitDividerActive]}
               onMouseDown={handleSplitResizeStart}
               onTouchStart={handleSplitResizeStart}
@@ -5381,11 +5380,11 @@ function RenderFile({ filePath }) {
   // Рендеринг бинарных файлов
   if (fileType === 'binary') {
     const lowerPath = filePath?.toLowerCase() || '';
-    const isImage = lowerPath.endsWith('.png') || lowerPath.endsWith('.jpg') || 
-                     lowerPath.endsWith('.jpeg') || lowerPath.endsWith('.gif') || 
-                     lowerPath.endsWith('.bmp') || lowerPath.endsWith('.ico') || 
+    const isImage = lowerPath.endsWith('.png') || lowerPath.endsWith('.jpg') ||
+                     lowerPath.endsWith('.jpeg') || lowerPath.endsWith('.gif') ||
+                     lowerPath.endsWith('.bmp') || lowerPath.endsWith('.ico') ||
                      lowerPath.endsWith('.svg') || lowerPath.endsWith('.webp');
-    
+
     return (
       <View style={styles.binaryContainer}>
         <View style={styles.fileTypeBadge}>
@@ -5396,8 +5395,8 @@ function RenderFile({ filePath }) {
           <Text style={styles.binaryPath}>Путь: {filePath}</Text>
           {isImage && (
             <View style={styles.imagePreview}>
-              <img 
-                src={`file://${filePath}`} 
+              <img
+                src={`file://${filePath}`}
                 alt={filePath.split(/[/\\]/).pop()}
                 style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }}
                 onError={(e) => {
@@ -5407,7 +5406,7 @@ function RenderFile({ filePath }) {
             </View>
           )}
           <Text style={styles.binaryHint}>
-            {isImage 
+            {isImage
               ? 'Это изображение. Для редактирования используйте графический редактор.'
               : 'Этот файл содержит бинарные данные и не может быть отредактирован как текст.'}
           </Text>
@@ -5447,7 +5446,7 @@ function RenderFile({ filePath }) {
     'vue': 'Vue',
     'plaintext': 'Текст',
   };
-  
+
   return (
     <View style={styles.textContainer}>
       <View style={styles.fileTypeBadge}>

@@ -160,8 +160,8 @@ no-code-ui/
 ├── src/                        # Frontend (Renderer Process)
 │   ├── App.jsx                 # Главный компонент (обычный React)
 │   ├── AppRN.jsx               # Главный компонент (React Native Web)
-│   ├── main.jsx                # Точка входа для React
-│   ├── mainRN.jsx              # Точка входа для React Native
+│   ├── main.tsx                # Точка входа для React
+│   ├── mainRN.tsx              # Точка входа для React Native
 │   │
 │   ├── RenderFile.jsx          # Компонент для рендеринга файлов
 │   ├── FileTree.jsx           # Компонент файлового дерева
