@@ -4,7 +4,7 @@ import { extractImports } from '../../features/file-renderer/lib/react-processor
  * Обрабатывает код React файла с поддержкой зависимостей.
  * Вынесено из ReactFramework.processReactCode, вызывается через .call(this, ...).
  */
-export async function processReactCodeImpl(code, basePath) {
+export async function processReactCodeImpl(code, basePath, projectRoot) {
   // ВАЖНО: внутри этой функции используется this (экземпляр ReactFramework)
   // Код перенесен 1:1 из метода ReactFramework.processReactCode.
 
@@ -80,6 +80,10 @@ export async function processReactCodeImpl(code, basePath) {
     .replace(/import\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '')           // import { useState } from 'react'
     // Удаляем импорты react-native (они будут доступны глобально)
     .replace(/import\s*\{[^}]*\}\s*from\s+['"]react-native['"];?\s*/gi, '')
+    // Удаляем CSS/SCSS/Less импорты
+    .replace(/import\s+['"][^'"]*\.css['"];?\s*/gi, '')
+    .replace(/import\s+['"][^'"]*\.scss['"];?\s*/gi, '')
+    .replace(/import\s+['"][^'"]*\.less['"];?\s*/gi, '')
     .replace(/export\s+default\s+/g, '')
     .trim();
   
@@ -687,6 +691,12 @@ export async function processReactCodeImpl(code, basePath) {
       }
     }
     if (importStatement) {
+      // Пропускаем CSS/SCSS/Less импорты - они уже были удалены ранее
+      if (importStatement.path && /\.(css|scss|less)$/.test(importStatement.path)) {
+        console.log(`[ProcessDependency] Skipping CSS import: ${importStatement.path}`);
+        continue;
+      }
+      
       // Парсим, что именно импортируется
       const match = importStatement.fullStatement.match(/import\s+(.*?)\s+from/);
       if (match) {
@@ -785,6 +795,12 @@ export async function processReactCodeImpl(code, basePath) {
   
   // Обрабатываем импорты в основном файле
   for (const imp of imports) {
+    // Пропускаем CSS/SCSS/Less импорты - они уже были удалены ранее
+    if (imp.path && /\.(css|scss|less)$/.test(imp.path)) {
+      console.log(`[ProcessReactCode] Skipping CSS import in main file: ${imp.path}`);
+      continue;
+    }
+    
     // Специальная обработка для react-native импортов
     if (imp.path === 'react-native') {
       const match = imp.fullStatement.match(/import\s+(.*?)\s+from/);
@@ -844,6 +860,12 @@ export async function processReactCodeImpl(code, basePath) {
         console.log('All modules loaded. Total modules:', Object.keys(window.__modules__ || {}).length);
         console.log('Registered module keys:', Object.keys(window.__modules__ || {}));
     `;
+  
+  // Финальная очистка - удаляем все оставшиеся CSS/SCSS/Less импорты и export default
+  processedCode = processedCode
+    .replace(/import\s+['"][^'"]*\.(css|scss|less)['"];?\s*/gi, '')
+    .replace(/export\s+default\s+.*?;?\s*/g, '')
+    .trim();
   
   return {
     processedCode,

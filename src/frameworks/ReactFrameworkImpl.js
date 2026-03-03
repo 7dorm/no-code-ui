@@ -28,9 +28,10 @@ import { processReactCodeImpl } from './react/processReactCode';
  * В будущем эту логику можно вынести в отдельные модули для лучшей организации
  */
 export class ReactFramework extends Framework {
-  constructor(filePath) {
+  constructor(filePath, projectRoot = null) {
     super(filePath);
     this.filePath = filePath;
+    this.projectRoot = projectRoot;
     // Кэш для загруженных зависимостей
     this._dependencyCache = new Map();
     // Мемоизированные функции для разрешения путей
@@ -443,7 +444,7 @@ export class ReactFramework extends Framework {
    * Вынесено в `src/frameworks/react/processReactCode.js`
    */
   async processReactCode(code, basePath) {
-    return processReactCodeImpl.call(this, code, basePath);
+    return processReactCodeImpl.call(this, code, basePath, this.projectRoot);
   }
 
   /**

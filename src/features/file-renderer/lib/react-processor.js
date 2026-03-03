@@ -15,14 +15,15 @@ export function extractImports(code, sourceFile = 'unknown') {
     const fullImport = match[0];
     const lineNumber = code.substring(0, match.index).split('\n').length;
     
-    // Пропускаем только внешние библиотеки (npm пакеты)
+    // Пропускаем только внешние библиотеки (npm пакеты) и CSS/SCSS/Less файлы
     // Теперь обрабатываем локальные импорты, включая относительные и @ пути
     if (!importPath.startsWith('react') && 
         !importPath.startsWith('react-dom') &&
         !importPath.startsWith('react-native') &&
         !importPath.startsWith('node_modules') &&
         !importPath.startsWith('http://') &&
-        !importPath.startsWith('https://')) {
+        !importPath.startsWith('https://') &&
+        !importPath.match(/\.(css|scss|less)$/)) {
       imports.push({
         path: importPath,
         fullStatement: fullImport,
