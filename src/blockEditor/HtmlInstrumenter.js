@@ -89,7 +89,7 @@ export function instrumentHtml(html, filePath) {
     };
   });
 
-  const serialized = `${hasDoctype ? '<!DOCTYPE html>\\n' : ''}${doc.documentElement.outerHTML}`;
+  const serialized = `${hasDoctype ? '<!DOCTYPE html>' : ''}${doc.documentElement.outerHTML}`;
   return { html: serialized, map };
 }
 

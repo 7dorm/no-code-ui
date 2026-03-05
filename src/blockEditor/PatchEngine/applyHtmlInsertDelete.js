@@ -81,7 +81,7 @@ export function applyHtmlOp({ html, op }) {
     const el = findElement(doc, { selector: sel, id });
     if (!el) return { ok: false, error: `applyHtmlOp: element not found: ${sel || id || 'unknown'}` };
     el.remove();
-    const out = `${hasDoctype ? '<!DOCTYPE html>\\n' : ''}${doc.documentElement.outerHTML}`;
+    const out = `${hasDoctype ? '<!DOCTYPE html>' : ''}${doc.documentElement.outerHTML}`;
     return { ok: true, html: out, changed: true };
   }
 
@@ -103,7 +103,7 @@ export function applyHtmlOp({ html, op }) {
       target.insertAdjacentElement('afterend', newEl);
     }
 
-    const out = `${hasDoctype ? '<!DOCTYPE html>\\n' : ''}${doc.documentElement.outerHTML}`;
+    const out = `${hasDoctype ? '<!DOCTYPE html>' : ''}${doc.documentElement.outerHTML}`;
     return { ok: true, html: out, changed: true };
   }
 
@@ -118,7 +118,7 @@ export function applyHtmlOp({ html, op }) {
     if (!dstEl) return { ok: false, error: `applyHtmlOp: target not found: ${targetSel || targetId || 'unknown'}` };
     if (srcEl === dstEl) return { ok: false, error: 'applyHtmlOp: source == target' };
     dstEl.appendChild(srcEl);
-    const out = `${hasDoctype ? '<!DOCTYPE html>\\n' : ''}${doc.documentElement.outerHTML}`;
+    const out = `${hasDoctype ? '<!DOCTYPE html>' : ''}${doc.documentElement.outerHTML}`;
     return { ok: true, html: out, changed: true };
   }
 
@@ -129,7 +129,7 @@ export function applyHtmlOp({ html, op }) {
     const el = findElement(doc, { selector: sel, id });
     if (!el) return { ok: false, error: `applyHtmlOp: element not found: ${sel || id || 'unknown'}` };
     el.textContent = text;
-    const out = `${hasDoctype ? '<!DOCTYPE html>\\n' : ''}${doc.documentElement.outerHTML}`;
+    const out = `${hasDoctype ? '<!DOCTYPE html>' : ''}${doc.documentElement.outerHTML}`;
     return { ok: true, html: out, changed: true };
   }
 
