@@ -1,0 +1,594 @@
+{
+  "src/App.jsx": {
+    "timestamp": "2026-03-04T07:45:28.479Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 585,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 23,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:53:74:div": {
+        "filePath": "src/App.jsx",
+        "start": 53,
+        "end": 74,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:81:112:header": {
+        "filePath": "src/App.jsx",
+        "start": 81,
+        "end": 112,
+        "tagName": "header",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:121:125:h1": {
+        "filePath": "src/App.jsx",
+        "start": 121,
+        "end": 125,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:152:155:p": {
+        "filePath": "src/App.jsx",
+        "start": 152,
+        "end": 155,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:239:266:main": {
+        "filePath": "src/App.jsx",
+        "start": 239,
+        "end": 266,
+        "tagName": "main",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:275:305:div": {
+        "filePath": "src/App.jsx",
+        "start": 275,
+        "end": 305,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:316:320:h2": {
+        "filePath": "src/App.jsx",
+        "start": 316,
+        "end": 320,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:353:356:p": {
+        "filePath": "src/App.jsx",
+        "start": 353,
+        "end": 356,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:451:454:p": {
+        "filePath": "src/App.jsx",
+        "start": 451,
+        "end": 454,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 3
+  },
+  "src/WebView.jsx": {
+    "timestamp": "2026-03-04T07:45:50.335Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 998,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 20,
+          "column": 4
+        }
+      }
+    },
+    "map": {
+      "mrpak:WebView.jsx:53:74:div": {
+        "filePath": "src/WebView.jsx",
+        "start": 32,
+        "end": 102,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:81:112:header": {
+        "filePath": "src/WebView.jsx",
+        "start": 109,
+        "end": 193,
+        "tagName": "header",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:121:125:h1": {
+        "filePath": "src/WebView.jsx",
+        "start": 202,
+        "end": 256,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:152:155:p": {
+        "filePath": "src/WebView.jsx",
+        "start": 283,
+        "end": 335,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:239:266:main": {
+        "filePath": "src/WebView.jsx",
+        "start": 419,
+        "end": 498,
+        "tagName": "main",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:275:305:div": {
+        "filePath": "src/WebView.jsx",
+        "start": 507,
+        "end": 588,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:316:320:h2": {
+        "filePath": "src/WebView.jsx",
+        "start": 599,
+        "end": 653,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:353:356:p": {
+        "filePath": "src/WebView.jsx",
+        "start": 686,
+        "end": 738,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:WebView.jsx:451:454:p": {
+        "filePath": "src/WebView.jsx",
+        "start": 833,
+        "end": 885,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  },
+  "src/AppRN.jsx": {
+    "timestamp": "2026-03-04T07:47:20.260Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 21832,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 496,
+          "column": 6
+        }
+      }
+    },
+    "map": {
+      "mrpak:AppRN.jsx:4469:4500:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 15146,
+        "end": 15229,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:4536:4564:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 15265,
+        "end": 15345,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:4573:4605:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 15354,
+        "end": 15438,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:4616:4643:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 15449,
+        "end": 15528,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:4688:4721:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 15573,
+        "end": 15658,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:4763:4926:TouchableOpacity": {
+        "filePath": "src/AppRN.jsx",
+        "start": 15696,
+        "end": 15905,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:4941:4979:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 15921,
+        "end": 16011,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5090:5202:TouchableOpacity": {
+        "filePath": "src/AppRN.jsx",
+        "start": 16121,
+        "end": 16285,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5215:5253:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 16299,
+        "end": 16389,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5422:5473:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 16554,
+        "end": 16657,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5626:5659:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 16805,
+        "end": 16890,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5670:5701:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 16901,
+        "end": 16984,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5729:5778:TouchableOpacity": {
+        "filePath": "src/AppRN.jsx",
+        "start": 17012,
+        "end": 17125,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5791:5823:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 17138,
+        "end": 17222,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:5938:5971:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 17336,
+        "end": 17421,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6026:6082:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 17476,
+        "end": 17584,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6093:6128:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 17595,
+        "end": 17682,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6141:6175:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 17695,
+        "end": 17781,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6224:6369:FileTree": {
+        "filePath": "src/AppRN.jsx",
+        "start": 17830,
+        "end": 18021,
+        "tagName": "FileTree",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6423:6454:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 18076,
+        "end": 18159,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6511:6540:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 18216,
+        "end": 18297,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6585:6627:RenderFile": {
+        "filePath": "src/AppRN.jsx",
+        "start": 18338,
+        "end": 18438,
+        "tagName": "RenderFile",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6656:6689:View": {
+        "filePath": "src/AppRN.jsx",
+        "start": 18452,
+        "end": 18537,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6704:6741:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 18552,
+        "end": 18641,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6765:6802:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 18665,
+        "end": 18754,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:6887:6924:Text": {
+        "filePath": "src/AppRN.jsx",
+        "start": 18839,
+        "end": 18928,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.jsx:7154:7328:CreateProjectDialog": {
+        "filePath": "src/AppRN.jsx",
+        "start": 19157,
+        "end": 19392,
+        "tagName": "CreateProjectDialog",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 10
+  },
+  "src/shared/ui/dialogs/create-file-dialog/index.jsx": {
+    "timestamp": "2026-03-04T07:47:25.819Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 21804,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 496,
+          "column": 6
+        }
+      }
+    },
+    "map": {
+      "mrpak:index.jsx:4469:4500:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 15118,
+        "end": 15201,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:4536:4564:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 15237,
+        "end": 15317,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:4573:4605:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 15326,
+        "end": 15410,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:4616:4643:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 15421,
+        "end": 15500,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:4688:4721:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 15545,
+        "end": 15630,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:4763:4926:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 15668,
+        "end": 15877,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:4941:4979:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 15893,
+        "end": 15983,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5090:5202:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 16093,
+        "end": 16257,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5215:5253:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 16271,
+        "end": 16361,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5422:5473:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 16526,
+        "end": 16629,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5626:5659:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 16777,
+        "end": 16862,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5670:5701:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 16873,
+        "end": 16956,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5729:5778:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 16984,
+        "end": 17097,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5791:5823:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 17110,
+        "end": 17194,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:5938:5971:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 17308,
+        "end": 17393,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6026:6082:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 17448,
+        "end": 17556,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6093:6128:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 17567,
+        "end": 17654,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6141:6175:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 17667,
+        "end": 17753,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6224:6369:FileTree": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 17802,
+        "end": 17993,
+        "tagName": "FileTree",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6423:6454:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 18048,
+        "end": 18131,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6511:6540:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 18188,
+        "end": 18269,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6585:6627:RenderFile": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 18310,
+        "end": 18410,
+        "tagName": "RenderFile",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6656:6689:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 18424,
+        "end": 18509,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6704:6741:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 18524,
+        "end": 18613,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6765:6802:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 18637,
+        "end": 18726,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:6887:6924:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 18811,
+        "end": 18900,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:7154:7328:CreateProjectDialog": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 19129,
+        "end": 19364,
+        "tagName": "CreateProjectDialog",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 10
+  }
+}

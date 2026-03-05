@@ -1,0 +1,200 @@
+{
+  "src/shared/ui/view-mode-tabs/index.jsx": {
+    "timestamp": "2026-03-04T07:48:01.442Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 2538,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 89,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:index.jsx:266:301:View": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 266,
+        "end": 301,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:308:454:TouchableOpacity": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 308,
+        "end": 454,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:463:542:Text": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 463,
+        "end": 542,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:635:781:TouchableOpacity": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 635,
+        "end": 781,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:792:868:Text": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 792,
+        "end": 868,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:951:1091:TouchableOpacity": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 951,
+        "end": 1091,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1100:1176:Text": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 1100,
+        "end": 1176,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1266:1414:TouchableOpacity": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 1266,
+        "end": 1414,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1425:1502:Text": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 1425,
+        "end": 1502,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1609:1761:TouchableOpacity": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 1609,
+        "end": 1761,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1772:1851:Text": {
+        "filePath": "src/shared/ui/view-mode-tabs/index.jsx",
+        "start": 1772,
+        "end": 1851,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 4
+  },
+  "src/features/file-operations/lib/file-operations.js": {
+    "timestamp": "2026-03-04T07:48:09.258Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 3084,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 84,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:file-operations.js:266:301:View": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 165,
+        "end": 259,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:308:454:TouchableOpacity": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 266,
+        "end": 476,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:463:542:Text": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 486,
+        "end": 624,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:635:781:TouchableOpacity": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 713,
+        "end": 917,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:792:868:Text": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 929,
+        "end": 1064,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:951:1091:TouchableOpacity": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 1146,
+        "end": 1351,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:1100:1176:Text": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 1361,
+        "end": 1498,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:1266:1414:TouchableOpacity": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 1584,
+        "end": 1792,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:1425:1502:Text": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 1804,
+        "end": 1942,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:1609:1761:TouchableOpacity": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 2044,
+        "end": 2256,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:file-operations.js:1772:1851:Text": {
+        "filePath": "src/features/file-operations/lib/file-operations.js",
+        "start": 2268,
+        "end": 2408,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  }
+}

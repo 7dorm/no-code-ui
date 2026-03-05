@@ -1,0 +1,657 @@
+{
+  "src/shared/ui/dialogs/create-file-dialog/index.jsx": {
+    "timestamp": "2026-03-04T07:47:34.394Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 6182,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 191,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:index.jsx:1232:1261:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 1073,
+        "end": 1154,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1268:1296:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 1161,
+        "end": 1241,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1305:1332:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 1250,
+        "end": 1329,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1366:1392:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 1363,
+        "end": 1441,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1438:1470:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 1487,
+        "end": 1571,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1481:1508:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 1582,
+        "end": 1661,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1536:2330:input": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 1689,
+        "end": 2525,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2356:2388:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 2552,
+        "end": 2636,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2399:2426:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 2647,
+        "end": 2726,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2454:3014:select": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 2754,
+        "end": 3356,
+        "tagName": "select",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3027:3047:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 3370,
+        "end": 3444,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3072:3091:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 3469,
+        "end": 3542,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3123:3143:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 3574,
+        "end": 3648,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3168:3187:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 3673,
+        "end": 3746,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3219:3240:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 3778,
+        "end": 3853,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3266:3286:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 3879,
+        "end": 3953,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3311:3332:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 3978,
+        "end": 4053,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3358:3377:option": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 4079,
+        "end": 4152,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3440:3469:View": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 4215,
+        "end": 4296,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3480:3538:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 4307,
+        "end": 4429,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3551:3583:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 4442,
+        "end": 4526,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3637:3759:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 4580,
+        "end": 4755,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3772:3832:Text": {
+        "filePath": "src/shared/ui/dialogs/create-file-dialog/index.jsx",
+        "start": 4769,
+        "end": 4881,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  },
+  "src/shared/ui/dialogs/create-folder-dialog/index.jsx": {
+    "timestamp": "2026-03-04T07:47:40.261Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 3313,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 134,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:index.jsx:477:506:View": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 477,
+        "end": 506,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:513:541:View": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 513,
+        "end": 541,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:550:577:Text": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 550,
+        "end": 577,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:612:638:Text": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 612,
+        "end": 638,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:684:716:View": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 684,
+        "end": 716,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:727:754:Text": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 727,
+        "end": 754,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:782:1578:input": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 782,
+        "end": 1578,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1604:1633:View": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 1604,
+        "end": 1633,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1644:1702:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 1644,
+        "end": 1702,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1715:1747:Text": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 1715,
+        "end": 1747,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1801:1923:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 1801,
+        "end": 1923,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1936:1996:Text": {
+        "filePath": "src/shared/ui/dialogs/create-folder-dialog/index.jsx",
+        "start": 1936,
+        "end": 1996,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 4
+  },
+  "src/shared/ui/dialogs/create-project-dialog/index.jsx": {
+    "timestamp": "2026-03-04T07:47:46.445Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 5360,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 197,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:index.jsx:575:604:View": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 575,
+        "end": 604,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:611:639:View": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 611,
+        "end": 639,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:648:675:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 648,
+        "end": 675,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:714:747:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 714,
+        "end": 747,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:840:872:View": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 840,
+        "end": 872,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:883:910:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 883,
+        "end": 910,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:945:1751:input": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 945,
+        "end": 1751,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1777:1809:View": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 1777,
+        "end": 1809,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1820:1847:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 1820,
+        "end": 1847,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1877:2443:select": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 1877,
+        "end": 2443,
+        "tagName": "select",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2456:2478:option": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2456,
+        "end": 2478,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2511:2540:option": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2511,
+        "end": 2540,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2574:2595:option": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2574,
+        "end": 2595,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2654:2686:View": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2654,
+        "end": 2686,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2697:2731:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2697,
+        "end": 2731,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2763:2796:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2763,
+        "end": 2796,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2847:2880:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2847,
+        "end": 2880,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2993:3026:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 2993,
+        "end": 3026,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3090:3119:View": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 3090,
+        "end": 3119,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3130:3188:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 3130,
+        "end": 3188,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3201:3233:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 3201,
+        "end": 3233,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3287:3452:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 3287,
+        "end": 3452,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3465:3525:Text": {
+        "filePath": "src/shared/ui/dialogs/create-project-dialog/index.jsx",
+        "start": 3465,
+        "end": 3525,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 4
+  },
+  "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx": {
+    "timestamp": "2026-03-04T07:47:48.590Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 6406,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 192,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:index.jsx:575:604:View": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 460,
+        "end": 539,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:611:639:View": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 546,
+        "end": 624,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:648:675:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 633,
+        "end": 710,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:714:747:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 749,
+        "end": 832,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:840:872:View": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 925,
+        "end": 1007,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:883:910:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 1018,
+        "end": 1095,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:945:1751:input": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 1130,
+        "end": 1977,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1777:1809:View": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 2004,
+        "end": 2088,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1820:1847:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 2099,
+        "end": 2178,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:1877:2443:select": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 2208,
+        "end": 2816,
+        "tagName": "select",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2456:2478:option": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 2830,
+        "end": 2906,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2511:2540:option": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 2939,
+        "end": 3022,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2574:2595:option": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3056,
+        "end": 3131,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2654:2686:View": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3190,
+        "end": 3274,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2697:2731:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3285,
+        "end": 3371,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2763:2796:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3403,
+        "end": 3488,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2847:2880:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3539,
+        "end": 3624,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:2993:3026:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3733,
+        "end": 3818,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3090:3119:View": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3881,
+        "end": 3962,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3130:3188:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 3973,
+        "end": 4095,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3201:3233:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 4108,
+        "end": 4192,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3287:3452:TouchableOpacity": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 4246,
+        "end": 4464,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:index.jsx:3465:3525:Text": {
+        "filePath": "src/shared/ui/dialogs/delete-confirm-dialog/index.jsx",
+        "start": 4478,
+        "end": 4590,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  }
+}
