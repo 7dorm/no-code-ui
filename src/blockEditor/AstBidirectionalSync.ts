@@ -5,7 +5,7 @@
 import { parse } from '@babel/parser';
 import generate from '@babel/generator';
 import { diffAst } from './AstDiff';
-import { MRPAK_CMD } from '../EditorProtocol';
+import { MRPAK_CMD } from './EditorProtocol';
 import { isTypeScriptFile } from './AstUtils';
 
 /**
@@ -14,12 +14,12 @@ import { isTypeScriptFile } from './AstUtils';
  * @param {string} filePath - путь к файлу
  * @returns {Object|null} AST или null при ошибке
  */
-export function parseCodeToAst(code, filePath) {
+export function parseCodeToAst(code: any, filePath: any) {
   if (!code || typeof code !== 'string') {
     return null;
   }
 
-  const plugins = ['jsx'];
+  const plugins: any[] = ['jsx'];
   if (isTypeScriptFile(filePath)) {
     plugins.push('typescript', 'classProperties', 'decorators-legacy', 'optionalChaining', 'nullishCoalescingOperator');
   }
@@ -32,7 +32,7 @@ export function parseCodeToAst(code, filePath) {
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstBidirectionalSync] Parse error:', error);
     return null;
   }
@@ -44,7 +44,7 @@ export function parseCodeToAst(code, filePath) {
  * @param {string} originalCode - оригинальный код (для сохранения форматирования)
  * @returns {string} сгенерированный код
  */
-export function generateCodeFromAst(ast, originalCode = '') {
+export function generateCodeFromAst(ast: any, originalCode: any = '') {
   if (!ast) {
     return originalCode;
   }
@@ -57,7 +57,7 @@ export function generateCodeFromAst(ast, originalCode = '') {
       comments: true,
     }, originalCode);
     return result.code;
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstBidirectionalSync] Generation error:', error);
     return originalCode;
   }
@@ -73,7 +73,7 @@ export function generateCodeFromAst(ast, originalCode = '') {
  * @param {string} params.originalCode - оригинальный код (для форматирования)
  * @returns {Object} { ok: boolean, code?: string, ast?: Object, error?: string }
  */
-export function syncConstructorToCode({ constructorAST, editorAST, filePath, originalCode }) {
+export function syncConstructorToCode({ constructorAST, editorAST, filePath, originalCode }: any) {
   if (!constructorAST) {
     return { ok: false, error: 'constructorAST is required' };
   }
@@ -81,10 +81,10 @@ export function syncConstructorToCode({ constructorAST, editorAST, filePath, ori
   try {
     // Генерируем код из constructorAST
     const newCode = generateCodeFromAst(constructorAST, originalCode);
-    
+
     // Парсим новый код обратно в editorAST для синхронизации
     const newEditorAST = parseCodeToAst(newCode, filePath);
-    
+
     if (!newEditorAST) {
       return { ok: false, error: 'Failed to parse generated code' };
     }
@@ -94,7 +94,7 @@ export function syncConstructorToCode({ constructorAST, editorAST, filePath, ori
       code: newCode,
       ast: newEditorAST,
     };
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: error.message };
   }
 }
@@ -109,7 +109,7 @@ export function syncConstructorToCode({ constructorAST, editorAST, filePath, ori
  * @param {Function} params.sendCommandToIframe - функция для отправки команд в iframe
  * @returns {Object} { ok: boolean, ast?: Object, changes?: Array, error?: string }
  */
-export function syncCodeToConstructor({ editorAST, constructorAST, filePath, sendCommandToIframe }) {
+export function syncCodeToConstructor({ editorAST, constructorAST, filePath, sendCommandToIframe }: any) {
   if (!editorAST) {
     return { ok: false, error: 'editorAST is required' };
   }
@@ -164,7 +164,7 @@ export function syncCodeToConstructor({ editorAST, constructorAST, filePath, sen
               console.log('[AstBidirectionalSync] Element added, may need manual insert:', change);
             }
           }
-        } catch (error) {
+        } catch (error: any) {
           console.warn('[AstBidirectionalSync] Failed to apply change:', change, error);
         }
       }
@@ -176,8 +176,9 @@ export function syncCodeToConstructor({ editorAST, constructorAST, filePath, sen
       ast: editorAST, // Используем editorAST как новый constructorAST
       changes: diff.changes,
     };
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: error.message };
   }
 }
+
 

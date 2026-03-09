@@ -1,8 +1,8 @@
-function parseStyleAttr(styleText) {
-  const map = {};
+function parseStyleAttr(styleText: any) {
+  const map: any = {};
   const s = String(styleText || '').trim();
   if (!s) return map;
-  s.split(';').forEach((part) => {
+  s.split(';').forEach((part: any) => {
     const p = part.trim();
     if (!p) return;
     const idx = p.indexOf(':');
@@ -15,17 +15,17 @@ function parseStyleAttr(styleText) {
   return map;
 }
 
-function serializeStyleAttr(map) {
+function serializeStyleAttr(map: any) {
   return Object.entries(map)
-    .filter(([k, v]) => k && v != null && String(v).length > 0)
-    .map(([k, v]) => `${k}: ${String(v)}`)
+    .filter(([k, v]: any) => k && v != null && String(v).length > 0)
+    .map(([k, v]: any) => `${k}: ${String(v)}`)
     .join('; ');
 }
 
 /**
  * patch: { [cssPropKebabOrLower]: string|number }
  */
-export function applyHtmlStylePatch({ html, selector, patch }) {
+export function applyHtmlStylePatch({ html, selector, patch }: any) {
   const source = String(html ?? '');
   if (!selector || typeof selector !== 'string') {
     return { ok: false, error: 'applyHtmlStylePatch: selector is required' };
@@ -50,5 +50,6 @@ export function applyHtmlStylePatch({ html, selector, patch }) {
   const serialized = `${hasDoctype ? '<!DOCTYPE html>' : ''}${doc.documentElement.outerHTML}`;
   return { ok: true, html: serialized, changed: true };
 }
+
 
 

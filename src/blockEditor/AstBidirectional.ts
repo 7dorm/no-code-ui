@@ -13,8 +13,8 @@ import { instrumentJsxWithAst } from './AstJsxInstrumenter';
 /**
  * Парсит код в AST
  */
-function parseCodeToAst(code, filePath) {
-  const plugins = ['jsx'];
+function parseCodeToAst(code: any, filePath: any) {
+  const plugins: any[] = ['jsx'];
   if (isTypeScriptFile(filePath)) {
     plugins.push('typescript', 'classProperties', 'decorators-legacy', 'optionalChaining', 'nullishCoalescingOperator');
   }
@@ -27,7 +27,7 @@ function parseCodeToAst(code, filePath) {
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstBidirectional] Parse error:', error);
     return null;
   }
@@ -36,7 +36,7 @@ function parseCodeToAst(code, filePath) {
 /**
  * Генерирует код из AST
  */
-function generateCodeFromAst(ast, originalCode) {
+function generateCodeFromAst(ast: any, originalCode: any) {
   try {
     const result = generate(ast, {
       retainLines: true,
@@ -45,7 +45,7 @@ function generateCodeFromAst(ast, originalCode) {
       comments: true,
     }, originalCode);
     return { ok: true, code: result.code };
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstBidirectional] Generate error:', error);
     return { ok: false, error: error.message };
   }
@@ -55,7 +55,13 @@ function generateCodeFromAst(ast, originalCode) {
  * Класс для управления двумя AST деревьями
  */
 export class AstBidirectionalManager {
-  constructor(filePath, projectRoot) {
+  filePath: any;
+  projectRoot: any;
+  codeAST: any;
+  constructorAST: any;
+  originalCode: string;
+
+  constructor(filePath: any, projectRoot: any) {
     this.filePath = filePath;
     this.projectRoot = projectRoot;
     this.codeAST = null; // AST из кода
@@ -67,7 +73,7 @@ export class AstBidirectionalManager {
    * Инициализирует оба AST из кода
    * ВАЖНО: код должен быть уже инструментирован (содержать data-no-code-ui-id)
    */
-  async initializeFromCode(code) {
+  async initializeFromCode(code: any) {
     // Для JS/TS файлов: инструментируем код перед парсингом, если он еще не инструментирован
     let codeToParse = code;
     if (isJavaScriptFile(this.filePath)) {
@@ -80,15 +86,15 @@ export class AstBidirectionalManager {
           codeToParse = instResult.code;
           console.log('[AstBidirectional] Code instrumented during initialization');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn('[AstBidirectional] Failed to instrument code during initialization:', error);
         // Продолжаем с исходным кодом
       }
     }
-    
+
     this.originalCode = codeToParse;
     this.codeAST = parseCodeToAst(codeToParse, this.filePath);
-    
+
     if (!this.codeAST) {
       return { ok: false, error: 'Failed to parse code to AST' };
     }
@@ -104,7 +110,7 @@ export class AstBidirectionalManager {
    * Клонирует AST через парсинг сгенерированного кода
    * Это более надежный способ, чем JSON сериализация
    */
-  cloneAst(ast) {
+  cloneAst(ast: any) {
     try {
       // Генерируем код из AST
       const generated = generateCodeFromAst(ast, this.originalCode);
@@ -112,16 +118,16 @@ export class AstBidirectionalManager {
         console.warn('[AstBidirectional] Failed to generate code for cloning, using original AST');
         return ast;
       }
-      
+
       // Парсим обратно в AST
       const cloned = parseCodeToAst(generated.code, this.filePath);
       if (!cloned) {
         console.warn('[AstBidirectional] Failed to parse cloned code, using original AST');
         return ast;
       }
-      
+
       return cloned;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[AstBidirectional] Clone error, using original:', error);
       return ast;
     }
@@ -130,7 +136,7 @@ export class AstBidirectionalManager {
   /**
    * Восстанавливает AST из сериализованного формата
    */
-  reconstructAst(serialized) {
+  reconstructAst(serialized: any) {
     // Для упрощения, просто возвращаем сериализованный объект
     // В будущем можно добавить полное восстановление через Babel builders
     return serialized;
@@ -139,7 +145,7 @@ export class AstBidirectionalManager {
   /**
    * Извлекает ID из JSX узла
    */
-  extractIdFromNode(node) {
+  extractIdFromNode(node: any) {
     if (!node || !node.attributes) return null;
     for (const attr of node.attributes) {
       if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
@@ -162,12 +168,12 @@ export class AstBidirectionalManager {
   /**
    * Обновляет стили в JSX узле
    */
-  updateStyleInNode(node, patch) {
+  updateStyleInNode(node: any, patch: any) {
     // Находим или создаем style атрибут
     let styleAttr = node.attributes.find(
-      attr => t.isJSXAttribute(attr) && 
-              t.isJSXIdentifier(attr.name) && 
-              attr.name.name === 'style'
+      (attr: any) => t.isJSXAttribute(attr) &&
+        t.isJSXIdentifier(attr.name) &&
+        attr.name.name === 'style'
     );
 
     if (!styleAttr) {
@@ -180,26 +186,26 @@ export class AstBidirectionalManager {
     }
 
     // Обновляем объект стилей
-    if (t.isJSXExpressionContainer(styleAttr.value) && 
-        t.isObjectExpression(styleAttr.value.expression)) {
+    if (t.isJSXExpressionContainer(styleAttr.value) &&
+      t.isObjectExpression(styleAttr.value.expression)) {
       const styleObj = styleAttr.value.expression;
-      
+
       // Обновляем или добавляем свойства
       for (const [key, value] of Object.entries(patch)) {
-        const camelKey = key.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+        const camelKey = key.replace(/-([a-z])/g, (g: any) => g[1].toUpperCase());
         const existingProp = styleObj.properties.find(
-          p => t.isObjectProperty(p) && 
-               t.isIdentifier(p.key) && 
-               p.key.name === camelKey
+          (p: any) => t.isObjectProperty(p) &&
+            t.isIdentifier(p.key) &&
+            p.key.name === camelKey
         );
 
-        const valueNode = typeof value === 'string' 
+        const valueNode = typeof value === 'string'
           ? t.stringLiteral(value)
           : typeof value === 'number'
-          ? t.numericLiteral(value)
-          : typeof value === 'boolean'
-          ? t.booleanLiteral(value)
-          : t.stringLiteral(String(value));
+            ? t.numericLiteral(value)
+            : typeof value === 'boolean'
+              ? t.booleanLiteral(value)
+              : t.stringLiteral(String(value));
 
         if (existingProp) {
           existingProp.value = valueNode;
@@ -215,9 +221,9 @@ export class AstBidirectionalManager {
   /**
    * Обновляет текст в JSX элементе
    */
-  updateTextInNode(jsxElementPath, text) {
+  updateTextInNode(jsxElementPath: any, text: any) {
     if (!jsxElementPath || !t.isJSXElement(jsxElementPath.node)) return;
-    
+
     // Заменяем детей на новый текст
     const textNode = t.jsxText(String(text || ''));
     jsxElementPath.node.children = [textNode];
@@ -226,8 +232,8 @@ export class AstBidirectionalManager {
   /**
    * Парсит JSX snippet в AST элемент
    */
-  parseJsxSnippet(jsxCode) {
-    const plugins = ['jsx'];
+  parseJsxSnippet(jsxCode: any) {
+    const plugins: any[] = ['jsx'];
     if (isTypeScriptFile(this.filePath)) {
       plugins.push('typescript', 'classProperties', 'decorators-legacy', 'optionalChaining', 'nullishCoalescingOperator');
     }
@@ -243,9 +249,9 @@ export class AstBidirectionalManager {
       });
 
       // Извлекаем JSX из return statement
-      let jsxNode = null;
+      let jsxNode: any = null;
       traverse(ast, {
-        ReturnStatement(path) {
+        ReturnStatement(path: any) {
           const arg = path.node.argument;
           if (t.isJSXElement(arg) || t.isJSXFragment(arg)) {
             jsxNode = arg;
@@ -258,7 +264,7 @@ export class AstBidirectionalManager {
       });
 
       return jsxNode;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[AstBidirectional] Failed to parse JSX snippet:', error);
       return null;
     }
@@ -269,7 +275,7 @@ export class AstBidirectionalManager {
    * @param {string} elementId - ID элемента
    * @param {Object} changes - изменения { type: 'style'|'text'|'delete'|'insert'|'reparent', ... }
    */
-  updateCodeAST(elementId, changes) {
+  updateCodeAST(elementId: any, changes: any) {
     if (!this.codeAST) {
       console.warn('[AstBidirectional] codeAST not initialized');
       return { ok: false, error: 'codeAST not initialized' };
@@ -281,10 +287,10 @@ export class AstBidirectionalManager {
     if (changes.type === 'delete') {
       // Удаление элемента
       traverse(this.codeAST, {
-        JSXElement(path) {
+        JSXElement(path: any) {
           const openingElement = path.node.openingElement;
           const id = self.extractIdFromNode(openingElement);
-          
+
           if (id === elementId) {
             path.remove();
             modified = true;
@@ -297,21 +303,21 @@ export class AstBidirectionalManager {
       const targetId = changes.targetId;
       const snippet = changes.snippet;
       const mode = changes.mode || 'child';
-      
+
       if (!targetId || !snippet) {
         return { ok: false, error: 'targetId and snippet required for insert' };
       }
-      
+
       // Парсим snippet в AST
       const jsxNode = this.parseJsxSnippet(snippet);
       if (!jsxNode) {
         return { ok: false, error: 'Failed to parse snippet' };
       }
-      
+
       // Находим целевой элемент
-      let targetPath = null;
+      let targetPath: any = null;
       traverse(this.codeAST, {
-        JSXOpeningElement(path) {
+        JSXOpeningElement(path: any) {
           const node = path.node;
           const id = self.extractIdFromNode(node);
           if (id === targetId) {
@@ -327,11 +333,11 @@ export class AstBidirectionalManager {
           }
         }
       });
-      
+
       if (!targetPath) {
         return { ok: false, error: 'Target element not found' };
       }
-      
+
       // Вставляем элемент
       if (mode === 'child') {
         targetPath.node.children.push(jsxNode);
@@ -347,26 +353,26 @@ export class AstBidirectionalManager {
           }
         }
       }
-      
+
       modified = true;
     } else if (changes.type === 'reparent') {
       // Перемещение элемента
       const sourceId = changes.sourceId;
       const targetParentId = changes.targetParentId;
-      
+
       if (!sourceId || !targetParentId) {
         return { ok: false, error: 'sourceId and targetParentId required for reparent' };
       }
-      
+
       // Находим исходный элемент
-      let sourcePath = null;
-      let targetParentPath = null;
-      
+      let sourcePath: any = null;
+      let targetParentPath: any = null;
+
       traverse(this.codeAST, {
-        JSXOpeningElement(path) {
+        JSXOpeningElement(path: any) {
           const node = path.node;
           const id = self.extractIdFromNode(node);
-          
+
           if (id === sourceId) {
             let jsxElementPath = path;
             while (jsxElementPath && !t.isJSXElement(jsxElementPath.node) && !t.isJSXFragment(jsxElementPath.node)) {
@@ -376,7 +382,7 @@ export class AstBidirectionalManager {
               sourcePath = jsxElementPath;
             }
           }
-          
+
           if (id === targetParentId) {
             let jsxElementPath = path;
             while (jsxElementPath && !t.isJSXElement(jsxElementPath.node) && !t.isJSXFragment(jsxElementPath.node)) {
@@ -388,11 +394,11 @@ export class AstBidirectionalManager {
           }
         }
       });
-      
+
       if (!sourcePath || !targetParentPath) {
         return { ok: false, error: 'Source or target parent element not found' };
       }
-      
+
       // Удаляем из старого места
       const sourceParentPath = sourcePath.parentPath;
       if (sourceParentPath && (t.isJSXElement(sourceParentPath.node) || t.isJSXFragment(sourceParentPath.node))) {
@@ -401,23 +407,23 @@ export class AstBidirectionalManager {
           sourceParentPath.node.children.splice(index, 1);
         }
       }
-      
+
       // Добавляем в новое место
       targetParentPath.node.children.push(sourcePath.node);
-      
+
       modified = true;
     } else {
       // style или text
       let foundElement = false;
       traverse(this.codeAST, {
-        JSXOpeningElement(path) {
+        JSXOpeningElement(path: any) {
           const node = path.node;
           const id = self.extractIdFromNode(node);
-          
+
           if (id === elementId) {
             foundElement = true;
             console.log('[AstBidirectional] Element found, applying changes:', changes.type);
-            
+
             if (changes.type === 'style' && changes.patch) {
               // Обновляем стили в AST
               self.updateStyleInNode(node, changes.patch);
@@ -425,7 +431,7 @@ export class AstBidirectionalManager {
               path.stop();
             } else if (changes.type === 'text' && changes.text !== undefined) {
               // Находим JSX элемент для обновления текста
-              const jsxElementPath = path.findParent(p => t.isJSXElement(p.node));
+              const jsxElementPath = path.findParent((p: any) => t.isJSXElement(p.node));
               if (jsxElementPath) {
                 self.updateTextInNode(jsxElementPath, changes.text);
                 modified = true;
@@ -435,7 +441,7 @@ export class AstBidirectionalManager {
           }
         }
       });
-      
+
       if (!foundElement) {
         console.warn('[AstBidirectional] Element not found in AST:', {
           elementId,
@@ -443,19 +449,19 @@ export class AstBidirectionalManager {
           hasProgram: !!this.codeAST?.program,
           programBodyLength: this.codeAST?.program?.body?.length
         });
-        
+
         // Попробуем найти все ID в AST для отладки
-        const allIds = [];
-        const allAttributes = [];
+        const allIds: any[] = [];
+        const allAttributes: any[] = [];
         traverse(this.codeAST, {
-          JSXOpeningElement(path) {
+          JSXOpeningElement(path: any) {
             const id = self.extractIdFromNode(path.node);
             if (id) {
               allIds.push(id);
             }
             // Собираем все атрибуты для отладки
             if (path.node.attributes) {
-              path.node.attributes.forEach(attr => {
+              path.node.attributes.forEach((attr: any) => {
                 if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
                   const attrName = attr.name.name;
                   if (attrName === 'data-no-code-ui-id' || attrName === 'data-mrpak-id') {
@@ -472,10 +478,10 @@ export class AstBidirectionalManager {
         console.log('[AstBidirectional] All IDs found in AST:', allIds);
         console.log('[AstBidirectional] All ID attributes found in AST:', allAttributes);
         console.log('[AstBidirectional] Looking for elementId:', elementId);
-        
+
         // Проверяем, есть ли элемент с похожим ID
-        const similarIds = allIds.filter(id => id && elementId && (
-          id.includes(elementId.split(':').pop()) || 
+        const similarIds = allIds.filter((id: any) => id && elementId && (
+          id.includes(elementId.split(':').pop()) ||
           elementId.includes(id.split(':').pop())
         ));
         if (similarIds.length > 0) {
@@ -496,7 +502,7 @@ export class AstBidirectionalManager {
    * @param {string} elementId - ID элемента (опционально, для логирования)
    * @param {Object} changes - изменения из diff
    */
-  updateConstructorASTFromCode(changes) {
+  updateConstructorASTFromCode(changes: any) {
     if (!this.codeAST) {
       console.warn('[AstBidirectional] codeAST not initialized');
       return { ok: false, error: 'codeAST not initialized' };
@@ -504,7 +510,7 @@ export class AstBidirectionalManager {
 
     // Синхронизируем constructorAST с codeAST (клонируем)
     this.constructorAST = this.cloneAst(this.codeAST);
-    
+
     return { ok: true, ast: this.constructorAST };
   }
 
@@ -517,17 +523,17 @@ export class AstBidirectionalManager {
     }
 
     // Проверяем, что в AST есть ID перед генерацией
-    const idsBeforeGenerate = [];
+    const idsBeforeGenerate: any[] = [];
     const self = this;
     traverse(this.codeAST, {
-      JSXOpeningElement(path) {
+      JSXOpeningElement(path: any) {
         const id = self.extractIdFromNode(path.node);
         if (id) {
           idsBeforeGenerate.push(id);
         }
       }
     });
-    
+
     if (idsBeforeGenerate.length === 0) {
       console.warn('[AstBidirectional] No IDs found in codeAST before generation!');
     } else {
@@ -535,13 +541,13 @@ export class AstBidirectionalManager {
     }
 
     const result = generateCodeFromAst(this.codeAST, this.originalCode);
-    
+
     // Проверяем, что ID сохранились в сгенерированном коде
     if (result.ok && result.code) {
       const idsInGenerated = (result.code.match(/data-no-code-ui-id=["']([^"']+)["']/g) || []).length;
       const idsInGeneratedLegacy = (result.code.match(/data-mrpak-id=["']([^"']+)["']/g) || []).length;
       const totalIdsInGenerated = idsInGenerated + idsInGeneratedLegacy;
-      
+
       if (totalIdsInGenerated === 0 && idsBeforeGenerate.length > 0) {
         console.error('[AstBidirectional] IDs were lost during code generation!', {
           idsBefore: idsBeforeGenerate.length,
@@ -579,7 +585,7 @@ export class AstBidirectionalManager {
    * @param {string} newCode - новый код
    * @param {boolean} skipSyncConstructor - если true, не синхронизирует constructorAST (для предотвращения рекурсии)
    */
-  async updateCodeASTFromCode(newCode, skipSyncConstructor = false) {
+  async updateCodeASTFromCode(newCode: any, skipSyncConstructor: any = false) {
     // Для JS/TS файлов: убеждаемся, что код инструментирован
     let codeToParse = newCode;
     if (isJavaScriptFile(this.filePath)) {
@@ -592,21 +598,21 @@ export class AstBidirectionalManager {
           codeToParse = instResult.code;
           console.log('[AstBidirectional] Code instrumented during updateCodeASTFromCode');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn('[AstBidirectional] Failed to instrument code during updateCodeASTFromCode:', error);
         // Продолжаем с исходным кодом
       }
     }
-    
+
     const newCodeAST = parseCodeToAst(codeToParse, this.filePath);
-    
+
     if (!newCodeAST) {
       return { ok: false, error: 'Failed to parse new code' };
     }
 
     this.originalCode = codeToParse;
     this.codeAST = newCodeAST;
-    
+
     // Синхронизируем constructorAST из codeAST только если не пропущено
     if (!skipSyncConstructor) {
       this.constructorAST = this.cloneAst(this.codeAST);
@@ -618,7 +624,7 @@ export class AstBidirectionalManager {
   /**
    * Сохраняет constructorAST в файл
    */
-  async saveConstructorAST(blockMap) {
+  async saveConstructorAST(blockMap: any) {
     if (!this.projectRoot || !this.constructorAST) {
       return { ok: false, error: 'projectRoot or constructorAST not set' };
     }
@@ -645,4 +651,5 @@ export class AstBidirectionalManager {
     return this.constructorAST;
   }
 }
+
 

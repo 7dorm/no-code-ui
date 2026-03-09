@@ -1,23 +1,23 @@
 import { readFile, writeFile, ensureDir } from '../shared/api/electron-api';
 
-function normalizePath(p) {
+function normalizePath(p: any) {
   return String(p || '').replace(/\\/g, '/');
 }
 
-function joinPath(a, b) {
+function joinPath(a: any, b: any) {
   const aa = normalizePath(a).replace(/\/+$/, '');
   const bb = normalizePath(b).replace(/^\/+/, '');
   return `${aa}/${bb}`;
 }
 
-export function getLayerStorePaths(projectRoot) {
+export function getLayerStorePaths(projectRoot: any) {
   const root = normalizePath(projectRoot);
   const dirPath = joinPath(root, '.mrpak');
   const filePath = joinPath(dirPath, 'layers.json');
   return { dirPath, filePath };
 }
 
-export async function loadLayerNames({ projectRoot, targetFilePath }) {
+export async function loadLayerNames({ projectRoot, targetFilePath }: any) {
   const { filePath } = getLayerStorePaths(projectRoot);
   const key = normalizePath(targetFilePath);
 
@@ -33,19 +33,19 @@ export async function loadLayerNames({ projectRoot, targetFilePath }) {
       ? json[key]
       : {};
     return { ok: true, names };
-  } catch (e) {
+  } catch (e: any) {
     return { ok: false, error: e.message, names: {} };
   }
 }
 
-export async function upsertLayerName({ projectRoot, targetFilePath, mrpakId, name }) {
+export async function upsertLayerName({ projectRoot, targetFilePath, mrpakId, name }: any) {
   const { dirPath, filePath } = getLayerStorePaths(projectRoot);
   const key = normalizePath(targetFilePath);
 
   try {
     await ensureDir(dirPath);
 
-    let json = {};
+    let json: any = {};
     const readRes = await readFile(filePath);
     if (readRes?.success) {
       try {
@@ -69,9 +69,10 @@ export async function upsertLayerName({ projectRoot, targetFilePath, mrpakId, na
     const writeRes = await writeFile(filePath, JSON.stringify(json, null, 2), { backup: true });
     if (!writeRes?.success) return { ok: false, error: writeRes?.error || 'Ошибка записи layers.json' };
     return { ok: true };
-  } catch (e) {
+  } catch (e: any) {
     return { ok: false, error: e.message };
   }
 }
+
 
 

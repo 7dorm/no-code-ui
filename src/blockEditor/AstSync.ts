@@ -11,10 +11,10 @@ import { loadAstTree } from './AstTreeStore';
  * @param {string} filePath - путь к файлу
  * @returns {Object|null} AST или null при ошибке
  */
-function parseCodeToAst(code, filePath) {
+function parseCodeToAst(code: any, filePath: any) {
   const ext = filePath?.split('.').pop()?.toLowerCase();
-  let plugins = ['jsx'];
-  
+  let plugins: any[] = ['jsx'];
+
   if (ext === 'ts' || ext === 'tsx') {
     plugins.push(
       'typescript',
@@ -33,7 +33,7 @@ function parseCodeToAst(code, filePath) {
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstSync] Parse error:', error);
     return null;
   }
@@ -45,7 +45,7 @@ function parseCodeToAst(code, filePath) {
  * @param {Object} serializedAst - сериализованное AST из ast-tree.json
  * @returns {Object|null} AST или null
  */
-function deserializeAst(serializedAst) {
+function deserializeAst(serializedAst: any) {
   // Для упрощения, мы будем использовать сохраненный AST только для сравнения ID
   // Полное восстановление AST требует парсинга кода
   return serializedAst;
@@ -61,7 +61,7 @@ function deserializeAst(serializedAst) {
  * @param {Function} params.onChange - callback для применения изменений в редакторе
  * @returns {Promise<Object>} { ok: boolean, changes?: Array, error?: string }
  */
-export async function syncCodeChangesToEditor({ code, filePath, projectRoot, oldAst, onChange }) {
+export async function syncCodeChangesToEditor({ code, filePath, projectRoot, oldAst, onChange }: any) {
   if (!code || !filePath) {
     return { ok: false, error: 'code and filePath are required' };
   }
@@ -96,7 +96,7 @@ export async function syncCodeChangesToEditor({ code, filePath, projectRoot, old
     for (const change of diff.changes) {
       try {
         await onChange(change);
-      } catch (error) {
+      } catch (error: any) {
         console.warn('[AstSync] Failed to apply change:', change, error);
       }
     }
@@ -110,8 +110,8 @@ export async function syncCodeChangesToEditor({ code, filePath, projectRoot, old
  * @param {Array} changes - массив изменений из diffAst
  * @returns {Array} массив команд для iframe
  */
-export function createEditorCommandsFromChanges(changes) {
-  const commands = [];
+export function createEditorCommandsFromChanges(changes: any) {
+  const commands: any[] = [];
 
   for (const change of changes) {
     if (change.type === 'style') {
@@ -159,4 +159,5 @@ export function createEditorCommandsFromChanges(changes) {
 
   return commands;
 }
+
 

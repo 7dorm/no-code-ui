@@ -27,7 +27,7 @@ export const MRPAK_CMD = {
   END_DRAG: 'MRPAK_CMD_END_DRAG',
 };
 
-export function isMrpakMessage(data) {
+export function isMrpakMessage(data: any) {
   return (
     data &&
     typeof data === 'object' &&
@@ -35,5 +35,6 @@ export function isMrpakMessage(data) {
     data.type.startsWith('MRPAK_')
   );
 }
+
 
 

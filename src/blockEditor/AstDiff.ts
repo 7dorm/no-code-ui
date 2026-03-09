@@ -9,9 +9,9 @@ import * as t from '@babel/types';
  * @param {t.JSXOpeningElement} node - узел открывающего тега
  * @returns {string|null} ID или null
  */
-function extractIdFromNode(node) {
+function extractIdFromNode(node: any) {
   if (!node || !node.attributes) return null;
-  
+
   for (const attr of node.attributes) {
     if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
       if (attr.name.name === 'data-no-code-ui-id' || attr.name.name === 'data-mrpak-id') {
@@ -30,31 +30,31 @@ function extractIdFromNode(node) {
  * @param {t.JSXOpeningElement} node - узел открывающего тега
  * @returns {Object} объект со стилями
  */
-function extractStylesFromNode(node) {
-  const styles = {};
-  
+function extractStylesFromNode(node: any) {
+  const styles: any = {};
+
   if (!node || !node.attributes) return styles;
-  
+
   for (const attr of node.attributes) {
     if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'style') {
       const value = attr.value;
-      
+
       if (t.isJSXExpressionContainer(value)) {
         const expr = value.expression;
-        
+
         if (t.isObjectExpression(expr)) {
           for (const prop of expr.properties) {
             if (t.isObjectProperty(prop)) {
               const key = prop.key;
               const val = prop.value;
-              
-              let keyName = null;
+
+              let keyName: any = null;
               if (t.isIdentifier(key)) {
                 keyName = key.name;
               } else if (t.isStringLiteral(key)) {
                 keyName = key.value;
               }
-              
+
               if (keyName) {
                 if (t.isStringLiteral(val)) {
                   styles[keyName] = val.value;
@@ -70,7 +70,7 @@ function extractStylesFromNode(node) {
       }
     }
   }
-  
+
   return styles;
 }
 
@@ -79,9 +79,9 @@ function extractStylesFromNode(node) {
  * @param {t.JSXElement} node - JSX элемент
  * @returns {string} текст
  */
-function extractTextFromNode(node) {
+function extractTextFromNode(node: any) {
   if (!node || !node.children) return '';
-  
+
   let text = '';
   for (const child of node.children) {
     if (t.isJSXText(child)) {
@@ -91,7 +91,7 @@ function extractTextFromNode(node) {
       text += '{...}';
     }
   }
-  
+
   return text.trim();
 }
 
@@ -100,18 +100,18 @@ function extractTextFromNode(node) {
  * @param {Object} ast - AST дерево
  * @returns {Map<string, Object>} карта ID → { node, path, parentId }
  */
-function createElementMap(ast) {
+function createElementMap(ast: any) {
   const map = new Map();
-  const parentStack = [];
-  
+  const parentStack: any[] = [];
+
   traverse(ast, {
-    JSXOpeningElement(path) {
+    JSXOpeningElement(path: any) {
       const node = path.node;
       const id = extractIdFromNode(node);
-      
+
       if (id) {
         // Находим родительский элемент с ID
-        let parentId = null;
+        let parentId: any = null;
         for (let i = parentStack.length - 1; i >= 0; i--) {
           const parent = parentStack[i];
           if (parent && parent.id) {
@@ -119,13 +119,13 @@ function createElementMap(ast) {
             break;
           }
         }
-        
+
         // Находим полный JSX элемент
         let jsxElementPath = path;
         while (jsxElementPath && !t.isJSXElement(jsxElementPath.node) && !t.isJSXFragment(jsxElementPath.node)) {
           jsxElementPath = jsxElementPath.parentPath;
         }
-        
+
         map.set(id, {
           id,
           node,
@@ -135,7 +135,7 @@ function createElementMap(ast) {
           styles: extractStylesFromNode(node),
           tagName: getTagName(node.name),
         });
-        
+
         parentStack.push({ id, node });
       }
     },
@@ -146,14 +146,14 @@ function createElementMap(ast) {
       }
     }
   });
-  
+
   return map;
 }
 
 /**
  * Получает имя тега из JSX имени
  */
-function getTagName(name) {
+function getTagName(name: any) {
   if (t.isJSXIdentifier(name)) {
     return name.name;
   }
@@ -179,19 +179,19 @@ function getTagName(name) {
  * @param {Object} newAst - новое AST дерево
  * @returns {Object} { changes: Array, added: Array, removed: Array, modified: Array }
  */
-export function diffAst(oldAst, newAst) {
+export function diffAst(oldAst: any, newAst: any) {
   if (!oldAst || !newAst) {
     return { changes: [], added: [], removed: [], modified: [] };
   }
 
   const oldMap = createElementMap(oldAst);
   const newMap = createElementMap(newAst);
-  
-  const changes = [];
-  const added = [];
-  const removed = [];
-  const modified = [];
-  
+
+  const changes: any[] = [];
+  const added: any[] = [];
+  const removed: any[] = [];
+  const modified: any[] = [];
+
   // Находим добавленные элементы
   for (const [id, newData] of newMap) {
     if (!oldMap.has(id)) {
@@ -211,7 +211,7 @@ export function diffAst(oldAst, newAst) {
       });
     }
   }
-  
+
   // Находим удаленные элементы
   for (const [id, oldData] of oldMap) {
     if (!newMap.has(id)) {
@@ -229,23 +229,23 @@ export function diffAst(oldAst, newAst) {
       });
     }
   }
-  
+
   // Находим измененные элементы
   for (const [id, newData] of newMap) {
     const oldData = oldMap.get(id);
     if (oldData) {
-      const styleChanges = [];
-      
+      const styleChanges: any[] = [];
+
       // Сравниваем стили
       const oldStyles = oldData.styles || {};
       const newStyles = newData.styles || {};
-      
+
       // Находим измененные стили
       const allStyleKeys = new Set([...Object.keys(oldStyles), ...Object.keys(newStyles)]);
       for (const key of allStyleKeys) {
         const oldValue = oldStyles[key];
         const newValue = newStyles[key];
-        
+
         if (oldValue !== newValue) {
           styleChanges.push({
             property: key,
@@ -254,7 +254,7 @@ export function diffAst(oldAst, newAst) {
           });
         }
       }
-      
+
       // Сравниваем родителя (перемещение)
       if (oldData.parentId !== newData.parentId) {
         changes.push({
@@ -272,7 +272,7 @@ export function diffAst(oldAst, newAst) {
           newParentId: newData.parentId,
         });
       }
-      
+
       // Если есть изменения стилей
       if (styleChanges.length > 0) {
         for (const styleChange of styleChanges) {
@@ -292,12 +292,12 @@ export function diffAst(oldAst, newAst) {
           });
         }
       }
-      
+
       // Сравниваем текст (если есть)
       if (oldData.jsxElement && newData.jsxElement) {
         const oldText = extractTextFromNode(oldData.jsxElement);
         const newText = extractTextFromNode(newData.jsxElement);
-        
+
         if (oldText !== newText) {
           changes.push({
             type: 'text',
@@ -315,7 +315,8 @@ export function diffAst(oldAst, newAst) {
       }
     }
   }
-  
+
   return { changes, added, removed, modified };
 }
+
 
