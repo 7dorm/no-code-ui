@@ -19,7 +19,7 @@ export class ReactNativeFramework extends ReactFramework {
    * Генерирует HTML для превью/редактора с поддержкой React Native Web
    * Перенесено из RenderFile.jsx: createReactNativeHTML
    */
-  async generateHTML(code, filePath, options = {}) {
+  async generateHTML(code: string, filePath: string, options: any = {}) {
     const viewMode = options.viewMode || 'preview';
     
     // ВАЖНО: сначала инструментируем ИСХОДНЫЙ код, чтобы data-no-code-ui-id были стабильны
@@ -30,7 +30,9 @@ export class ReactNativeFramework extends ReactFramework {
       try {
         instOriginal = instrumentJsxWithAst(code, filePath, { projectRoot });
       } catch (error) {
-        console.warn('[ReactNativeFramework] AST instrumentation failed, falling back:', error.message);
+        if (error instanceof Error) {
+          console.warn('[ReactNativeFramework] AST instrumentation failed, falling back:', error.message);
+        }
         instOriginal = instrumentJsx(code, filePath);
       }
     } else {
@@ -56,7 +58,9 @@ export class ReactNativeFramework extends ReactFramework {
       try {
         instProcessed = instrumentJsxWithAst(processedCodeBeforeInst, filePath, { projectRoot });
       } catch (error) {
-        console.warn('[ReactNativeFramework] AST instrumentation failed for processed code, falling back:', error.message);
+        if (error instanceof Error) {
+          console.warn('[ReactNativeFramework] AST instrumentation failed for processed code, falling back:', error.message);
+        }
         instProcessed = instrumentJsx(processedCodeBeforeInst, filePath);
       }
     } else {
@@ -702,7 +706,7 @@ export class ReactNativeFramework extends ReactFramework {
    * Строит JSX сниппет для вставки нового блока (React Native)
    * Переопределяет метод из ReactFramework для поддержки React Native компонентов
    */
-  buildInsertSnippet({ tag, text, stylePatch }) {
+  buildInsertSnippet({ tag, text, stylePatch } : any) {
     const styleObj = stylePatch ? toReactStyleObjectText(stylePatch) : '';
     const styleAttr = styleObj ? ` style={{${styleObj}}}` : '';
     const tagName = tag || 'View';

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, CSSProperties } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { DeleteConfirmDialog } from './shared/ui/dialogs/delete-confirm-dialog';
 import { RenameDialog } from './shared/ui/dialogs/rename-dialog';
@@ -7,11 +7,27 @@ import { CreateFolderDialog } from './shared/ui/dialogs/create-folder-dialog';
 import { loadDirectory, renameItem, deleteItem, deleteDir, createFile, createFolder } from './features/file-operations/lib/file-operations';
 import { readDirectory, deleteFile, deleteDirectory } from './shared/api/filesystem-api';
 
-// Диалоги вынесены в shared/ui/dialogs
+interface FileTreeItem {
+  path: string;
+  name: string;
+  isDirectory: boolean;
+  isFile: boolean;
+  children?: FileTreeItem[];
+}
+ 
+// Update the ContextMenu component with proper types
+interface ContextMenuProps {
+  visible: boolean;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onDelete?: () => void;
+  onRename?: () => void;
+}
 
 // Компонент контекстного меню
-function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
-  const menuRef = useRef(null);
+function ContextMenu({ visible, x, y, onClose, onDelete, onRename }: ContextMenuProps) {
+  const menuRef = useRef<View>(null);
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
   const [isPositioned, setIsPositioned] = useState(false);
 
@@ -61,11 +77,11 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
   useEffect(() => {
     if (!visible) return;
 
-    const handleClick = (e) => {
+    const handleClick = (e: any) => {
       onClose();
     };
 
-    const handleContextMenu = (e) => {
+    const handleContextMenu = (e: any) => {
       e.preventDefault();
     };
 
@@ -149,7 +165,18 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }) {
 
 // CreateFileDialog вынесен в shared/ui/dialogs/create-file-dialog
 
-function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPaths, onToggleExpand, onCreateFile, onCreateFolder, onDelete, onRename }) {
+function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPaths, onToggleExpand, onCreateFile, onCreateFolder, onDelete, onRename }: {
+  item: FileTreeItem;
+  level?: number;
+  onSelectFile?: (path: string | null) => void;
+  selectedPath?: string;
+  expandedPaths: Set<string>;
+  onToggleExpand: (path: string) => void;
+  onCreateFile?: (path: string) => void;
+  onCreateFolder?: (path: string) => void;
+  onDelete?: (path: string) => void;
+  onRename?: (path: string) => void;
+}) {
   const isExpanded = expandedPaths.has(item.path);
   const isSelected = selectedPath === item.path;
   const hasChildren = item.isDirectory;
@@ -160,13 +187,13 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
 
   const handlePress = () => {
     if (item.isFile) {
-      onSelectFile(item.path);
+      onSelectFile?.(item.path);
     } else {
       onToggleExpand(item.path);
     }
   };
 
-  const handleLongPress = (e) => {
+  const handleLongPress = (e: any) => {
     // Для контекстного меню используем правый клик через onContextMenu
     // Но в React Native Web можно использовать длительное нажатие
     if (e) {
@@ -182,7 +209,7 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
     const container = containerRef.current;
     if (!container) return;
 
-    const handleContextMenu = (e) => {
+    const handleContextMenu = (e: any) => {
       e.preventDefault();
       e.stopPropagation();
 
@@ -196,10 +223,10 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
       setShowContextMenu(true);
     };
 
-    container.addEventListener('contextmenu', handleContextMenu);
+    (container as any).addEventListener('contextmenu', handleContextMenu);
 
     return () => {
-      container.removeEventListener('contextmenu', handleContextMenu);
+      (container as any).removeEventListener('contextmenu', handleContextMenu);
     };
   }, []);
 
@@ -223,7 +250,7 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
       'gif': '🖼️',
       'svg': '🖼️',
     };
-    return icons[ext] || '📄';
+    return icons[ext as keyof typeof icons] || '📄';
   };
 
   return (
@@ -262,7 +289,7 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
             <>
             <TouchableOpacity
               style={styles.addButton}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 e.stopPropagation();
                 onCreateFile && onCreateFile(item.path);
               }}
@@ -271,7 +298,7 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
             </TouchableOpacity>
               <TouchableOpacity
                 style={styles.addFolderButton}
-                onPress={(e) => {
+                onPress={(e: any) => {
                   e.stopPropagation();
                   onCreateFolder && onCreateFolder(item.path);
                 }}
@@ -282,9 +309,9 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
           )}
           <TouchableOpacity
             style={styles.deleteButton}
-            onPress={(e) => {
+            onPress={(e: any) => {
               e.stopPropagation();
-              onDelete && onDelete(item);
+              onDelete && onDelete(item.path);
             }}
           >
             <Text style={styles.deleteButtonText}>🗑️</Text>
@@ -297,32 +324,32 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
         y={contextMenuPos.y}
         onClose={() => setShowContextMenu(false)}
         onDelete={() => {
-          onDelete && onDelete(item);
+          onDelete && onDelete(item.path);
         }}
         onRename={() => {
-          onRename && onRename(item);
+          onRename && onRename(item.path);
         }}
       />
     </View>
   );
 }
 
-function FileTree({ rootPath, onSelectFile, selectedPath }) {
-  const [tree, setTree] = useState([]);
+function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string; onSelectFile: (path: string | null) => void; selectedPath: string }) {
+  const [tree, setTree] = useState<FileTreeItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [expandedPaths, setExpandedPaths] = useState(new Set());
-  const [loadedPaths, setLoadedPaths] = useState(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [loadedPaths, setLoadedPaths] = useState<Set<string>>(new Set());
   const [createDialogVisible, setCreateDialogVisible] = useState(false);
-  const [createDialogPath, setCreateDialogPath] = useState(null);
+  const [createDialogPath, setCreateDialogPath] = useState<string | null>(null);
   const [createFolderDialogVisible, setCreateFolderDialogVisible] = useState(false);
-  const [createFolderDialogPath, setCreateFolderDialogPath] = useState(null);
+  const [createFolderDialogPath, setCreateFolderDialogPath] = useState<string | null>(null);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
+  const [itemToDelete, setItemToDelete] = useState<FileTreeItem | null>(null);
   const [renameDialogVisible, setRenameDialogVisible] = useState(false);
-  const [itemToRename, setItemToRename] = useState(null);
+  const [itemToRename, setItemToRename] = useState<FileTreeItem | null>(null);
 
-  const loadDirectory = useCallback(async (dirPath, isRoot = false) => {
+  const loadDirectory = useCallback(async (dirPath: string, isRoot = false) => {
     // dirPath - это относительный путь внутри проекта (пустая строка для корня)
     if (loadedPaths.has(dirPath) && !isRoot) {
       return; // Уже загружено (кроме корня)
@@ -340,8 +367,8 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
         setLoadedPaths(prev => new Set([...prev, dirPath]));
 
         // Обновляем дерево
-        const updateTree = (items, targetPath, newItems) => {
-          return items.map(item => {
+        const updateTree = (items: FileTreeItem[], targetPath: string, newItems: FileTreeItem[]): FileTreeItem[] => {
+          return items.map((item: FileTreeItem) => {
             if (item.path === targetPath && item.isDirectory) {
               return { ...item, children: newItems };
             }
@@ -353,9 +380,9 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
         };
 
         if (isRoot) {
-          setTree(result.items);
+          setTree(result.items as FileTreeItem[]);
         } else {
-          setTree(prev => updateTree(prev, dirPath, result.items));
+          setTree(prev => updateTree(prev, dirPath, result.items as FileTreeItem[]));
         }
       } else {
         if (isRoot) {
@@ -364,7 +391,8 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
       }
     } catch (err) {
       if (isRoot) {
-        setError(`Ошибка: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Ошибка: ${errorMessage}`);
       }
     } finally {
       if (isRoot) {
@@ -383,7 +411,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
     }
   }, [rootPath]);
 
-  const handleToggleExpand = (path) => {
+  const handleToggleExpand = (path: string) => {
     // path - это относительный путь (уже нормализован из item.path)
     const newExpanded = new Set(expandedPaths);
     if (newExpanded.has(path)) {
@@ -398,28 +426,57 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
     setExpandedPaths(newExpanded);
   };
 
-  const handleCreateFile = (parentPath) => {
+  const handleCreateFile = (parentPath: string) => {
     setCreateDialogPath(parentPath);
     setCreateDialogVisible(true);
   };
 
-  const handleCreateFolder = (parentPath) => {
+  const handleCreateFolder = (parentPath: string) => {
     setCreateFolderDialogPath(parentPath);
     setCreateFolderDialogVisible(true);
   };
 
-  const handleDelete = (item) => {
-    setItemToDelete(item);
-    setDeleteDialogVisible(true);
+  const handleDelete = (path: string) => {
+    // Find the item in the tree by path
+    const findItemByPath = (items: FileTreeItem[], targetPath: string): FileTreeItem | null => {
+      for (const item of items) {
+        if (item.path === targetPath) return item;
+        if (item.children) {
+          const found = findItemByPath(item.children, targetPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const item = findItemByPath(tree, path);
+    if (item) {
+      setItemToDelete(item);
+      setDeleteDialogVisible(true);
+    }
   };
 
-  const handleRename = (item) => {
-    if (!item) return;
-    setItemToRename(item);
-    setRenameDialogVisible(true);
+  const handleRename = (path: string) => {
+    // Find the item in the tree by path
+    const findItemByPath = (items: FileTreeItem[], targetPath: string): FileTreeItem | null => {
+      for (const item of items) {
+        if (item.path === targetPath) return item;
+        if (item.children) {
+          const found = findItemByPath(item.children, targetPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const item = findItemByPath(tree, path);
+    if (item) {
+      setItemToRename(item);
+      setRenameDialogVisible(true);
+    }
   };
 
-  const handleRenameConfirm = async (newName) => {
+  const handleRenameConfirm = async (newName: string) => {
     if (!itemToRename || !newName) return;
 
     try {
@@ -437,7 +494,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
           }
 
           // Сбрасываем кэш для родительской директории
-          setLoadedPaths(prev => {
+          setLoadedPaths((prev : Set<string>) => {
             const newSet = new Set(prev);
             newSet.delete(parentPath);
             // Также удаляем кэш для всех поддиректорий переименованного элемента
@@ -460,7 +517,8 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
           setItemToRename(null);
         }
     } catch (err) {
-      setError(`Ошибка: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Ошибка: ${errorMessage}`);
       setRenameDialogVisible(false);
       setItemToRename(null);
     }
@@ -511,13 +569,14 @@ function FileTree({ rootPath, onSelectFile, selectedPath }) {
         setItemToDelete(null);
       }
     } catch (err) {
-      setError(`Ошибка: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Ошибка: ${errorMessage}`);
       setDeleteDialogVisible(false);
       setItemToDelete(null);
     }
   };
 
-  const handleCreateFileConfirm = async (fileName) => {
+  const handleCreateFileConfirm = async (fileName: string) => {
     if (!createDialogPath || !fileName) return;
 
     try {
@@ -601,11 +660,12 @@ export default ${componentName};`;
         setError(`Ошибка создания файла: ${result.error}`);
       }
     } catch (err) {
-      setError(`Ошибка: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Ошибка: ${errorMessage}`);
     }
   };
 
-  const handleCreateFolderConfirm = async (folderName) => {
+  const handleCreateFolderConfirm = async (folderName: string) => {
     if (!createFolderDialogPath || !folderName) return;
 
     try {
@@ -627,11 +687,12 @@ export default ${componentName};`;
         setError(`Ошибка создания папки: ${result.error}`);
       }
     } catch (err) {
-      setError(`Ошибка: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Ошибка: ${errorMessage}`);
     }
   };
 
-  const renderTree = (items, level = 0) => {
+  const renderTree = (items: FileTreeItem[], level = 0) => {
     return items.map((item) => {
       const isExpanded = expandedPaths.has(item.path);
       const children = item.children || [];
@@ -1024,7 +1085,7 @@ const dialogStyles = {
   },
 };
 
-const contextMenuStyles = {
+const contextMenuStyles: Record<string, CSSProperties> = {
   overlay: {
     position: 'fixed',
     top: 0,

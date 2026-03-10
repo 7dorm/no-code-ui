@@ -19,81 +19,170 @@ import { findProjectRoot, resolvePath, resolvePathSync } from './features/file-r
 import { extractImports, detectComponents } from './features/file-renderer/lib/react-processor';
 import { createFramework, isFrameworkSupported } from './frameworks/FrameworkFactory';
 
-function RenderFile({ filePath }) {
-  const [fileContent, setFileContent] = useState(null);
-  const [fileType, setFileType] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [unsavedContent, setUnsavedContent] = useState(null); // Несохраненные изменения
-  const [isModified, setIsModified] = useState(false); // Флаг изменений
-  const [showSaveIndicator, setShowSaveIndicator] = useState(false); // Индикатор сохранения
-  const monacoEditorRef = useRef(null);
-  const autoSaveTimeoutRef = useRef(null); // Таймер для автосохранения
-  const undoHistoryTimeoutRef = useRef(null); // Таймер для debounce истории undo/redo
-  const pendingHistoryOperationRef = useRef(null); // Отложенная операция для истории
-  const isUpdatingFromConstructorRef = useRef(false); // Флаг для предотвращения рекурсии при обновлении из конструктора
-  const isUpdatingFromFileRef = useRef(false); // Флаг для предотвращения рекурсии при обновлении из файла
+type StylePatch = Record<string, any>;
+
+type PatchHistoryOperation = {
+  type: 'patch';
+  blockId: string;
+  patch: StylePatch;
+  previousValue?: StylePatch | null;
+};
+
+type InsertHistoryOperation = {
+  type: 'insert';
+  blockId: string;
+  targetId: string;
+  mode: 'child' | 'before' | 'after';
+  snippet: string;
+  fileType: string | null;
+  filePath: string;
+};
+
+type DeleteHistoryOperation = {
+  type: 'delete';
+  blockId: string;
+  parentId: string;
+  snippet: string;
+  fileType: string | null;
+  filePath: string;
+};
+
+type DeleteOperationDedup = {
+  blockId: string;
+  timestamp: number;
+};
+
+type SetTextHistoryOperation = {
+  type: 'setText';
+  blockId: string;
+  text: string;
+  previousText?: string | null;
+};
+
+type HistoryOperation =
+  | PatchHistoryOperation
+  | InsertHistoryOperation
+  | DeleteHistoryOperation
+  | SetTextHistoryOperation;
+
+type StagedOpInsert = {
+  type: 'insert';
+  targetId: string;
+  mode: 'child' | 'before' | 'after';
+  snippet: string;
+  blockId: string;
+  fileType: string | null;
+  filePath: string;
+};
+
+type StagedOpDelete = {
+  type: 'delete';
+  blockId: string;
+  fileType: string | null;
+  filePath: string;
+};
+
+type StagedOpSetText = {
+  type: 'setText';
+  blockId: string;
+  text: string;
+  fileType: string | null;
+  filePath: string;
+};
+
+type StagedOp = StagedOpInsert | StagedOpDelete | StagedOpSetText;
+
+type BlockMap = Record<string, any>;
+
+type LayersTree = {
+  nodes: Record<string, any>;
+  rootIds: string[];
+};
+
+type LayerNames = Record<string, string>;
+
+type LivePosition = {
+  left: number | null;
+  top: number | null;
+  width: number | null;
+  height: number | null;
+};
+
+function RenderFile({ filePath }: { filePath: string }) {
+  const [fileContent, setFileContent] = useState<string | null>(null);
+  const [fileType, setFileType] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [unsavedContent, setUnsavedContent] = useState<string | null>(null); // Несохраненные изменения
+  const [isModified, setIsModified] = useState<boolean>(false); // Флаг изменений
+  const [showSaveIndicator, setShowSaveIndicator] = useState<boolean>(false); // Индикатор сохранения
+  const monacoEditorRef = useRef<any>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Таймер для автосохранения
+  const undoHistoryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Таймер для debounce истории undo/redo
+  const pendingHistoryOperationRef = useRef<HistoryOperation | null>(null); // Отложенная операция для истории
+  const isUpdatingFromConstructorRef = useRef<boolean>(false); // Флаг для предотвращения рекурсии при обновлении из конструктора
+  const isUpdatingFromFileRef = useRef<boolean>(false); // Флаг для предотвращения рекурсии при обновлении из файла
 
   // Хуки для React и React Native файлов (всегда вызываются)
-  const [reactHTML, setReactHTML] = useState('');
-  const [isProcessingReact, setIsProcessingReact] = useState(false);
-  const [reactNativeHTML, setReactNativeHTML] = useState('');
-  const [isProcessingReactNative, setIsProcessingReactNative] = useState(false);
-  const [renderVersion, setRenderVersion] = useState(0); // увеличиваем, чтобы форсировать перерисовку WebView
+  const [reactHTML, setReactHTML] = useState<string>('');
+  const [isProcessingReact, setIsProcessingReact] = useState<boolean>(false);
+  const [reactNativeHTML, setReactNativeHTML] = useState<string>('');
+  const [isProcessingReactNative, setIsProcessingReactNative] = useState<boolean>(false);
+  const [renderVersion, setRenderVersion] = useState<number>(0); // увеличиваем, чтобы форсировать перерисовку WebView
 
   // Пути к зависимым файлам для отслеживания изменений
-  const [dependencyPaths, setDependencyPaths] = useState([]);
+  const [dependencyPaths, setDependencyPaths] = useState<string[]>([]);
 
   // Хуки для HTML файлов (всегда вызываются)
-  const [processedHTML, setProcessedHTML] = useState('');
-  const [htmlDependencyPaths, setHtmlDependencyPaths] = useState([]);
-  const [isProcessingHTML, setIsProcessingHTML] = useState(false);
+  const [processedHTML, setProcessedHTML] = useState<string>('');
+  const [htmlDependencyPaths, setHtmlDependencyPaths] = useState<string[]>([]);
+  const [isProcessingHTML, setIsProcessingHTML] = useState<boolean>(false);
 
   // Режим просмотра: 'preview' или 'code'
-  const [viewMode, setViewMode] = useState('preview');
-  const [splitLeftWidth, setSplitLeftWidth] = useState(0.5); // 0.5 = 50% ширины
-  const [isResizing, setIsResizing] = useState(false);
-  const splitContainerRef = useRef(null);
+  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'edit' | 'split' | 'changes'>('preview');
+  const [splitLeftWidth, setSplitLeftWidth] = useState<number>(0.5); // 0.5 = 50% ширины
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const splitContainerRef = useRef<HTMLElement | null>(null);
 
   // Состояние редактора блоков
-  const [blockMap, setBlockMap] = useState({});
+  const [blockMap, setBlockMap] = useState<BlockMap>({});
   // blockMap для исходного файла (для записи патчей в исходный код, без зависимости от обработанного превью)
-  const [blockMapForFile, setBlockMapForFile] = useState({});
-  const [selectedBlock, setSelectedBlock] = useState(null); // { id, meta? }
-  const [changesLog, setChangesLog] = useState([]); // [{ ts, filePath, blockId, patch }]
-  const [editorHTML, setEditorHTML] = useState('');
-  const [stagedPatches, setStagedPatches] = useState({}); // { [blockId]: patchObject }
-  const [hasStagedChanges, setHasStagedChanges] = useState(false);
-  const [layersTree, setLayersTree] = useState(null); // { nodes: {id:...}, rootIds: [] }
-  const [layerNames, setLayerNames] = useState({}); // { [mrpakId]: "Name" }
-  const [projectRoot, setProjectRoot] = useState(null);
-  const [iframeCommand, setIframeCommand] = useState(null); // { type, ...payload, ts }
-  const [stagedOps, setStagedOps] = useState([]); // [{type:'insert'|'delete', ...}]
-  const [styleSnapshots, setStyleSnapshots] = useState({}); // { [mrpakId]: { inlineStyle: string, computedStyle?: object } }
-  const [textSnapshots, setTextSnapshots] = useState({}); // { [mrpakId]: text }
-  const [externalStylesMap, setExternalStylesMap] = useState({}); // { [varName]: { path: string, type: string } }
-  const [livePosition, setLivePosition] = useState({ left: null, top: null, width: null, height: null });
+  const [blockMapForFile, setBlockMapForFile] = useState<BlockMap>({});
+  const [selectedBlock, setSelectedBlock] = useState<{ id: string; meta?: any } | null>(null); // { id, meta? }
+  const [changesLog, setChangesLog] = useState<Array<{ ts: number; filePath: string; blockId: any; patch: any }>>([]); // [{ ts, filePath, blockId, patch }]
+  const [editorHTML, setEditorHTML] = useState<string>('');
+  const [stagedPatches, setStagedPatches] = useState<Record<string, StylePatch>>({}); // { [blockId]: patchObject }
+  const [hasStagedChanges, setHasStagedChanges] = useState<boolean>(false);
+  const [layersTree, setLayersTree] = useState<LayersTree | null>(null); // { nodes: {id:...}, rootIds: [] }
+  const [layerNames, setLayerNames] = useState<LayerNames>({}); // { [mrpakId]: "Name" }
+  const [projectRoot, setProjectRoot] = useState<string | null>(null);
+  const [iframeCommand, setIframeCommand] = useState<any>(null); // { type, ...payload, ts }
+  const [stagedOps, setStagedOps] = useState<StagedOp[]>([]); // [{type:'insert'|'delete', ...}]
+  const [styleSnapshots, setStyleSnapshots] = useState<Record<string, { inlineStyle: string; computedStyle?: any }>>({}); // { [mrpakId]: { inlineStyle: string, computedStyle?: object } }
+  const [textSnapshots, setTextSnapshots] = useState<Record<string, string>>({}); // { [mrpakId]: text }
+  const [externalStylesMap, setExternalStylesMap] = useState<Record<string, { path: string; type: string }>>({}); // { [varName]: { path: string, type: string } }
+  const [livePosition, setLivePosition] = useState<LivePosition>({ left: null, top: null, width: null, height: null });
 
   // Две копии AST для bidirectional editing
   // Менеджер для bidirectional editing через два AST
-  const astManagerRef = useRef(null);
+  const astManagerRef = useRef<AstBidirectionalManager | null>(null);
 
   // История для Undo/Redo
-  const [undoStack, setUndoStack] = useState([]); // Стек операций для отмены
-  const [redoStack, setRedoStack] = useState([]); // Стек операций для повтора
+  const [undoStack, setUndoStack] = useState<HistoryOperation[]>([]); // Стек операций для отмены
+  const [redoStack, setRedoStack] = useState<HistoryOperation[]>([]); // Стек операций для повтора
 
   // Рефы для актуальных значений staged состояний (чтобы избегать устаревших замыканий)
-  const stagedPatchesRef = useRef(stagedPatches);
-  const stagedOpsRef = useRef(stagedOps);
-  const hasStagedChangesRef = useRef(hasStagedChanges);
+  const stagedPatchesRef = useRef<Record<string, StylePatch>>(stagedPatches);
+  const stagedOpsRef = useRef<StagedOp[]>(stagedOps);
+  const hasStagedChangesRef = useRef<boolean>(hasStagedChanges);
 
   // Защита от дублирования операций
-  const lastInsertOperationRef = useRef(null);
-  const lastDeleteOperationRef = useRef(null);
-  const lastReparentOperationRef = useRef(null);
+  const lastInsertOperationRef = useRef<InsertHistoryOperation | null>(null);
+  const lastDeleteOperationRef = useRef<DeleteOperationDedup | null>(null);
+  const lastReparentOperationRef = useRef<any>(null);
 
   // Хелперы для синхронного обновления state + ref одновременно
-  const updateStagedPatches = useCallback((updater) => {
+  const updateStagedPatches = useCallback((updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>) => {
     setStagedPatches((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       stagedPatchesRef.current = next; // СИНХРОННО обновляем ref
@@ -101,7 +190,7 @@ function RenderFile({ filePath }) {
     });
   }, []);
 
-  const updateStagedOps = useCallback((updater) => {
+  const updateStagedOps = useCallback((updater: ((prev: StagedOp[]) => StagedOp[]) | StagedOp[]) => {
     setStagedOps((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       stagedOpsRef.current = next; // СИНХРОННО обновляем ref
@@ -109,32 +198,32 @@ function RenderFile({ filePath }) {
     });
   }, []);
 
-  const updateHasStagedChanges = useCallback((value) => {
+  const updateHasStagedChanges = useCallback((value: boolean) => {
     setHasStagedChanges(value);
     hasStagedChangesRef.current = value; // СИНХРОННО обновляем ref
   }, []);
 
   // Ref для stageReparentBlock (используется в handleEditorMessage до определения функции)
-  const stageReparentBlockRef = useRef(null);
+  const stageReparentBlockRef = useRef<((params: { sourceId: string; targetParentId: string }) => void) | null>(null);
 
   // getFileType и getMonacoLanguage импортированы из shared/lib/file-type-detector.js
 
   // injectBlockEditorScript теперь импортируется из модуля
 
   // Команды для iframe - определяем рано, так как используется в undo/redo
-  const sendIframeCommand = useCallback((cmd) => {
+  const sendIframeCommand = useCallback((cmd: any) => {
     setIframeCommand({ ...cmd, ts: Date.now() });
   }, []);
 
   // Функция для добавления операции в историю undo
-  const addToHistory = useCallback((operation) => {
+  const addToHistory = useCallback((operation: HistoryOperation | SetTextHistoryOperation | ReparentHistoryOperation) => {
     setUndoStack((prev) => [...prev, operation]);
     setRedoStack([]); // Очищаем redo стек при новой операции
     console.log('📝 [History] Добавлена операция в историю:', operation.type);
   }, []);
 
   // Добавляет операцию в историю с debounce для промежуточных изменений
-  const addToHistoryDebounced = useCallback((operation, isIntermediate = false) => {
+  const addToHistoryDebounced = useCallback((operation: HistoryOperation, isIntermediate: boolean = false) => {
     if (isIntermediate) {
       // Для промежуточных изменений сохраняем операцию, но не добавляем в историю сразу
       pendingHistoryOperationRef.current = operation;
@@ -209,7 +298,7 @@ function RenderFile({ filePath }) {
           // Если это была первая операция - удаляем все ключи из текущего патча
           patchToApply = {};
           for (const key in operation.patch) {
-            patchToApply[key] = null; // null означает удалить стиль
+            (patchToApply as any)[key] = null; // null означает удалить стиль
           }
         }
 
@@ -237,8 +326,8 @@ function RenderFile({ filePath }) {
       case 'delete': {
         console.log('⏮️ [Undo] Отменяю удаление, восстанавливаю блок:', operation.blockId);
         // Отменяем удаление - восстанавливаем блок
-        updateStagedOps((prev) => {
-          const restored = [
+        updateStagedOps((prev: StagedOp[]) => {
+          const restored: StagedOp[] = [
             ...prev,
             {
               type: 'insert',
@@ -284,7 +373,7 @@ function RenderFile({ filePath }) {
         break;
       }
       default:
-        console.warn('⏮️ [Undo] Неизвестный тип операции:', operation.type);
+        console.warn('⏮️ [Undo] Неизвестный тип операции:', (operation as any).type);
     }
 
     // Проверяем, остались ли изменения после отмены
@@ -310,7 +399,7 @@ function RenderFile({ filePath }) {
       return;
     }
 
-    const operation = redoStack[redoStack.length - 1];
+    const operation: HistoryOperation = redoStack[redoStack.length - 1];
     console.log('⏭️ [Redo] Повторяю операцию:', operation.type, operation);
 
     // Возвращаем операцию в undo стек
@@ -343,8 +432,8 @@ function RenderFile({ filePath }) {
       }
       case 'insert': {
         console.log('⏭️ [Redo] Повторяю вставку блока:', operation.blockId);
-        updateStagedOps((prev) => {
-          const updated = [
+        updateStagedOps((prev: StagedOp[]) => {
+          const updated: StagedOp[] = [
             ...prev,
             {
               type: 'insert',
@@ -370,8 +459,8 @@ function RenderFile({ filePath }) {
       }
       case 'delete': {
         console.log('⏭️ [Redo] Повторяю удаление блока:', operation.blockId);
-        updateStagedOps((prev) => {
-          const updated = [
+        updateStagedOps((prev: StagedOp[]) => {
+          const updated: StagedOp[] = [
             ...prev,
             {
               type: 'delete',
@@ -392,8 +481,8 @@ function RenderFile({ filePath }) {
           blockId: operation.blockId,
           text: operation.text
         });
-        updateStagedOps((prev) => {
-          const updated = [
+        updateStagedOps((prev: StagedOp[]) => {
+          const updated: StagedOp[] = [
             ...prev,
             {
               type: 'setText',
@@ -415,7 +504,7 @@ function RenderFile({ filePath }) {
         break;
       }
       default:
-        console.warn('⏭️ [Redo] Неизвестный тип операции:', operation.type);
+        console.warn('⏭️ [Redo] Неизвестный тип операции:', (operation as any).type);
     }
 
     console.log('⏭️ [Redo] Обновляю hasStagedChanges = true');
@@ -423,7 +512,7 @@ function RenderFile({ filePath }) {
   }, [redoStack, fileType, filePath, sendIframeCommand, updateStagedPatches, updateStagedOps, updateHasStagedChanges]);
 
   // Вспомогательная функция для обновления Monaco Editor с сохранением скролла
-  const updateMonacoEditorWithScroll = useCallback((newContent) => {
+  const updateMonacoEditorWithScroll = useCallback((newContent: any) => {
     if (!monacoEditorRef?.current) return;
 
     try {
@@ -473,7 +562,7 @@ function RenderFile({ filePath }) {
   }, []);
 
   const applyBlockPatch = useCallback(
-    async (blockId, patch, isIntermediate = false) => {
+    async (blockId: any, patch: any, isIntermediate = false) => {
       try {
         // Bidirectional editing через AST: применяем изменения к constructorAST
         if (!blockId) return;
@@ -482,11 +571,11 @@ function RenderFile({ filePath }) {
         if (fileType !== 'react' && fileType !== 'react-native') {
           // Для HTML используем старую логику
           const currentBlockMapForFile = blockMapForFile || {};
-          if (!isFrameworkSupported(fileType)) {
+          if (!isFrameworkSupported(fileType as string)) {
             console.warn('applyBlockPatch: Unsupported file type:', fileType);
             return;
           }
-          const framework = createFramework(fileType, filePath);
+          const framework = createFramework(fileType as string, filePath);
           const result = await framework.commitPatches({
             originalCode: String(fileContent ?? ''),
             stagedPatches: { [blockId]: patch },
@@ -494,11 +583,11 @@ function RenderFile({ filePath }) {
             blockMapForFile: currentBlockMapForFile,
             externalStylesMap,
             filePath,
-            resolvePath,
-            readFile,
-            writeFile
+            resolvePath: resolvePathForFramework,
+            readFile: readFile as any,
+            writeFile: writeFile as any
           });
-          if (!result.ok) throw new Error(result.error || 'Ошибка применения изменений');
+          if (!result.ok) throw new Error((result as any).error || 'Ошибка применения изменений');
           const newContent = result.code || String(fileContent ?? '');
           if (!newContent || typeof newContent !== 'string' || newContent.length === 0) {
             throw new Error('Результат применения изменений пуст или некорректен');
@@ -525,7 +614,41 @@ function RenderFile({ filePath }) {
             // Продолжаем с новым менеджером
             return await applyBlockPatch(blockId, patch);
           } else {
-            throw new Error('projectRoot not available for AST bidirectional editing');
+            // Fallback: используем старый метод через framework, если projectRoot еще не загружен
+            console.warn('[applyBlockPatch] projectRoot not available yet, using framework fallback');
+
+            // Во время перетаскивания (isIntermediate) не запускаем тяжелый fallback,
+            // иначе это приводит к частым setFileContent/setRenderVersion и морганию превью.
+            // Визуальная обратная связь во время drag уже есть внутри iframe через transform.
+            if (isIntermediate) {
+              return;
+            }
+            const framework = createFramework(fileType as string, filePath);
+            if (!framework) {
+              console.warn('[applyBlockPatch] Unsupported file type for fallback:', fileType);
+              return;
+            }
+            
+            const commitResult = await framework.commitPatches({
+              originalCode: fileContent || '',
+              stagedPatches: { [blockId]: patch },
+              stagedOps: [],
+              blockMapForFile: blockMapForFile || {},
+              externalStylesMap: {},
+              filePath,
+              resolvePath: resolvePathForFramework,
+              readFile: (path: string) => ({ success: true, content: '' }),
+              writeFile: (path: string, content: string) => ({ success: true })
+            });
+            
+            if (commitResult.ok && commitResult.code) {
+              setFileContent(commitResult.code);
+              updateMonacoEditorWithScroll(commitResult.code);
+              setRenderVersion((v) => v + 1);
+              return;
+            } else {
+              throw new Error(`Framework fallback failed: ${commitResult.error || 'Unknown error'}`);
+            }
           }
         }
 
@@ -554,11 +677,11 @@ function RenderFile({ filePath }) {
             blockMapForFile: currentBlockMapForFile,
             externalStylesMap,
             filePath,
-            resolvePath,
-            readFile,
-            writeFile
+            resolvePath: resolvePathForFramework,
+            readFile: readFile as any,
+            writeFile: writeFile as any
           });
-          if (!result.ok) throw new Error(result.error || 'Ошибка применения изменений');
+          if (!result.ok) throw new Error((result as any).error || 'Ошибка применения изменений');
           const newContent = result.code || String(fileContent ?? '');
           if (!newContent || typeof newContent !== 'string' || newContent.length === 0) {
             throw new Error('Результат применения изменений пуст или некорректен');
@@ -604,7 +727,7 @@ function RenderFile({ filePath }) {
 
           // ВАЖНО: Обновляем codeAST из сгенерированного кода, чтобы он был синхронизирован
           // для следующих промежуточных изменений. Но НЕ обновляем fileContent, чтобы не триггерить useEffect
-          await manager.updateCodeASTFromCode(newContent, true);
+          await manager.updateCodeASTFromCode(newContent || '', true);
 
           // НЕ вызываем setFileContent и setRenderVersion для промежуточных изменений
 
@@ -623,10 +746,10 @@ function RenderFile({ filePath }) {
         isUpdatingFromConstructorRef.current = true;
 
         // Автосохранение в файл (только для финальных изменений)
-        await writeFile(filePath, newContent, { backup: true });
+        await writeFile(filePath, newContent || '', { backup: true });
 
         // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-        setFileContent(newContent);
+        setFileContent(newContent || '');
         updateMonacoEditorWithScroll(newContent);
         setRenderVersion((v) => v + 1);
         setChangesLog((prev) => [
@@ -649,7 +772,8 @@ function RenderFile({ filePath }) {
         }, 100);
       } catch (e) {
         console.error('BlockEditor apply error:', e);
-        setError(`Ошибка применения изменений: ${e.message}`);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        setError(`Ошибка применения изменений: ${errorMessage}`);
       }
     },
     [fileContent, fileType, filePath, blockMapForFile, externalStylesMap, resolvePath, readFile, writeFile, addToHistory, projectRoot]
@@ -694,7 +818,10 @@ function RenderFile({ filePath }) {
 
       console.log('commitStagedPatches: committing changes', {
         entries: entries.map(([id]) => id),
-        ops: ops.map(o => ({ type: o.type, blockId: o.blockId || o.targetId })),
+        ops: ops.map((o) => ({
+          type: o.type,
+          blockId: o.type === 'insert' ? o.targetId : o.blockId,
+        })),
         blockMapKeys: Object.keys(currentBlockMap).length,
         blockMapForFileKeys: Object.keys(currentBlockMapForFile).length
       });
@@ -702,12 +829,12 @@ function RenderFile({ filePath }) {
       // API проверяется в функции writeFile
 
       // Используем Framework для коммита патчей
-      if (!isFrameworkSupported(fileType)) {
+      if (!isFrameworkSupported(fileType as string)) {
         console.warn('commitStagedPatches: Unsupported file type:', fileType);
         return;
       }
 
-      const framework = createFramework(fileType, filePath);
+      const framework = createFramework(fileType as string, filePath);
       const result = await framework.commitPatches({
         originalCode: String(fileContent ?? ''),
         stagedPatches: currentStagedPatches,
@@ -715,20 +842,21 @@ function RenderFile({ filePath }) {
         blockMapForFile: currentBlockMapForFile,
             externalStylesMap,
         filePath,
-        resolvePath,
-        readFile,
-        writeFile
+        resolvePath: resolvePathForFramework,
+        readFile: readFile as any,
+        writeFile: writeFile as any
       });
 
       if (!result.ok) {
-        throw new Error(result.error || 'Ошибка применения изменений');
+        throw new Error((result as any).error || 'Ошибка применения изменений');
       }
 
       const newContent = result.code || String(fileContent ?? '');
 
-      // Обрабатываем внешние патчи, если они есть
-      if (result.externalPatches && result.externalPatches.length > 0) {
-        for (const extPatch of result.externalPatches) {
+      // Обрабатываем внешние патчи, если они есть (доступ через any, т.к. в типах они необязательны)
+      const anyResult: any = result;
+      if (anyResult.externalPatches && anyResult.externalPatches.length > 0) {
+        for (const extPatch of anyResult.externalPatches) {
           console.log('commitStagedPatches: External patch applied:', extPatch);
         }
       }
@@ -776,7 +904,12 @@ function RenderFile({ filePath }) {
       setRenderVersion((v) => v + 1);
       setChangesLog((prev) => [
         ...entries.map(([blockId, patch]) => ({ ts: Date.now(), filePath, blockId, patch })),
-        ...ops.map((o) => ({ ts: Date.now(), filePath, blockId: o.blockId || o.targetId, patch: { op: o.type } })),
+        ...ops.map((o) => ({
+          ts: Date.now(),
+          filePath,
+          blockId: o.type === 'insert' ? o.targetId : o.blockId,
+          patch: { op: o.type },
+        })),
         ...prev,
       ]);
       updateStagedPatches({});
@@ -1034,10 +1167,10 @@ function RenderFile({ filePath }) {
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent, { backup: true });
+            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent);
+            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
 
@@ -1140,7 +1273,7 @@ function RenderFile({ filePath }) {
             const updateResult = manager.updateCodeAST(targetId, {
               type: 'insert',
               targetId,
-              mode: mode === 'sibling' ? 'sibling' : 'child',
+              mode: mode === 'sibling' ? 'after' : 'child',
               snippet: String(snippetWithId || ''),
             });
 
@@ -1158,10 +1291,10 @@ function RenderFile({ filePath }) {
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent, { backup: true });
+            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent);
+            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
 
@@ -1170,7 +1303,7 @@ function RenderFile({ filePath }) {
               type: 'insert',
               blockId: newId,
               targetId,
-              mode: mode === 'sibling' ? 'sibling' : 'child',
+              mode: mode === 'sibling' ? 'after' : 'child',
               snippet: String(snippetWithId || ''),
             });
           } catch (e) {
@@ -1183,7 +1316,7 @@ function RenderFile({ filePath }) {
         sendIframeCommand({
           type: MRPAK_CMD.INSERT,
           targetId,
-          mode: mode === 'sibling' ? 'sibling' : 'child',
+          mode: mode === 'sibling' ? 'after' : 'child',
           html: String(snippetWithId || ''),
         });
         return;
@@ -1195,7 +1328,7 @@ function RenderFile({ filePath }) {
         {
           type: 'insert',
           targetId,
-          mode: mode === 'sibling' ? 'sibling' : 'child',
+          mode: mode === 'sibling' ? 'after' : 'child',
           snippet: String(snippetWithId || ''),
           blockId: newId,
           fileType,
@@ -1210,7 +1343,7 @@ function RenderFile({ filePath }) {
         type: 'insert',
         blockId: newId,
         targetId,
-        mode: mode === 'sibling' ? 'sibling' : 'child',
+        mode: mode === 'sibling' ? 'after' : 'child',
         snippet: String(snippetWithId || ''),
       });
 
@@ -1218,7 +1351,7 @@ function RenderFile({ filePath }) {
       sendIframeCommand({
         type: MRPAK_CMD.INSERT,
         targetId,
-        mode: mode === 'sibling' ? 'sibling' : 'child',
+        mode: mode === 'sibling' ? 'after' : 'child',
         html: String(snippetWithId || ''),
       });
     },
@@ -1287,10 +1420,10 @@ function RenderFile({ filePath }) {
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent, { backup: true });
+            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent);
+            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
 
@@ -1302,7 +1435,8 @@ function RenderFile({ filePath }) {
             });
           } catch (e) {
             console.error('stageReparentBlock error:', e);
-            setError(`Ошибка перемещения блока: ${e.message}`);
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setError(`Ошибка перемещения блока: ${errorMessage}`);
           }
         })();
 
@@ -1388,10 +1522,10 @@ function RenderFile({ filePath }) {
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent, { backup: true });
+            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent);
+            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
             setRenderVersion((v) => v + 1);
 
@@ -1404,7 +1538,8 @@ function RenderFile({ filePath }) {
             });
           } catch (e) {
             console.error('stageSetText error:', e);
-            setError(`Ошибка изменения текста: ${e.message}`);
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setError(`Ошибка изменения текста: ${errorMessage}`);
           }
         })();
 
@@ -1443,7 +1578,7 @@ function RenderFile({ filePath }) {
   );
 
   // Функция сохранения файла
-  const saveFile = useCallback(async (contentToSave = null) => {
+  const saveFile = useCallback(async (contentToSave: string | null = null) => {
     if (!filePath) {
       console.warn('💾 saveFile: Нет пути к файлу');
       return;
@@ -1499,7 +1634,7 @@ function RenderFile({ filePath }) {
 
           // Обновляем парсинг импортов стилей для React/React Native файлов
           if (fileType === 'react' || fileType === 'react-native') {
-            const imports = parseStyleImports(content);
+            const imports = parseStyleImports(content) as Record<string, { path: string; type: string }>;
             setExternalStylesMap(imports);
           }
 
@@ -1515,7 +1650,8 @@ function RenderFile({ filePath }) {
         }
     } catch (e) {
       console.error('💾 saveFile: ❌ Исключение при сохранении:', e);
-      setError(`Ошибка сохранения файла: ${e.message}`);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(`Ошибка сохранения файла: ${errorMessage}`);
     }
   }, [filePath, unsavedContent, fileContent, fileType]);
 
@@ -1575,10 +1711,10 @@ function RenderFile({ filePath }) {
       hasFilePath: !!filePath
     });
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         console.log('💾 [Global Ctrl+S] ✅ ОБРАБОТЧИК ВЫЗВАН!', {
-          target: e.target.tagName,
+          target: e.target instanceof Element ? e.target.tagName : undefined,
           currentTarget: e.currentTarget,
           phase: e.eventPhase === 1 ? 'CAPTURE' : e.eventPhase === 2 ? 'TARGET' : 'BUBBLE'
         });
@@ -1602,7 +1738,7 @@ function RenderFile({ filePath }) {
         // В режиме edit/split изменения применяются сразу (bidirectional editing)
         // Ctrl+S здесь только для сохранения кода из Monaco Editor в split режиме
         if (viewMode === 'split' && isModified) {
-          let contentToSave = null;
+          let contentToSave: string | null = null;
           if (monacoEditorRef?.current) {
             try {
               contentToSave = monacoEditorRef.current.getValue();
@@ -1650,7 +1786,7 @@ function RenderFile({ filePath }) {
 
   // Обработка Ctrl+Z (Undo) и Ctrl+Shift+Z (Redo)
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Только в режиме конструктора (edit или split)
       if (viewMode !== 'edit' && viewMode !== 'split') return;
 
@@ -1689,28 +1825,28 @@ function RenderFile({ filePath }) {
   }, [viewMode, undo, redo]);
 
   // Обработчики для изменения размера split панелей
-  const handleSplitResizeStart = useCallback((e) => {
+  const handleSplitResizeStart = useCallback((e: any) => {
     setIsResizing(true);
     if (e.preventDefault) e.preventDefault();
     if (e.stopPropagation) e.stopPropagation();
   }, []);
 
-  const handleSplitResize = useCallback((e) => {
+  const handleSplitResize = useCallback((e: any) => {
     if (!isResizing) return;
 
     // Для React Native Web используем DOM API
-    let container = splitContainerRef.current;
+    let container = splitContainerRef.current as any;
 
     // Пробуем получить DOM элемент разными способами
     if (container) {
-      if (typeof container.getBoundingClientRect === 'function') {
+      if (typeof (container as HTMLElement).getBoundingClientRect === 'function') {
         // Уже DOM элемент
-      } else if (container._nativeNode) {
-        container = container._nativeNode;
-      } else if (container._internalInstanceHandle?.stateNode) {
-        container = container._internalInstanceHandle.stateNode;
-      } else if (container._owner?.stateNode) {
-        container = container._owner.stateNode;
+      } else if ((container as any)._nativeNode) {
+        container = (container as any)._nativeNode;
+      } else if ((container as any)._internalInstanceHandle?.stateNode) {
+        container = (container as any)._internalInstanceHandle.stateNode;
+      } else if ((container as any)._owner?.stateNode) {
+        container = (container as any)._owner.stateNode;
       }
     }
 
@@ -1719,7 +1855,7 @@ function RenderFile({ filePath }) {
       // Используем глобальный поиск по классу или data-атрибуту
       const splitContainers = document.querySelectorAll('[data-split-container]');
       if (splitContainers.length > 0) {
-        container = splitContainers[0];
+        container = splitContainers[0] as HTMLElement;
       }
     }
 
@@ -1743,14 +1879,14 @@ function RenderFile({ filePath }) {
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: any) => {
       handleSplitResize(e);
       if (e.preventDefault) e.preventDefault();
     };
     const handleMouseUp = () => {
       handleSplitResizeEnd();
     };
-    const handleTouchMove = (e) => {
+    const handleTouchMove = (e: any) => {
       handleSplitResize(e);
       if (e.preventDefault) e.preventDefault();
     };
@@ -1789,14 +1925,14 @@ function RenderFile({ filePath }) {
 
         if (result.success) {
           console.log('RenderFile: File content loaded, length:', result.content?.length);
-          setFileContent(result.content);
+          setFileContent(result.content || '');
           setUnsavedContent(null);
           setIsModified(false);
 
           // Парсим импорты стилей для React/React Native файлов
           const type = getFileType(path, result.content);
           if (type === 'react' || type === 'react-native') {
-            const imports = parseStyleImports(result.content);
+            const imports = parseStyleImports(result.content || '') as Record<string, { path: string; type: string }>;
             setExternalStylesMap(imports);
             console.log('RenderFile: Parsed style imports:', imports);
 
@@ -1812,6 +1948,10 @@ function RenderFile({ filePath }) {
         }
     } catch (err) {
       console.error('RenderFile: Exception:', err);
+      
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Ошибка: ${errorMessage}`);
       setError(`Ошибка: ${err.message}`);
     } finally {
       setLoading(false);
@@ -1926,7 +2066,7 @@ function RenderFile({ filePath }) {
     });
 
     // Обработчик изменений файла
-    const handleFileChanged = async (changedFilePath) => {
+    const handleFileChanged = async (changedFilePath: string) => {
       if (changedFilePath === currentFilePath) {
         console.log('RenderFile: File changed, syncing with AST:', changedFilePath);
 
@@ -2033,7 +2173,7 @@ function RenderFile({ filePath }) {
     };
 
     // Подписываемся на события изменения файла
-    const unsubscribe = onFileChanged(handleFileChanged);
+    const unsubscribe: () => void = onFileChanged(handleFileChanged) as unknown as () => void;
 
     // Cleanup: останавливаем отслеживание при размонтировании или смене файла
     return () => {
@@ -2058,16 +2198,17 @@ function RenderFile({ filePath }) {
         try {
           console.log('RenderFile: Rendering React file, content length:', fileContent.length);
           const framework = createFramework('react', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot });
+          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot: projectRoot || undefined });
           console.log('RenderFile: Generated React HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
           setReactHTML(result.html);
-          setBlockMap(result.blockMapForEditor || result.blockMap || {});
+          setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths); // Сохраняем пути зависимостей
         } catch (error) {
           console.error('RenderFile: Error generating HTML:', error);
-          setReactHTML(`<html><body><div class="error">Ошибка обработки: ${error.message}</div></body></html>`);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          setReactHTML(`<html><body><div class="error">Ошибка обработки: ${errorMessage}</div></body></html>`);
           setDependencyPaths([]);
           setBlockMapForFile({});
         } finally {
@@ -2090,16 +2231,17 @@ function RenderFile({ filePath }) {
         try {
           console.log('RenderFile: Rendering React Native file, content length:', fileContent.length);
           const framework = createFramework('react-native', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot });
+          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot: projectRoot || undefined });
           console.log('RenderFile: Generated React Native HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
           setReactNativeHTML(result.html);
-          setBlockMap(result.blockMapForEditor || result.blockMap || {});
+          setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths); // Сохраняем пути зависимостей
         } catch (error) {
           console.error('RenderFile: Error generating HTML:', error);
-          setReactNativeHTML(`<html><body><div class="error">Ошибка обработки: ${error.message}</div></body></html>`);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          setReactNativeHTML(`<html><body><div class="error">Ошибка обработки: ${errorMessage}</div></body></html>`);
           setDependencyPaths([]);
           setBlockMapForFile({});
         } finally {
@@ -2122,11 +2264,11 @@ function RenderFile({ filePath }) {
 
     console.log('RenderFile: Setting up watchers for dependencies:', dependencyPaths);
 
-    const watchers = [];
-    const unsubscribers = [];
+    const watchers: string[] = [];
+    const unsubscribers: Array<() => void> = [];
 
     // Создаем обработчик изменений зависимого файла
-    const handleDependencyChanged = (changedFilePath) => {
+    const handleDependencyChanged = (changedFilePath: string) => {
       console.log('RenderFile: Dependency file changed:', changedFilePath);
       console.log('RenderFile: Reloading main file:', filePath);
       // Перезагружаем основной файл при изменении зависимости
@@ -2147,11 +2289,11 @@ function RenderFile({ filePath }) {
       });
 
       // Подписываемся на события изменения (глобальный обработчик, который проверит путь)
-      const unsubscribe = onFileChanged((changedFilePath) => {
+      const unsubscribe: () => void = onFileChanged((changedFilePath: string) => {
         if (changedFilePath === depPath) {
           handleDependencyChanged(changedFilePath);
         }
-      });
+      }) as unknown as () => void;
       unsubscribers.push(unsubscribe);
     });
 
@@ -2160,14 +2302,14 @@ function RenderFile({ filePath }) {
       console.log('RenderFile: Cleaning up dependency watchers');
 
       // Отписываемся от событий
-      unsubscribers.forEach((unsubscribe) => {
+      unsubscribers.forEach((unsubscribe: () => void) => {
         if (typeof unsubscribe === 'function') {
           unsubscribe();
         }
       });
 
       // Останавливаем watchers
-      dependencyPaths.forEach((depPath) => {
+      dependencyPaths.forEach((depPath: string) => {
         unwatchFile(depPath);
       });
     };
@@ -2179,9 +2321,14 @@ function RenderFile({ filePath }) {
   // findProjectRoot и resolvePath теперь импортируются из модуля
   const findProjectRootMemo = useCallback(findProjectRoot, []);
   const resolvePathMemo = useCallback(resolvePath, []);
+  const resolvePathForFramework = useCallback((path: string, base?: string) => resolvePathSync(base ?? '', path), []);
 
   // Загружаем зависимый файл относительно основного файла
-  const loadDependency = useCallback(async (basePath, importPath) => {
+  const loadDependency = useCallback(
+    async (
+      basePath: string,
+      importPath: string
+    ): Promise<{ success: boolean; content?: string; error?: string; path?: string }> => {
     try {
       // Разрешаем путь к зависимому файлу (теперь асинхронно для поддержки @ путей)
       let resolvedPath = await resolvePathMemo(basePath, importPath);
@@ -2218,13 +2365,15 @@ function RenderFile({ filePath }) {
       return { success: false, error: `Файл не найден: ${importPath}` };
     } catch (error) {
       console.error('RenderFile: Error loading dependency:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
-  }, [resolvePathMemo]);
+  },
+  [resolvePathMemo]);
 
   // Функция для обработки HTML с загрузкой зависимостей
-  const processHTMLWithDependencies = useCallback(async (htmlContent, basePath) => {
-    const dependencyPaths = [];
+  const processHTMLWithDependencies = useCallback(
+    async (htmlContent: string, basePath: string): Promise<{ html: string; dependencyPaths: string[] }> => {
+    const dependencyPaths: string[] = [];
     let processedHTML = htmlContent;
 
     // Регулярные выражения для поиска внешних зависимостей
@@ -2244,7 +2393,7 @@ function RenderFile({ filePath }) {
 
       const depResult = await loadDependency(basePath, cssPath);
       if (depResult.success) {
-        dependencyPaths.push(depResult.path);
+        dependencyPaths.push(depResult.path || '');
         // Заменяем link на style с встроенным CSS
         const styleTag = `<style>\n/* ${cssPath} */\n${depResult.content}\n</style>`;
         processedHTML = processedHTML.replace(match[0], styleTag);
@@ -2265,7 +2414,7 @@ function RenderFile({ filePath }) {
 
       const depResult = await loadDependency(basePath, scriptPath);
       if (depResult.success) {
-        dependencyPaths.push(depResult.path);
+        dependencyPaths.push(depResult.path || '');
         // Заменяем script src на встроенный script
         const scriptTag = `<script>\n/* ${scriptPath} */\n${depResult.content}\n</script>`;
         processedHTML = processedHTML.replace(match[0], scriptTag);
@@ -2305,20 +2454,18 @@ function RenderFile({ filePath }) {
     }
 
     return { html: processedHTML, dependencyPaths };
-  }, [loadDependency, resolvePathMemo]);
+  },
+  [loadDependency, resolvePathMemo]);
 
   // Обработка HTML файлов с зависимостями
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:1155',message:'HTML useEffect hook called',data:{fileType,hasFileContent:!!fileContent,hasFilePath:!!filePath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (fileType === 'html' && fileContent && filePath) {
       const processHTML = async () => {
         setIsProcessingHTML(true);
         try {
           console.log('RenderFile: Processing HTML with dependencies');
           const framework = createFramework('html', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot });
+          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot: '' });
           setProcessedHTML(result.html);
           setHtmlDependencyPaths(result.dependencyPaths);
           setBlockMap(result.blockMapForEditor || {});
@@ -2343,18 +2490,15 @@ function RenderFile({ filePath }) {
 
   // Отслеживание изменений зависимых файлов для HTML
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:1182',message:'HTML dependencies useEffect hook called',data:{fileType,hasFilePath:!!filePath,dependencyPathsCount:htmlDependencyPaths.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!filePath || htmlDependencyPaths.length === 0 || fileType !== 'html') {
       return;
     }
 
     console.log('RenderFile: Setting up watchers for HTML dependencies:', htmlDependencyPaths);
 
-    const unsubscribers = [];
+    const unsubscribers: Array<() => void> = [];
 
-    const handleDependencyChanged = (changedFilePath) => {
+    const handleDependencyChanged = (changedFilePath: string) => {
       console.log('RenderFile: HTML dependency file changed:', changedFilePath);
       // Перезагружаем HTML файл при изменении зависимости
       // Используем текущий filePath из замыкания
@@ -2362,7 +2506,7 @@ function RenderFile({ filePath }) {
       // Используем readFile из filesystem-api
       readFile(currentPath).then((result) => {
         if (result.success) {
-          setFileContent(result.content);
+          setFileContent(result.content || '');
         }
       });
     };
@@ -2376,22 +2520,22 @@ function RenderFile({ filePath }) {
       });
 
       // File System API не поддерживает события изменения файлов
-      const unsubscribe = onFileChanged((changedFilePath) => {
+    const unsubscribe = onFileChanged((changedFilePath: string) => {
         if (changedFilePath === depPath) {
           handleDependencyChanged(changedFilePath);
         }
       });
-      unsubscribers.push(unsubscribe);
+      unsubscribers.push(unsubscribe as () => void);
     });
 
     return () => {
-      unsubscribers.forEach((unsubscribe) => {
+      unsubscribers.forEach((unsubscribe: () => void) => {
         if (typeof unsubscribe === 'function') {
           unsubscribe();
         }
       });
 
-      htmlDependencyPaths.forEach((depPath) => {
+      htmlDependencyPaths.forEach((depPath: string) => {
         // File System API не поддерживает unwatch
         unwatchFile(depPath);
       });
@@ -2450,7 +2594,12 @@ function RenderFile({ filePath }) {
 
   // Вспомогательная функция для поиска модуля по различным путям
   // Синхронная версия, использует уже разрешенные пути из pathMap
-  const findModulePath = (importPath, basePath, pathMap, dependencyModules) => {
+  const findModulePath = (
+    importPath: string,
+    basePath: string,
+    pathMap: Record<string, string>,
+    dependencyModules: Record<string, string>
+  ) => {
     // Пробуем найти по оригинальному пути (включая @ пути, которые уже разрешены)
     if (pathMap[importPath]) {
       return pathMap[importPath];
@@ -2470,7 +2619,7 @@ function RenderFile({ filePath }) {
         basePath,
         resolvedPath,
         pathMapHasResolved: !!pathMap[resolvedPath],
-        pathMapKeys: Object.keys(pathMap).filter(k => k.includes(importPath) || k.includes(resolvedPath.split('/').pop())).slice(0, 5)
+        pathMapKeys: Object.keys(pathMap).filter(k => k.includes(importPath) || k.includes(resolvedPath.split('/').pop() || '')).slice(0, 5)
       });
 
       // Пробуем найти по разрешенному пути
@@ -2483,7 +2632,7 @@ function RenderFile({ filePath }) {
       }
 
       // Извлекаем имя файла из разрешенного пути для более гибкого поиска
-      const fileName = resolvedPath.split('/').pop().replace(/\.(js|jsx|ts|tsx)$/, '');
+      const fileName = resolvedPath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx)$/, '');
       const pathWithoutExt = resolvedPath.replace(/\.(js|jsx|ts|tsx)$/, '');
       const lastPart = resolvedPath.split('/').slice(-2).join('/'); // Последние 2 части пути
 
@@ -2622,7 +2771,15 @@ function RenderFile({ filePath }) {
   };
 
   // Рекурсивная функция для загрузки всех зависимостей
-  const loadAllDependencies = async (importPath, basePath, loadedDeps = new Set(), dependencyMap = {}, dependencyPaths = [], pathMap = {}, actualPathMap = {}) => {
+  const loadAllDependencies = async (
+    importPath: string,
+    basePath: string,
+    loadedDeps: Set<string> = new Set<string>(),
+    dependencyMap: Record<string, string> = {},
+    dependencyPaths: string[] = [],
+    pathMap: Record<string, string> = {},
+    actualPathMap: Record<string, string> = {}
+  ) => {
     const baseFileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
 
     console.log(`[LoadAllDependencies] Starting to load dependency:`, {
@@ -2670,88 +2827,91 @@ function RenderFile({ filePath }) {
       contentLength: depResult.content?.length || 0
     });
 
+    const depPath = String(depResult.path ?? resolvedPath);
+    const depContent = String(depResult.content ?? '');
+
     // Сохраняем фактический путь файла для разрешенного пути
-    actualPathMap[resolvedPath] = depResult.path;
-    actualPathMap[depResult.path] = depResult.path;
+    actualPathMap[resolvedPath] = depPath;
+    actualPathMap[depPath] = depPath;
 
     // Сохраняем по абсолютному пути как основному ключу
-    dependencyMap[resolvedPath] = depResult.content;
-    dependencyPaths.push(depResult.path);
+    dependencyMap[resolvedPath] = depContent;
+    dependencyPaths.push(depPath);
 
     // Сохраняем маппинг: относительный путь -> абсолютный путь
     pathMap[importPath] = resolvedPath;
     // Также сохраняем маппинг разрешенного пути (если он отличается от фактического пути файла)
-    if (resolvedPath !== depResult.path) {
-      pathMap[resolvedPath] = depResult.path;
+    if (resolvedPath !== depPath) {
+      pathMap[resolvedPath] = depPath;
     }
     // Сохраняем маппинг фактического пути файла к самому себе
-    pathMap[depResult.path] = depResult.path;
+    pathMap[depPath] = depPath;
 
     // Для относительных путей также сохраняем разрешенный путь как ключ
     // Это поможет найти модуль, когда мы разрешаем относительный путь в findModulePath
     if (importPath.startsWith('./') || importPath.startsWith('../')) {
       // Разрешаем путь синхронно для сохранения маппинга
       const syncResolved = resolvePathSync(basePath, importPath);
-      if (syncResolved !== resolvedPath && syncResolved !== depResult.path && !pathMap[syncResolved]) {
-        pathMap[syncResolved] = depResult.path;
+      if (syncResolved !== resolvedPath && syncResolved !== depPath && !pathMap[syncResolved]) {
+        pathMap[syncResolved] = depPath;
       }
       // Также сохраняем путь без расширения
       const syncResolvedNoExt = syncResolved.replace(/\.(js|jsx|ts|tsx)$/, '');
-      if (syncResolvedNoExt !== syncResolved && syncResolvedNoExt !== depResult.path && !pathMap[syncResolvedNoExt]) {
-        pathMap[syncResolvedNoExt] = depResult.path;
+      if (syncResolvedNoExt !== syncResolved && syncResolvedNoExt !== depPath && !pathMap[syncResolvedNoExt]) {
+        pathMap[syncResolvedNoExt] = depPath;
       }
       // Сохраняем последние 2 части пути (например, styles/commonStyles)
       const pathParts = syncResolved.split('/');
       if (pathParts.length >= 2) {
         const last2Parts = pathParts.slice(-2).join('/');
-        if (last2Parts !== syncResolved && last2Parts !== depResult.path && !pathMap[last2Parts]) {
-          pathMap[last2Parts] = depResult.path;
+        if (last2Parts !== syncResolved && last2Parts !== depPath && !pathMap[last2Parts]) {
+          pathMap[last2Parts] = depPath;
         }
         const last2PartsNoExt = last2Parts.replace(/\.(js|jsx|ts|tsx)$/, '');
-        if (last2PartsNoExt !== last2Parts && last2PartsNoExt !== depResult.path && !pathMap[last2PartsNoExt]) {
-          pathMap[last2PartsNoExt] = depResult.path;
+        if (last2PartsNoExt !== last2Parts && last2PartsNoExt !== depPath && !pathMap[last2PartsNoExt]) {
+          pathMap[last2PartsNoExt] = depPath;
         }
       }
     }
 
     // Также сохраняем путь без расширения для фактического пути файла
-    const depPathNoExt = depResult.path.replace(/\.(js|jsx|ts|tsx)$/, '');
-    if (depPathNoExt !== depResult.path && !pathMap[depPathNoExt]) {
-      pathMap[depPathNoExt] = depResult.path;
+    const depPathNoExt = depPath.replace(/\.(js|jsx|ts|tsx)$/, '');
+    if (depPathNoExt !== depPath && !pathMap[depPathNoExt]) {
+      pathMap[depPathNoExt] = depPath;
     }
 
     // Сохраняем последние 2 части фактического пути файла
-    const depPathParts = depResult.path.split('/');
+    const depPathParts = depPath.split('/');
     if (depPathParts.length >= 2) {
       const depLast2Parts = depPathParts.slice(-2).join('/');
-      if (depLast2Parts !== depResult.path && !pathMap[depLast2Parts]) {
-        pathMap[depLast2Parts] = depResult.path;
+      if (depLast2Parts !== depPath && !pathMap[depLast2Parts]) {
+        pathMap[depLast2Parts] = depPath;
       }
       const depLast2PartsNoExt = depLast2Parts.replace(/\.(js|jsx|ts|tsx)$/, '');
-      if (depLast2PartsNoExt !== depLast2Parts && depLast2PartsNoExt !== depResult.path && !pathMap[depLast2PartsNoExt]) {
-        pathMap[depLast2PartsNoExt] = depResult.path;
+      if (depLast2PartsNoExt !== depLast2Parts && depLast2PartsNoExt !== depPath && !pathMap[depLast2PartsNoExt]) {
+        pathMap[depLast2PartsNoExt] = depPath;
       }
     }
 
     console.log('RenderFile: Saved path mappings for:', {
       importPath,
       resolvedPath,
-      actualPath: depResult.path,
-      savedKeys: Object.keys(pathMap).filter(k => pathMap[k] === depResult.path).slice(0, 10)
+      actualPath: depPath,
+      savedKeys: Object.keys(pathMap).filter(k => pathMap[k] === depPath).slice(0, 10)
     });
 
     // Извлекаем импорты из загруженной зависимости
-    const depFileName = depResult.path.split('/').pop() || depResult.path.split('\\').pop() || 'unknown';
-    const depImports = extractImports(depResult.content, depFileName);
+    const depFileName = depPath.split('/').pop() || depPath.split('\\').pop() || 'unknown';
+    const depImports = extractImports(depContent, depFileName);
 
     console.log(`[LoadAllDependencies] Found ${depImports.length} imports in ${depFileName}:`, {
-      file: depResult.path,
+      file: depPath,
       fileName: depFileName,
       imports: depImports.map(i => ({ path: i.path, line: i.line }))
     });
 
     // Рекурсивно загружаем зависимости зависимостей
-    const depBasePath = depResult.path; // Используем фактический путь файла как базовый
+    const depBasePath = depPath; // Используем фактический путь файла как базовый
     for (const depImp of depImports) {
       // Пропускаем только внешние библиотеки (npm пакеты)
       // Теперь обрабатываем локальные импорты, включая @ пути
@@ -2795,12 +2955,12 @@ function RenderFile({ filePath }) {
       imports: imports.map(i => ({ path: i.path, line: i.line }))
     });
 
-    const dependencies = {};
-    const dependencyModules = {};
-    const dependencyPaths = []; // Массив путей к зависимым файлам
-    const loadedDeps = new Set(); // Для предотвращения циклических зависимостей
-    const pathMap = {}; // Маппинг: относительный путь -> абсолютный путь
-    const actualPathMap = {}; // Маппинг: разрешенный путь -> фактический путь файла
+    const dependencies: Record<string, string> = {};
+    const dependencyModules: Record<string, string> = {};
+    const dependencyPaths: string[] = []; // Массив путей к зависимым файлам
+    const loadedDeps = new Set<string>(); // Для предотвращения циклических зависимостей
+    const pathMap: Record<string, string> = {}; // Маппинг: относительный путь -> абсолютный путь
+    const actualPathMap: Record<string, string> = {}; // Маппинг: разрешенный путь -> фактический путь файла
 
     // Загружаем все зависимости рекурсивно
     for (const imp of imports) {
@@ -2845,7 +3005,7 @@ function RenderFile({ filePath }) {
 
     // Обрабатываем код - удаляем импорты React, но сохраняем локальные
     // Сначала сохраняем информацию о default export перед удалением
-    let defaultExportInfo = null;
+    let defaultExportInfo: { name: string; type: string } | null = null;
     const defaultExportMatch = code.match(/export\s+default\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
     if (defaultExportMatch) {
       defaultExportInfo = {
@@ -2912,9 +3072,9 @@ function RenderFile({ filePath }) {
     }
 
     // Топологическая сортировка модулей по зависимостям
-    const sortedModules = [];
-    const visited = new Set();
-    const visiting = new Set();
+    const sortedModules: string[] = [];
+    const visited: Set<string> = new Set();
+    const visiting: Set<string> = new Set();
 
     const visit = (modulePath) => {
       if (visiting.has(modulePath)) {
@@ -2974,10 +3134,10 @@ function RenderFile({ filePath }) {
       const importPath = absolutePath;
       // Обрабатываем зависимость
       // Сначала извлекаем все экспорты
-      let moduleExports = {};
+      let moduleExports: Record<string, unknown> = {};
       let hasDefaultExport = false;
-      let defaultExportName = null;
-      const namedExports = [];
+      let defaultExportName: string | null = null;
+      const namedExports: string[] = [];
 
       // Получаем фактический путь файла для текущей зависимости (для разрешения относительных путей)
       // Используем actualPathMap для получения фактического пути файла
@@ -2995,7 +3155,7 @@ function RenderFile({ filePath }) {
       });
 
       // Обрабатываем экспорты
-      let processedDep = content;
+      let processedDep: string = String(content ?? '');
 
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:605',message:'Processing dependency before removing imports',data:{importPath,contentLength:processedDep.length,hasImports:processedDep.includes('import'),hasExports:processedDep.includes('export')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
@@ -3003,8 +3163,8 @@ function RenderFile({ filePath }) {
 
       // СНАЧАЛА обрабатываем экспорты, ПОТОМ удаляем импорты
       // Named exports: export const/let/var (обрабатываем ДО удаления импортов)
-      const namedConstExports = [];
-      processedDep = processedDep.replace(/export\s+(const|let|var)\s+(\w+)\s*=/g, (match, keyword, name) => {
+      const namedConstExports: string[] = [];
+      processedDep = processedDep.replace(/export\s+(const|let|var)\s+(\w+)\s*=/g, (match: string, keyword: string, name: string) => {
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:612',message:'Found named export const',data:{importPath,name,keyword},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
@@ -3016,8 +3176,8 @@ function RenderFile({ filePath }) {
       });
 
       // Named exports: export function (обрабатываем ДО удаления импортов)
-      const namedFunctionExports = [];
-      processedDep = processedDep.replace(/export\s+function\s+(\w+)/g, (match, name) => {
+      const namedFunctionExports: string[] = [];
+      processedDep = processedDep.replace(/export\s+function\s+(\w+)/g, (match: string, name: string) => {
         namedFunctionExports.push(name);
         if (!namedExports.includes(name)) {
           namedExports.push(name);
@@ -3036,10 +3196,7 @@ function RenderFile({ filePath }) {
         // Удаляем import { ... } from 'react-native'
         .replace(/import\s*\{[^}]*\}\s*from\s+['"]react-native['"];?\s*/gi, '')
         // Заменяем все остальные импорты на код доступа к модулям
-        .replace(/import\s+(.*?)\s+from\s+['"](.*?)['"];?\s*/g, (match, importSpec, depImportPath) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:635',message:'Processing import in dependency',data:{depImportPath,importSpec,importStatement:match.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
+        .replace(/import\s+(.*?)\s+from\s+['"](.*?)['"];?\s*/g, (match: string, importSpec: string, depImportPath: string) => {
 
           const currentDepFileName = currentDepActualPath.split('/').pop() || currentDepActualPath.split('\\').pop() || 'unknown';
 
@@ -3088,7 +3245,7 @@ function RenderFile({ filePath }) {
             resolvedPath: finalDepPath,
             resolvedPathSync,
             possibleKeys,
-            foundInPathMap: !!pathMap[depImportPath] || !!pathMap[finalDepPath],
+            foundInPathMap: !!(pathMap as Record<string, string>)[depImportPath] || !!(pathMap as Record<string, string>)[String(finalDepPath)],
             pathMapKeys: Object.keys(pathMap).filter(k =>
               k.includes(depImportPath.replace(/\.\.?\//g, '')) ||
               k.includes('commonStyles') ||
@@ -3098,7 +3255,7 @@ function RenderFile({ filePath }) {
 
           if (importSpec.startsWith('{')) {
             // Named imports: import { a, b as c } from ...
-            const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
+            const names = importSpec.replace(/[{}]/g, '').split(',').map((n: string) => n.trim()).filter((n: string) => n);
             return names.map(name => {
               const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
               let orig = parts[0].trim();
@@ -3394,17 +3551,17 @@ function RenderFile({ filePath }) {
           // Добавляем named exports - используем прямую проверку в текущей области видимости
           ${namedExports.length > 0 ? namedExports.map(name => 
             `// #region agent log
-            fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Checking export variable',data:{name:'${name}',importPath:'${importPath}',isDefined:typeof ${name} !== "undefined",valueType:typeof ${name}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Checking export variable',data:{name:'${name}',importPath:'${importPath}',isDefined:typeof ${name} !== "undefined",valueType:typeof ${name}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
             // #endregion
             if (typeof ${name} !== "undefined") { 
               moduleExports.${name} = ${name}; 
               // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Export added successfully',data:{name:'${name}',importPath:'${importPath}',exportKeys:Object.keys(moduleExports)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Export added successfully',data:{name:'${name}',importPath:'${importPath}',exportKeys:Object.keys(moduleExports)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
               console.log('Added named export ${name} to module ${importPath}:', ${name});
             } else { 
               // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Export variable undefined',data:{name:'${name}',importPath:'${importPath}'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+              ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Export variable undefined',data:{name:'${name}',importPath:'${importPath}'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
               // #endregion
               console.error('Named export ${name} is undefined in module ${importPath}!');
               console.error('Trying to find variable in different ways...');
@@ -3482,7 +3639,7 @@ function RenderFile({ filePath }) {
             '${moduleAbsolutePath.split('/').slice(-2).join('/')}',
             '${moduleAbsolutePath.split('/').slice(-2).join('/').replace(/\.(js|jsx|ts|tsx)$/, '')}',
             '${moduleAbsolutePath.split('/').pop()}',
-            '${moduleAbsolutePath.split('/').pop().replace(/\.(js|jsx|ts|tsx)$/, '')}'
+            '${moduleAbsolutePath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx)$/, '')}'
           ];
           resolvedVariants.forEach(variant => {
             if (variant && variant.trim()) {
@@ -3492,7 +3649,7 @@ function RenderFile({ filePath }) {
           
           console.log('Registered module under keys:', allPossiblePaths);
           // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-register',message:'Module registered',data:{importPath:'${importPath}',absolutePath:'${moduleAbsolutePath}',allModules:Object.keys(window.__modules__||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+          ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-register',message:'Module registered',data:{importPath:'${importPath}',absolutePath:'${moduleAbsolutePath}',allModules:Object.keys(window.__modules__||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
           // #endregion
         })();
       `;
@@ -3521,7 +3678,7 @@ function RenderFile({ filePath }) {
             importReplacements[importStatement.fullStatement] = `const ${alias} = window.__modules__['${importPath}'];`;
           } else if (importSpec.startsWith('{')) {
             // Named imports: import { a, b as c } from ...
-            const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
+            const names = importSpec.replace(/[{}]/g, '').split(',').map((n: string) => n.trim()).filter((n: string) => n);
             // Получаем абсолютный путь для этого модуля
             const absolutePath = dependencyModules[importPath] || importPath;
             // #region agent log
@@ -3546,7 +3703,7 @@ function RenderFile({ filePath }) {
               // Добавляем проверку и логирование для отладки
               return `const ${alias} = (() => {
                 // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Resolving import',data:{orig:'${orig}',alias:'${alias}',importPath:'${importPath}',absolutePath:'${absolutePath}',modulesAvailable:Object.keys(window.__modules__||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Resolving import',data:{orig:'${orig}',alias:'${alias}',importPath:'${importPath}',absolutePath:'${absolutePath}',modulesAvailable:Object.keys(window.__modules__||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
                 // Ищем модуль по всем возможным путям
                 const module1 = window.__modules__ && window.__modules__['${absolutePath}'];
@@ -3563,7 +3720,7 @@ function RenderFile({ filePath }) {
                   }
                 }
                 // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Module lookup',data:{orig:'${orig}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Module lookup',data:{orig:'${orig}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
                 // #endregion
                 const module = module1 || module2 || module3;
                 if (!module) {
@@ -3573,7 +3730,7 @@ function RenderFile({ filePath }) {
                 }
                 const value = module.${orig} || module.default?.${orig};
                 // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Import result',data:{orig:'${orig}',alias:'${alias}',valueDefined:value!==undefined,valueType:typeof value,moduleKeys:Object.keys(module)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Import result',data:{orig:'${orig}',alias:'${alias}',valueDefined:value!==undefined,valueType:typeof value,moduleKeys:Object.keys(module)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
                 // #endregion
                 if (value === undefined) {
                   console.error('Failed to import ${orig} from ${importPath}.');
@@ -3598,7 +3755,7 @@ function RenderFile({ filePath }) {
             // Ищем модуль в dependencies по абсолютному пути
             const depContent = dependencies[absolutePath] || dependencies[importPath];
             let hasDefaultExport2 = false;
-            let defaultExportName2 = null;
+            let defaultExportName2: string | null = null;
 
             if (depContent) {
               // Проверяем наличие default export в содержимом
@@ -3637,12 +3794,12 @@ function RenderFile({ filePath }) {
                 }
               }
               // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Module lookup for default import',data:{importSpec:'${importSpec}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Module lookup for default import',data:{importSpec:'${importSpec}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
               // #endregion
               const module = module1 || module2 || module3;
               const value = module?.default || module?.styles || module;
               // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Default import result',data:{importSpec:'${importSpec}',valueDefined:value!==undefined,valueType:typeof value,isFunction:typeof value==='function'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Default import result',data:{importSpec:'${importSpec}',valueDefined:value!==undefined,valueType:typeof value,isFunction:typeof value==='function'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
               if (value === undefined) {
                 console.error('Failed to import default from ${importPath}. Available modules:', Object.keys(window.__modules__ || {}));
@@ -3682,7 +3839,7 @@ function RenderFile({ filePath }) {
         importReplacements[imp.fullStatement] = `const ${alias} = window.__modules__ && window.__modules__['${absolutePath}'] || window.__modules__ && window.__modules__['${imp.path}'] || {};`;
       } else if (importSpec.startsWith('{')) {
         // Named imports: import { a, b as c } from ...
-        const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
+        const names = importSpec.replace(/[{}]/g, '').split(',').map((n: string) => n.trim()).filter((n: string) => n);
         const replacements = names.map(name => {
           const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
           let orig = parts[0].trim();
@@ -3783,7 +3940,7 @@ function RenderFile({ filePath }) {
 
     // Создаем код для предварительной регистрации всех модулей
     // Это гарантирует, что модули будут доступны, даже если они еще не выполнились
-    const allModulePaths = new Set();
+    const allModulePaths = new Set<string>();
     // Собираем все возможные пути для каждого модуля
     for (const [relPath, absPath] of Object.entries(pathMap)) {
       allModulePaths.add(relPath);
@@ -3816,7 +3973,7 @@ function RenderFile({ filePath }) {
       }
     }
 
-    const preRegisterCode = Array.from(allModulePaths).filter(Boolean).map(path => {
+    const preRegisterCode = Array.from(allModulePaths).filter(Boolean).map((path: string) => {
       // Экранируем кавычки в пути
       const escapedPath = path.replace(/'/g, "\\'");
       return `window.__modules__['${escapedPath}'] = window.__modules__['${escapedPath}'] || null;`;
@@ -3887,8 +4044,8 @@ function RenderFile({ filePath }) {
     }
 
     // Находим компонент для рендеринга по приоритету
-    let componentToRender = null;
-    let componentName = null;
+    let componentToRender: string | null = null;
+    let componentName: string | null = null;
 
     // Приоритет: default export > named exports > остальные компоненты
     for (const comp of detectedComponents) {
@@ -4150,7 +4307,7 @@ function RenderFile({ filePath }) {
   };
 
   // Создаем HTML обертку для React Native файлов
-  const createReactNativeHTML = async (code, basePath) => {
+  const createReactNativeHTML = async (code: string, basePath: string) => {
     // ВАЖНО: сначала инструментируем ИСХОДНЫЙ код, чтобы data-no-code-ui-id были стабильны относительно файла.
     const instOriginal = instrumentJsx(code, basePath);
 
@@ -4178,7 +4335,7 @@ function RenderFile({ filePath }) {
     }
 
     // Находим компонент для рендеринга по приоритету
-    let componentToRender = null;
+    let componentToRender: string | null = null;
     let componentName = null;
 
     // Приоритет: default export > named exports > остальные компоненты
@@ -4623,7 +4780,7 @@ function RenderFile({ filePath }) {
         
         try {
             // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:main-code',message:'About to execute processed code',data:{modulesAvailable:Object.keys(window.__modules__||{}).length,codeLength:${processedCode.length}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+            ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:main-code',message:'About to execute processed code',data:{modulesAvailable:Object.keys(window.__modules__||{}).length,codeLength:${processedCode.length}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
             // #endregion
             ${processedCode}
             
@@ -4843,7 +5000,7 @@ function RenderFile({ filePath }) {
           <View
             style={styles.splitContainer}
             ref={splitContainerRef}
-            onLayout={(e) => {
+            onLayout={(e: any) => {
               if (splitContainerRef.current && !splitContainerRef.current.getBoundingClientRect) {
                 // Для React Native Web используем DOM API
                 const element = splitContainerRef.current;
@@ -5060,7 +5217,7 @@ function RenderFile({ filePath }) {
                   setTimeout(() => {
                     const element = document.querySelector('[data-split-container]');
                     if (element) {
-                      splitContainerRef.current = element;
+                      splitContainerRef.current = element as HTMLElement;
                     }
                   }, 0);
                 }
@@ -5269,7 +5426,7 @@ function RenderFile({ filePath }) {
                   setTimeout(() => {
                     const element = document.querySelector('[data-split-container]');
                     if (element) {
-                      splitContainerRef.current = element;
+                      splitContainerRef.current = element as HTMLElement;
                     }
                   }, 0);
                 }
@@ -5451,7 +5608,7 @@ function RenderFile({ filePath }) {
     <View style={styles.textContainer}>
       <View style={styles.fileTypeBadge}>
         <Text style={styles.fileTypeText}>
-          {languageNames[monacoLanguage] || 'Текст'}
+          {languageNames[monacoLanguage as keyof typeof languageNames] || 'Текст'}
         </Text>
       </View>
       <View style={styles.editorContainer}>

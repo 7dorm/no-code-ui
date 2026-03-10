@@ -9,9 +9,9 @@ import { ReactNativeFramework } from './ReactNativeFramework';
  * Создает экземпляр Framework для указанного типа файла
  * @param {string} fileType - тип файла ('html', 'react', 'react-native')
  * @param {string} filePath - путь к файлу
- * @returns {Framework} экземпляр Framework
+ * @returns {HtmlFramework|ReactFramework|ReactNativeFramework} экземпляр Framework
  */
-export function createFramework(fileType, filePath) {
+export function createFramework(fileType:string, filePath:string) {
   switch (fileType) {
     case 'html':
       return new HtmlFramework(filePath);
@@ -29,7 +29,7 @@ export function createFramework(fileType, filePath) {
  * @param {string} fileType - тип файла
  * @returns {boolean}
  */
-export function isFrameworkSupported(fileType) {
+export function isFrameworkSupported(fileType:string) {
   return ['html', 'react', 'react-native'].includes(fileType);
 }
 

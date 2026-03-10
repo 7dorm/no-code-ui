@@ -7,11 +7,11 @@ import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
 import { createProject } from './features/file-operations/lib/file-operations';
 
 function AppRN() {
-  const [projectPath, setProjectPath] = useState(null);
-  const [selectedFilePath, setSelectedFilePath] = useState(null);
+  const [projectPath, setProjectPath] = useState<string | null>(null);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [createProjectDialogVisible, setCreateProjectDialogVisible] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);;
 
   const handleSelectProject = async () => {
     try {
@@ -59,17 +59,17 @@ function AppRN() {
         console.warn('Неожиданный результат выбора папки:', result);
         setError('Не удалось получить доступ к выбранной папке');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при выборе папки:', error);
       setError(`Ошибка при выборе папки: ${error.message || error.toString()}`);
     }
   };
 
-  const handleSelectFile = (filePath) => {
+  const handleSelectFile = (filePath: string) => {
     setSelectedFilePath(filePath);
   };
 
-  const handleCreateProject = async (projectName, projectType) => {
+  const handleCreateProject = async (projectName: string, projectType: string) => {
     try {
       setError(null);
       
@@ -95,11 +95,11 @@ function AppRN() {
           } else {
             setError(`Ошибка создания проекта: ${createResult.error}`);
           }
-        } catch (dirError) {
+        } catch (dirError: any) {
           setError(`Ошибка создания папки проекта: ${dirError.message}`);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(`Ошибка: ${err.message}`);
     }
   };

@@ -10,6 +10,8 @@ import {
 import { normalizeStyleKey, parseStyleText, parseValueForReactLike } from './blockEditor/styleUtils';
 import { NumberField } from './shared/ui/fields/number-field';
 import { TextField } from './shared/ui/fields/text-field';
+import { ReactFramework } from './frameworks/ReactFramework';
+import { HtmlFramework } from './frameworks/HtmlFramework';
 
 // Стили для HTML input элементов (используется в нескольких местах)
 const htmlInputStyle = {
@@ -48,6 +50,37 @@ export default function BlockEditorPanel({
   canUndo,
   canRedo,
   livePosition,
+}: {
+  fileType: 'html' | 'react' | 'react-native';
+  html: string;
+  selectedBlock: any;
+  onMessage: (msg: any) => void;
+  onApplyPatch: (blockId: any, patch: any) => void;
+  onStagePatch: (blockId: any, patch: any, isIntermediate?: boolean) => void;
+  styleSnapshot: any;
+  textSnapshot: any;
+  layersTree: any;
+  layerNames: any;
+  onRenameLayer: (id: string, name: string) => void;
+  outgoingMessage: any;
+  onSendCommand: (cmd: any) => void;
+  onInsertBlock: ({ targetId, mode, snippet }: {
+    targetId: any;
+    mode: any;
+    snippet: any;
+}) => void;
+  onDeleteBlock: (id: string) => void;
+  onReparentBlock: ({ sourceId, targetParentId }: { sourceId: any; targetParentId: any; }) => void;
+  onSetText: ({ blockId, text }: {
+    blockId: any;
+    text: any;
+}) => void;
+  framework: HtmlFramework | ReactFramework | null;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  livePosition: { left: number | null; top: number | null; width: number | null; height: number | null } | null;
 }) {
   const [left, setLeft] = useState(null);
   const [top, setTop] = useState(null);
@@ -60,7 +93,7 @@ export default function BlockEditorPanel({
   const [styleMode, setStyleMode] = useState('kv'); // 'kv' | 'text'
   const [styleRows, setStyleRows] = useState([{ key: '', value: '' }]);
   const [styleText, setStyleText] = useState('');
-  const [baselineMap, setBaselineMap] = useState({}); // normalizedKey -> normalizedValue
+  const [baselineMap, setBaselineMap] = useState<Record<string, string | number | boolean>>({}); // normalizedKey -> normalizedValue
   const [textValue, setTextValue] = useState('');
   const [reparentMode, setReparentMode] = useState(false);
   const [reparentTargetId, setReparentTargetId] = useState(null);
@@ -84,14 +117,14 @@ export default function BlockEditorPanel({
     }
     // Строим baseline map в нормализованном виде
     const raw = parseStyleText(inline);
-    const norm = {};
+    const norm: Record<string, string | number | boolean> = {};
     for (const [k, v] of Object.entries(raw)) {
       const nk = normalizeStyleKey({ fileType, key: k });
       if (!nk) continue;
       if (fileType === 'html') {
         norm[nk] = String(v).trim();
       } else {
-        norm[nk] = parseValueForReactLike(v);
+        norm[nk] = parseValueForReactLike(v)!;
       }
     }
     setBaselineMap(norm);
@@ -107,9 +140,9 @@ export default function BlockEditorPanel({
   const canApply = !!selectedBlock?.id;
 
   const patch = useMemo(() => {
-    const p = {};
+    const p: Record<string, any> = {};
 
-    const setPx = (key, val) => {
+    const setPx = (key: any, val: any) => {
       if (val == null || !Number.isFinite(val)) return;
       if (fileType === 'html') p[key] = `${val}px`;
       else p[key] = val; // React/RN: число = px
@@ -153,8 +186,8 @@ export default function BlockEditorPanel({
     return buildPatchFromKv({ fileType, rows: styleRows });
   };
 
-  const diffAgainstBaseline = (patchObj) => {
-    const out = {};
+  const diffAgainstBaseline = (patchObj: Record<string, any>) => {
+    const out: Record<string, any> = {};
     for (const [k, v] of Object.entries(patchObj || {})) {
       if (!k) continue;
       const base = baselineMap ? baselineMap[k] : undefined;
@@ -201,7 +234,7 @@ export default function BlockEditorPanel({
     }
   };
 
-  const [insertMode, setInsertMode] = useState(null); // 'child'|'sibling'|null
+  const [insertMode, setInsertMode] = useState<string | null>(null); // 'child'|'sibling'|null
   const [insertTag, setInsertTag] = useState(fileType === 'react-native' ? 'View' : 'div');
   const [insertText, setInsertText] = useState('Новый блок');
   const [insertStyleMode, setInsertStyleMode] = useState('kv');
@@ -281,12 +314,12 @@ export default function BlockEditorPanel({
     [fileType, html]
   );
 
-  const shortId = (id) => {
+  const shortId = (id: any) => {
     const s = String(id || '');
     return s.length > 28 ? s.slice(0, 28) + '…' : s;
   };
 
-  const renderTreeNode = (id, depth = 0) => {
+  const renderTreeNode = (id: any, depth = 0) => {
     if (!layersTree?.nodes?.[id]) return null;
     const node = layersTree.nodes[id];
     const isSelected = selectedBlock?.id === id;
@@ -358,7 +391,7 @@ export default function BlockEditorPanel({
 
         {Array.isArray(node.childIds) && node.childIds.length > 0 && (
           <View style={{ marginTop: 6 }}>
-            {node.childIds.map((cid) => renderTreeNode(cid, depth + 1))}
+            {node.childIds.map((cid: any) => renderTreeNode(cid, depth + 1))}
           </View>
         )}
       </View>
@@ -397,7 +430,7 @@ export default function BlockEditorPanel({
           <Text style={styles.sectionTitle}>Слои</Text>
           {layersTree?.rootIds?.length ? (
             <div style={{ maxHeight: 240, overflow: 'auto' }}>
-              {layersTree.rootIds.map((rid) => renderTreeNode(rid, 0))}
+              {layersTree.rootIds.map((rid: any) => renderTreeNode(rid, 0))}
             </div>
           ) : (
             <Text style={styles.hint}>Дерево слоёв загружается…</Text>

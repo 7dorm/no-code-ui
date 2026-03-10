@@ -1,12 +1,10 @@
 import { instrumentJsx } from '../../../blockEditor/JsxInstrumenter';
-import { MRPAK_MSG } from '../../../blockEditor/EditorProtocol';
-import { readFile } from '../../../shared/api/electron-api';
 
 /**
  * Извлекает импорты из кода
  */
-export function extractImports(code, sourceFile = 'unknown') {
-  const imports = [];
+export function extractImports(code: string, sourceFile = 'unknown') {
+  const imports: { path: string; fullStatement: string; line: number }[] = [];
   const importRegex = /import\s+.*?\s+from\s+['"](.*?)['"];?/g;
   let match;
   
@@ -48,8 +46,8 @@ export function extractImports(code, sourceFile = 'unknown') {
 /**
  * Детектирует React компоненты в коде
  */
-export function detectComponents(code) {
-  const components = [];
+export function detectComponents(code: string): { name: string; type: string; priority: number; isAnonymous?: boolean; isInferred?: boolean }[] {
+  const components: { name: string; type: string; priority: number; isAnonymous?: boolean; isInferred?: boolean }[] = [];
   
   // 1. Поиск default export (высший приоритет)
   
@@ -224,6 +222,13 @@ export function createReactHTMLTemplate({
   componentName,
   detectedComponents,
   basePath
+}: {
+  processedCode: string;
+  modulesCode?: string;
+  componentToRender?: string;
+  componentName?: string;
+  detectedComponents?: any[];
+  basePath?: string;
 }) {
   const inst = instrumentJsx(processedCode, basePath);
   const instrumentedCode = inst.code;
@@ -446,7 +451,7 @@ export function createReactHTMLTemplate({
                   });
                 }, 100);
             } else {
-                const foundComponents = ${JSON.stringify(detectedComponents.map(c => c.name))};
+                const foundComponents = ${JSON.stringify((detectedComponents || []).map(c => c.name))};
                 const errorMsg = foundComponents.length > 0 
                   ? 'Найдены компоненты: ' + foundComponents.join(', ') + '. Но не удалось их использовать для рендеринга.'
                   : 'Не найден компонент для рендеринга. Убедитесь, что файл содержит React компонент (функцию с заглавной буквы, возвращающую JSX).';

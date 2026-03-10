@@ -1,4 +1,4 @@
-import { Framework } from './Framework';
+import { Framework, type CommitPatchesResult } from './Framework';
 import { instrumentHtml } from '../blockEditor/HtmlInstrumenter';
 import { applyHtmlOp } from '../blockEditor/PatchEngine/applyHtmlInsertDelete';
 import { applyStylePatch } from '../blockEditor/PatchEngine';
@@ -10,22 +10,28 @@ import { toHtmlStyleAttr } from '../blockEditor/styleUtils';
  * Реализация Framework для HTML файлов
  */
 export class HtmlFramework extends Framework {
+  filePath: string;
+  constructor(filePath:string) {
+    super();
+    this.filePath = filePath;
+  }
+
   /**
    * Инструментирует HTML код, добавляя data-no-code-ui-id атрибуты
    */
-  instrument(code, filePath) {
+  instrument(code: string, filePath: string) {
     return instrumentHtml(code, filePath);
   }
 
   /**
    * Обрабатывает зависимости HTML файла (CSS, JS, изображения)
    */
-  async processDependencies(code, filePath) {
+  async processDependencies(code:string, filePath:string): Promise<{ processedCode: string, dependencyPaths: string[] }> {
     const dependencyPaths = [];
     let processedHTML = code;
 
     // Загружаем зависимый файл относительно основного файла
-    const loadDependency = async (basePath, importPath) => {
+    const loadDependency = async (basePath: string, importPath: string) => {
       try {
         let resolvedPath = await resolvePath(basePath, importPath);
         
@@ -59,8 +65,10 @@ export class HtmlFramework extends Framework {
         
         return { success: false, error: `Файл не найден: ${importPath}` };
       } catch (error) {
-        console.error('HtmlFramework: Error loading dependency:', error);
-        return { success: false, error: error.message };
+        if (error instanceof Error) {
+          console.error('HtmlFramework: Error loading dependency:', error);
+          return { success: false, error: error.message };
+        }
       }
     };
 
@@ -79,14 +87,16 @@ export class HtmlFramework extends Framework {
       }
       
       const depResult = await loadDependency(filePath, cssPath);
-      if (depResult.success) {
+      if (depResult?.success) {
         dependencyPaths.push(depResult.path);
         // Заменяем link на style с встроенным CSS
         const styleTag = `<style>\n/* ${cssPath} */\n${depResult.content}\n</style>`;
         processedHTML = processedHTML.replace(match[0], styleTag);
         console.log('HtmlFramework: Inlined CSS:', cssPath);
       } else {
-        console.warn('HtmlFramework: Failed to load CSS:', cssPath, depResult.error);
+        if (depResult?.error) {
+          console.warn('HtmlFramework: Failed to load CSS:', cssPath, depResult.error);
+        }
       }
     }
 
@@ -100,14 +110,16 @@ export class HtmlFramework extends Framework {
       }
       
       const depResult = await loadDependency(filePath, scriptPath);
-      if (depResult.success) {
+      if (depResult?.success) {
         dependencyPaths.push(depResult.path);
         // Заменяем script src на встроенный script
         const scriptTag = `<script>\n/* ${scriptPath} */\n${depResult.content}\n</script>`;
         processedHTML = processedHTML.replace(match[0], scriptTag);
         console.log('HtmlFramework: Inlined JS:', scriptPath);
       } else {
-        console.warn('HtmlFramework: Failed to load JS:', scriptPath, depResult.error);
+        if (depResult?.error) {
+          console.warn('HtmlFramework: Failed to load JS:', scriptPath, depResult.error);
+        }
       }
     }
 
@@ -140,13 +152,13 @@ export class HtmlFramework extends Framework {
       }
     }
 
-    return { processedCode: processedHTML, dependencyPaths };
+    return { processedCode: processedHTML, dependencyPaths: (dependencyPaths.filter(Boolean) as string[]) };
   }
 
   /**
    * Генерирует HTML для превью/редактора
    */
-  async generateHTML(code, filePath, options = {}) {
+  async generateHTML(code: string, filePath: string, options = {}) {
     // Обрабатываем зависимости
     const { processedCode, dependencyPaths } = await this.processDependencies(code, filePath);
     
@@ -167,7 +179,7 @@ export class HtmlFramework extends Framework {
   /**
    * Применяет патч стилей к HTML элементу
    */
-  applyStylePatch({ code, mapEntry, patch, externalStylesMap }) {
+  applyStylePatch({ code, mapEntry, patch, externalStylesMap } : { code: string, mapEntry: any, patch: any, externalStylesMap: any }) {
     return applyStylePatch({
       fileType: 'html',
       fileContent: code,
@@ -186,7 +198,7 @@ export class HtmlFramework extends Framework {
    * @param {string} params.mode - 'child' или 'sibling'
    * @param {string} params.snippet - HTML код для вставки
    */
-  applyInsert({ code, targetEntry, targetId, mode, snippet }) {
+  applyInsert({ code, targetEntry, targetId, mode, snippet } : { code: string, targetEntry: any, targetId: string, mode: string, snippet: string }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -206,7 +218,7 @@ export class HtmlFramework extends Framework {
    * @param {Object} params.entry - запись элемента (содержит selector)
    * @param {string} params.blockId - ID элемента (ключ в blockMap)
    */
-  applyDelete({ code, entry, blockId }) {
+  applyDelete({ code, entry, blockId } : { code: string, entry: any, blockId: string }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -226,7 +238,7 @@ export class HtmlFramework extends Framework {
    * @param {Object} params.targetEntry - запись целевого родителя
    * @param {string} params.targetId - ID целевого родителя
    */
-  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId }) {
+  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId } : { code: string, sourceEntry: any, sourceId: string, targetEntry: any, targetId: string }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -247,7 +259,7 @@ export class HtmlFramework extends Framework {
    * @param {string} params.blockId - ID элемента
    * @param {string} params.text - новый текст
    */
-  applySetText({ code, entry, blockId, text }) {
+  applySetText({ code, entry, blockId, text } : { code: string, entry: any, blockId: string, text: string }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -262,14 +274,14 @@ export class HtmlFramework extends Framework {
   /**
    * HTML не использует импорты стилей, возвращаем пустой объект
    */
-  parseStyleImports(code) {
+  parseStyleImports(code: string) {
     return {};
   }
 
   /**
    * Удаляет служебные атрибуты из HTML
    */
-  stripInstrumentationIds(code) {
+  stripInstrumentationIds(code: string) {
     return String(code ?? '')
       .replace(/\sdata-no-code-ui-id\s*=\s*"[^"]*"/g, '')
       .replace(/\sdata-no-code-ui-id\s*=\s*'[^']*'/g, '')
@@ -280,7 +292,7 @@ export class HtmlFramework extends Framework {
   /**
    * Получает blockMap для исходного и обработанного кода
    */
-  getBlockMaps(instrumentedCode, originalCode, filePath) {
+  getBlockMaps(instrumentedCode: string, originalCode: string, filePath: string) {
     const instOriginal = this.instrument(originalCode, filePath);
     const instProcessed = this.instrument(instrumentedCode, filePath);
     
@@ -293,7 +305,7 @@ export class HtmlFramework extends Framework {
   /**
    * Находит элемент по ID в HTML коде
    */
-  findElementById(code, id) {
+  findElementById(code: string, id: string) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(code, 'text/html');
     const element = doc.querySelector(`[data-no-code-ui-id="${id}"]`) || 
@@ -312,7 +324,7 @@ export class HtmlFramework extends Framework {
   /**
    * Коммитит накопленные патчи и операции в HTML файл
    */
-  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile }) {
+  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile } : { originalCode: string, stagedPatches: any, stagedOps: any, blockMapForFile: any, externalStylesMap: any, filePath: string, resolvePath: any, readFile: any, writeFile: any }): Promise<CommitPatchesResult> {
     const entries = Object.entries(stagedPatches || {}).filter(
       ([id, p]) => id && p && Object.keys(p).length > 0
     );

@@ -20,9 +20,24 @@ function WebView({
   outgoingMessage,
   allowExternalScripts = false, // Для React файлов нужна загрузка внешних скриптов
   ...props 
+}: {
+  source: { html?: string; uri?: string };
+  style?: any;
+  javaScriptEnabled?: boolean;
+  domStorageEnabled?: boolean;
+  startInLoadingState?: boolean;
+  renderLoading?: () => React.ReactNode;
+  onError?: (error: any) => void;
+  onHttpError?: (error: any) => void;
+  onLoad?: (event: any) => void;
+  onLoadEnd?: () => void;
+  onMessage?: (event: any) => void;
+  outgoingMessage?: string;
+  allowExternalScripts?: boolean;
+  [key: string]: any;
 }) {
-  const containerRef = useRef(null);
-  const iframeRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [loading, setLoading] = useState(startInLoadingState);
 
   useEffect(() => {
@@ -35,7 +50,7 @@ function WebView({
       return;
     }
 
-    const container = containerRef.current;
+    const container = containerRef.current as HTMLElement;
     console.log('WebView: useEffect triggered', { 
       hasHtml: !!source.html, 
       hasUri: !!source.uri,
@@ -44,7 +59,7 @@ function WebView({
     });
     
     // Очищаем контейнер
-    container.innerHTML = '';
+    (container as HTMLElement).innerHTML = '';
     setLoading(startInLoadingState);
 
     // Создаем iframe
@@ -87,6 +102,31 @@ function WebView({
       console.log('WebView: iframe readyState:', iframe.contentDocument?.readyState || 'N/A');
       setLoading(false);
       
+      if (iframe.contentWindow) {
+        console.log('WebView: iframe contentWindow доступен');
+        try {
+          if (iframe.contentDocument) {
+            const body = iframe.contentDocument.body;
+            if (body) {
+              console.log('WebView: iframe body найден, innerHTML length:', body.innerHTML?.length || 0);
+              console.log('WebView: iframe body has content:', body.innerHTML?.length > 0 ? 'YES' : 'NO');
+            } else {
+              console.warn('WebView: iframe body не найден');
+            }
+          } else {
+            console.log('WebView: contentDocument недоступен (нормально для sandboxed iframe)');
+          }
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          console.log(
+            'WebView: Не удалось проверить contentDocument (нормально для sandboxed iframe):',
+            message
+          );
+        }
+      } else {
+        console.warn('WebView: iframe contentWindow недоступен');
+      }
+      
       // Проверяем, действительно ли контент загружен
       setTimeout(() => {
         try {
@@ -110,7 +150,7 @@ function WebView({
       }
     };
 
-    const handleError = (error) => {
+    const handleError = (error: any) => {
       setLoading(false);
       console.error('WebView iframe error:', error);
       if (onError) {
@@ -123,7 +163,7 @@ function WebView({
     iframe.addEventListener('error', handleError, { once: true });
 
     // Сообщения из iframe -> родитель
-    const handleMessage = (event) => {
+    const handleMessage = (event: MessageEvent) => {
       try {
         // Фильтруем только сообщения от текущего iframe
         if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) {
@@ -174,35 +214,11 @@ function WebView({
             console.log('WebView: Использован data URI');
           }
           
-          // Проверяем через небольшой таймаут, загрузился ли iframe
-          setTimeout(() => {
-            if (iframe.contentWindow) {
-              console.log('WebView: iframe contentWindow доступен');
-              // Проверяем, есть ли контент в iframe
-              try {
-                if (iframe.contentDocument) {
-                  const body = iframe.contentDocument.body;
-                  if (body) {
-                    console.log('WebView: iframe body найден, innerHTML length:', body.innerHTML?.length || 0);
-                    console.log('WebView: iframe body has content:', body.innerHTML?.length > 0 ? 'YES' : 'NO');
-                  } else {
-                    console.warn('WebView: iframe body не найден');
-                  }
-                } else {
-                  console.log('WebView: contentDocument недоступен (нормально для sandboxed iframe)');
-                }
-              } catch (e) {
-                console.log('WebView: Не удалось проверить contentDocument (нормально для sandboxed iframe):', e.message);
-              }
-            } else {
-              console.warn('WebView: iframe contentWindow недоступен');
-            }
-          }, 500);
         } catch (error) {
           console.error('WebView: Ошибка при установке контента:', error);
           // Фоллбэк на srcDoc
           try {
-            iframe.srcDoc = source.html;
+            iframe.srcdoc = source.html;
             console.log('WebView: Использован srcDoc как fallback');
           } catch (srcDocError) {
             console.error('WebView: Ошибка при использовании srcDoc:', srcDocError);

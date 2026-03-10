@@ -3,7 +3,7 @@ import { readFile, readDirectory } from '../../../shared/api/electron-api';
 /**
  * Находит корень проекта (директорию с package.json)
  */
-export async function findProjectRoot(filePath) {
+export async function findProjectRoot(filePath: string) {
   if (!filePath) return null;
   
   // Нормализуем путь
@@ -31,6 +31,7 @@ export async function findProjectRoot(filePath) {
     try {
       const result = await readDirectory(testPath);
       if (result.success) {
+        if (!result.items) return null;
         const hasSrc = result.items.some(item => item.name === 'src' && item.isDirectory);
         const hasNodeModules = result.items.some(item => item.name === 'node_modules' && item.isDirectory);
         if (hasSrc || hasNodeModules) {
@@ -56,7 +57,7 @@ export async function findProjectRoot(filePath) {
 /**
  * Разрешает путь относительно базового пути, включая поддержку @ путей
  */
-export async function resolvePath(basePath, relativePath) {
+export async function resolvePath(basePath: string, relativePath: string) {
   // Если путь начинается с @, разрешаем его относительно корня проекта
   if (relativePath.startsWith('@/')) {
     const projectRoot = await findProjectRoot(basePath);
@@ -159,7 +160,7 @@ export async function resolvePath(basePath, relativePath) {
 /**
  * Синхронная версия resolvePath для относительных путей (без @)
  */
-export function resolvePathSync(basePath, relativePath) {
+export function resolvePathSync(basePath: string, relativePath: string) {
   // Если путь начинается с @, не можем разрешить синхронно - возвращаем как есть
   if (relativePath.startsWith('@/')) {
     return relativePath;

@@ -5,12 +5,13 @@ import { readDirectory, rename, deleteFile, deleteDirectory, writeFile, ensureDi
  * @param {string} dirPath - путь к директории
  * @returns {Promise<{success: boolean, items?: Array, error?: string}>}
  */
-export async function loadDirectory(dirPath) {
+export async function loadDirectory(dirPath: string) {
   try {
     const result = await readDirectory(dirPath);
     return result;
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -20,12 +21,13 @@ export async function loadDirectory(dirPath) {
  * @param {string} newPath - новый путь
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function renameItem(oldPath, newPath) {
+export async function renameItem(oldPath: string, newPath: string) {
   try {
     const result = await rename(oldPath, newPath);
     return result;
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -34,12 +36,13 @@ export async function renameItem(oldPath, newPath) {
  * @param {string} filePath - путь к файлу
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function deleteItem(filePath) {
+export async function deleteItem(filePath: string) {
   try {
     const result = await deleteFile(filePath);
     return result;
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -48,12 +51,13 @@ export async function deleteItem(filePath) {
  * @param {string} dirPath - путь к директории
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function deleteDir(dirPath) {
+export async function deleteDir(dirPath: string) {
   try {
     const result = await deleteDirectory(dirPath);
     return result;
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -63,12 +67,13 @@ export async function deleteDir(dirPath) {
  * @param {string} content - содержимое файла
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function createFile(filePath, content) {
+export async function createFile(filePath: string, content: string) {
   try {
     const result = await writeFile(filePath, content, { backup: false });
     return result;
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -77,12 +82,13 @@ export async function createFile(filePath, content) {
  * @param {string} folderPath - путь к папке
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function createFolder(folderPath) {
+export async function createFolder(folderPath: string) {
   try {
     const result = await ensureDir(folderPath);
     return result;
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -93,7 +99,7 @@ export async function createFolder(folderPath) {
  * @param {string} projectType - тип проекта ('react', 'react-native', 'html')
  * @returns {Promise<{success: boolean, projectPath?: string, error?: string}>}
  */
-export async function createProject(parentPath, projectName, projectType = 'react') {
+export async function createProject(parentPath: string, projectName: string, projectType: string = 'react') {
   try {
     // В File System API мы работаем с относительными путями от корневой директории
     const projectPath = projectName;
@@ -105,7 +111,7 @@ export async function createProject(parentPath, projectName, projectType = 'reac
     }
 
     // Определяем содержимое файлов в зависимости от типа проекта
-    let files = [];
+    let files: { name: string; content: string }[] = [];
     
     if (projectType === 'react') {
       // React проект
@@ -298,7 +304,8 @@ export default App;`
 
     return { success: true, projectPath };
   } catch (error) {
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 

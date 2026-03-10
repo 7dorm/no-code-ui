@@ -5,7 +5,7 @@ import { MRPAK_MSG, MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
  * @param {string} type - тип файла ('html', 'react', 'react-native')
  * @param {string} mode - режим работы ('preview' | 'edit')
  */
-export function generateBlockEditorScript(type, mode = 'preview') {
+export function generateBlockEditorScript(type: string, mode: string = 'preview') {
   const isEditMode = mode === 'edit';
   
   return `
@@ -859,7 +859,7 @@ export function generateBlockEditorScript(type, mode = 'preview') {
  * @param {string} type - тип файла ('html', 'react', 'react-native')
  * @param {string} mode - режим работы ('preview' | 'edit')
  */
-export function injectBlockEditorScript(html, type, mode = 'preview') {
+export function injectBlockEditorScript(html: string, type: string, mode: string = 'preview') {
   const source = String(html ?? '');
   const script = generateBlockEditorScript(type, mode);
 

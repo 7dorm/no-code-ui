@@ -1,4 +1,4 @@
-import { Framework } from './Framework';
+import { Framework, type CommitPatchesResult } from './Framework';
 import { instrumentJsx } from '../blockEditor/JsxInstrumenter';
 import { instrumentJsxWithAst } from '../blockEditor/AstJsxInstrumenter';
 import { isJavaScriptFile } from '../blockEditor/AstUtils';
@@ -27,8 +27,17 @@ import { toReactStyleObjectText } from '../blockEditor/styleUtils';
  * В будущем эту логику можно вынести в отдельные модули для лучшей организации
  */
 export class ReactFramework extends Framework {
-  constructor(filePath) {
-    super(filePath);
+  // Мемоизированные функции для разрешения путей
+  private resolvePathMemo: (base: string, rel: string) => Promise<string>;
+  private resolvePathSyncMemo: (base: string, rel: string) => string;
+  
+  // Кэш для загруженных зависимостей
+  private _dependencyCache: Map<string, any>;
+  
+  private filePath: string;
+  
+  constructor(filePath: string) {
+    super();  // No parameters
     this.filePath = filePath;
     // Кэш для загруженных зависимостей
     this._dependencyCache = new Map();
@@ -44,14 +53,16 @@ export class ReactFramework extends Framework {
    * @param {string} filePath - путь к файлу
    * @param {Object} opts - опции (projectRoot?: string)
    */
-  instrument(code, filePath, opts = {}) {
+  instrument(code: string, filePath: string, opts: any = {}) {
     // Используем AST парсинг для JavaScript/TypeScript файлов
     if (isJavaScriptFile(filePath)) {
       try {
         return instrumentJsxWithAst(code, filePath, { projectRoot: opts.projectRoot });
       } catch (error) {
         // Fallback на ручной парсинг при ошибках AST
-        console.warn('[ReactFramework] AST instrumentation failed, falling back to manual parser:', error.message);
+        if (error instanceof Error) {
+          console.warn('[ReactFramework] AST instrumentation failed, falling back to manual parser:', error.message);
+        }
         return instrumentJsx(code, filePath);
       }
     }
@@ -62,7 +73,7 @@ export class ReactFramework extends Framework {
   /**
    * Находит элемент по ID в JSX коде
    */
-  findElementById(code, id) {
+  findElementById(code: string, id: string) {
     const needleNew1 = `data-no-code-ui-id="${String(id)}"`;
     const needleNew2 = `data-no-code-ui-id='${String(id)}'`;
     const needleOld1 = `data-mrpak-id="${String(id)}"`;
@@ -90,7 +101,7 @@ export class ReactFramework extends Framework {
   /**
    * Загружает зависимый файл относительно основного файла
    */
-  async loadDependency(basePath, importPath) {
+  async loadDependency(basePath: string, importPath: string) {
     try {
       // Разрешаем путь к зависимому файлу (асинхронно для поддержки @ путей)
       let resolvedPath = await this.resolvePathMemo(basePath, importPath);
@@ -127,7 +138,9 @@ export class ReactFramework extends Framework {
       return { success: false, error: `Файл не найден: ${importPath}` };
     } catch (error) {
       console.error('ReactFramework: Error loading dependency:', error);
-      return { success: false, error: error.message };
+      
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
     }
   }
 
@@ -135,7 +148,7 @@ export class ReactFramework extends Framework {
    * Вспомогательная функция для поиска модуля по различным путям
    * Синхронная версия, использует уже разрешенные пути из pathMap
    */
-  findModulePath(importPath, basePath, pathMap, dependencyModules) {
+  findModulePath(importPath: string, basePath: string, pathMap: any, dependencyModules: any) {
     // Пробуем найти по оригинальному пути (включая @ пути, которые уже разрешены)
     if (pathMap[importPath]) {
       return pathMap[importPath];
@@ -160,7 +173,7 @@ export class ReactFramework extends Framework {
       }
       
       // Извлекаем имя файла из разрешенного пути для более гибкого поиска
-      const fileName = resolvedPath.split('/').pop().replace(/\.(js|jsx|ts|tsx)$/, '');
+      const fileName = resolvedPath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx)$/, '');
       const pathWithoutExt = resolvedPath.replace(/\.(js|jsx|ts|tsx)$/, '');
       const lastPart = resolvedPath.split('/').slice(-2).join('/'); // Последние 2 части пути
       
@@ -221,13 +234,13 @@ export class ReactFramework extends Framework {
     if (importPath.startsWith('@/')) {
       // Ищем все ключи, которые могут соответствовать этому @ пути
       for (const [key, value] of Object.entries(pathMap)) {
-        if (key.includes(importPath.substring(2)) || value.includes(importPath.substring(2))) {
+        if (key.includes(importPath.substring(2)) || String(value).includes(importPath.substring(2))) {
           return value;
         }
       }
       // Также ищем в dependencyModules
       for (const [key, value] of Object.entries(dependencyModules)) {
-        if (key.includes(importPath.substring(2)) || value.includes(importPath.substring(2))) {
+        if (key.includes(importPath.substring(2)) || String(value).includes(importPath.substring(2))) {
           return value;
         }
       }
@@ -246,7 +259,7 @@ export class ReactFramework extends Framework {
   /**
    * Рекурсивная функция для загрузки всех зависимостей
    */
-  async loadAllDependencies(importPath, basePath, loadedDeps = new Set(), dependencyMap = {}, dependencyPaths = [], pathMap = {}, actualPathMap = {}) {
+  async loadAllDependencies(importPath: string, basePath: string, loadedDeps: Set<string> = new Set(), dependencyMap: any = {}, dependencyPaths: string[] = [], pathMap: any = {}, actualPathMap: any = {}) {
     const baseFileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
     
     console.log(`[LoadAllDependencies] Starting to load dependency:`, {
@@ -275,7 +288,7 @@ export class ReactFramework extends Framework {
     loadedDeps.add(resolvedPath);
     
     // Загружаем зависимость по разрешенному пути
-    const depResult = await this.loadDependency(basePath, importPath);
+    const depResult: any = await this.loadDependency(basePath, importPath);
     if (!depResult.success) {
       console.warn(`[LoadAllDependencies] Failed to load dependency from ${baseFileName}:`, {
         importPath,
@@ -402,7 +415,7 @@ export class ReactFramework extends Framework {
    * Обрабатывает зависимости React файла
    * Перенесено из RenderFile.jsx: processReactCode
    */
-  async processDependencies(code, filePath) {
+  async processDependencies(code: string, filePath: string): Promise<{ processedCode: string; dependencyPaths: string[]; modulesCode?: string; defaultExportInfo?: any }> {
     // Вызываем processReactCode для обработки зависимостей
     return await this.processReactCode(code, filePath);
   }
@@ -411,7 +424,7 @@ export class ReactFramework extends Framework {
    * Обрабатывает код React файла с поддержкой зависимостей
    * Перенесено из RenderFile.jsx: processReactCode
    */
-  async processReactCode(code, basePath) {
+  async processReactCode(code: string, basePath: string) {
     // Извлекаем импорты
     const fileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
     const imports = extractImports(code, fileName);
@@ -422,12 +435,12 @@ export class ReactFramework extends Framework {
       imports: imports.map(i => ({ path: i.path, line: i.line }))
     });
     
-    const dependencies = {};
-    const dependencyModules = {};
-    const dependencyPaths = [];
-    const loadedDeps = new Set();
-    const pathMap = {};
-    const actualPathMap = {};
+    const dependencies:Record<string, string> = {};
+    const dependencyModules:Record<string, string> = {};
+    const dependencyPaths:string[] = [];
+    const loadedDeps:Set<string> = new Set();
+    const pathMap:Record<string, string> = {};
+    const actualPathMap:Record<string, string> = {};
     
     // Загружаем все зависимости рекурсивно
     for (const imp of imports) {
@@ -492,7 +505,7 @@ export class ReactFramework extends Framework {
     
     // Создаем код для модулей зависимостей
     let modulesCode = '';
-    let importReplacements = {};
+    let importReplacements: { [key: string]: string } = {};
     
     // Собираем уникальные абсолютные пути из pathMap
     const uniqueAbsolutePaths = new Set(Object.values(pathMap));
@@ -539,11 +552,11 @@ export class ReactFramework extends Framework {
     }
     
     // Топологическая сортировка модулей по зависимостям
-    const sortedModules = [];
-    const visited = new Set();
-    const visiting = new Set();
+    const sortedModules:string[] = [];
+    const visited:Set<string> = new Set();
+    const visiting:Set<string> = new Set();
     
-    const visit = (modulePath) => {
+    const visit = (modulePath:string) => {
       if (visiting.has(modulePath)) {
         return; // Циклическая зависимость - пропускаем
       }
@@ -600,10 +613,10 @@ export class ReactFramework extends Framework {
       const importPath = absolutePath;
       // Обрабатываем зависимость
       // Сначала извлекаем все экспорты
-      let moduleExports = {};
+      let moduleExports: Record<string, string> = {};
       let hasDefaultExport = false;
       let defaultExportName = null;
-      const namedExports = [];
+      const namedExports:string[] = [];
       
       // Получаем фактический путь файла для текущей зависимости (для разрешения относительных путей)
       // Используем actualPathMap для получения фактического пути файла
@@ -649,10 +662,10 @@ export class ReactFramework extends Framework {
       // Для локальных импортов заменяем их на код доступа к модулям
       
       // Собираем все импорты из react-native для замены
-      const rnImports = [];
+      const rnImports: Array<{orig: string, alias: string}> = [];
       processedDep = processedDep.replace(/import\s*\{([^}]*)\}\s*from\s+['"]react-native['"];?\s*/gi, (match, imports) => {
-        const names = imports.split(',').map(n => n.trim()).filter(n => n);
-        names.forEach(name => {
+        const names = imports.split(',').map((n:string) => n.trim()).filter((n:string) => n);
+        names.forEach((name:string) => {
           const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
           const orig = parts[0].trim();
           const alias = parts[1].trim();
@@ -734,8 +747,8 @@ export class ReactFramework extends Framework {
           
           if (importSpec.startsWith('{')) {
             // Named imports: import { a, b as c } from ...
-            const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
-            return names.map(name => {
+            const names = importSpec.replace(/[{}]/g, '').split(',').map((n:string) => n.trim()).filter((n:string) => n);
+            return names.map((name:string) => {
               const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
               let orig = parts[0].trim();
               let alias = parts[1].trim();
@@ -1067,7 +1080,7 @@ export class ReactFramework extends Framework {
             '${moduleAbsolutePath.split('/').slice(-2).join('/')}',
             '${moduleAbsolutePath.split('/').slice(-2).join('/').replace(/\.(js|jsx|ts|tsx)$/, '')}',
             '${moduleAbsolutePath.split('/').pop()}',
-            '${moduleAbsolutePath.split('/').pop().replace(/\.(js|jsx|ts|tsx)$/, '')}'
+            '${moduleAbsolutePath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx)$/, '')}'
           ];
           resolvedVariants.forEach(variant => {
             if (variant && variant.trim()) {
@@ -1392,7 +1405,7 @@ export class ReactFramework extends Framework {
     
     const preRegisterCode = Array.from(allModulePaths).filter(Boolean).map(path => {
       // Экранируем кавычки в пути
-      const escapedPath = path.replace(/'/g, "\\'");
+      const escapedPath = String(path).replace(/'/g, "\\'");
       return `window.__modules__['${escapedPath}'] = window.__modules__['${escapedPath}'] || null;`;
     }).join('\n        ');
     
@@ -1422,7 +1435,7 @@ export class ReactFramework extends Framework {
    * Генерирует HTML для превью/редактора
    * Перенесено из RenderFile.jsx: createReactHTML
    */
-  async generateHTML(code, filePath, options = {}) {
+  async generateHTML(code: string, filePath: string, options: { viewMode?: string, projectRoot?: string } = {}) {
     const viewMode = options.viewMode || 'preview';
     const projectRoot = options.projectRoot || null;
     
@@ -1811,7 +1824,9 @@ export class ReactFramework extends Framework {
   /**
    * Применяет патч стилей к JSX элементу
    */
-  applyStylePatch({ code, mapEntry, patch, externalStylesMap }) {
+  applyStylePatch({ code, mapEntry, patch, externalStylesMap }
+    : {code: string, mapEntry: any, patch: any, externalStylesMap: any}
+  ) {
     return applyStylePatch({
       fileType: 'react',
       fileContent: code,
@@ -1824,7 +1839,9 @@ export class ReactFramework extends Framework {
   /**
    * Вставляет новый элемент в JSX
    */
-  applyInsert({ code, targetEntry, targetId, mode, snippet }) {
+  applyInsert({ code, targetEntry, targetId, mode, snippet }
+    : {code: string, targetEntry: any, targetId: string, mode: string, snippet: string}
+  ) {
     return applyJsxInsert({
       code,
       entry: targetEntry,
@@ -1836,35 +1853,41 @@ export class ReactFramework extends Framework {
   /**
    * Удаляет элемент из JSX
    */
-  applyDelete({ code, entry, blockId }) {
+  applyDelete({ code, entry, blockId }
+    : {code: string, entry: any, blockId: string}
+  ) {
     return applyJsxDelete({ code, entry });
   }
 
   /**
    * Переносит элемент в другого родителя
    */
-  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId }) {
+  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId }
+    : {code: string, sourceEntry: any, sourceId: string, targetEntry: any, targetId: string}
+  ) {
     return applyJsxReparent({ code, sourceEntry, targetEntry });
   }
 
   /**
    * Изменяет текст элемента
    */
-  applySetText({ code, entry, blockId, text }) {
+  applySetText({ code, entry, blockId, text }
+    : {code: string, entry: any, blockId: string, text: string}
+  ) {
     return applyJsxSetText({ code, entry, text: String(text ?? '') });
   }
 
   /**
    * Парсит импорты стилей из кода
    */
-  parseStyleImports(code) {
+  parseStyleImports(code: string) {
     return parseStyleImports(code);
   }
 
   /**
    * Удаляет служебные атрибуты из JSX
    */
-  stripInstrumentationIds(code) {
+  stripInstrumentationIds(code: string) {
     return String(code ?? '')
       .replace(/\sdata-no-code-ui-id\s*=\s*"[^"]*"/g, '')
       .replace(/\sdata-no-code-ui-id\s*=\s*'[^']*'/g, '')
@@ -1875,7 +1898,7 @@ export class ReactFramework extends Framework {
   /**
    * Получает blockMap для исходного и обработанного кода
    */
-  getBlockMaps(instrumentedCode, originalCode, filePath) {
+  getBlockMaps(instrumentedCode: string, originalCode: string, filePath: string) {
     const instOriginal = this.instrument(originalCode, filePath);
     const instProcessed = this.instrument(instrumentedCode, filePath);
     
@@ -1889,7 +1912,9 @@ export class ReactFramework extends Framework {
    * Коммитит накопленные патчи и операции в React файл
    * Перенесено из RenderFile.jsx: commitStagedPatches для React/React Native
    */
-  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile }) {
+  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile }
+    : {originalCode: string, stagedPatches: Record<string, Record<string, any>>, stagedOps: any[], blockMapForFile: any, externalStylesMap: any, filePath: string, resolvePath: (path: string, base?: string) => string, readFile: (path: string) => { success: boolean, content: string }, writeFile: (path: string, content: string) => { success: boolean, error?: string }}
+  ): Promise<CommitPatchesResult> {
     const entries = Object.entries(stagedPatches || {}).filter(
       ([id, p]) => id && p && Object.keys(p).length > 0
     );
@@ -1902,7 +1927,7 @@ export class ReactFramework extends Framework {
     let newContent = String(originalCode ?? '');
     
     // Вспомогательные функции
-    const stripMrpakIds = (src) => {
+    const stripMrpakIds = (src: string) => {
       return String(src ?? '')
         .replace(/\sdata-no-code-ui-id\s*=\s*"[^"]*"/g, '')
         .replace(/\sdata-no-code-ui-id\s*=\s*'[^']*'/g, '')
@@ -1910,7 +1935,7 @@ export class ReactFramework extends Framework {
         .replace(/\sdata-mrpak-id\s*=\s*'[^']*'/g, '');
     };
 
-    const findOpeningTagEntryById = (src, id) => {
+    const findOpeningTagEntryById = (src: string, id: string) => {
       const code = String(src ?? '');
       const needleNew1 = `data-no-code-ui-id="${String(id)}"`;
       const needleNew2 = `data-no-code-ui-id='${String(id)}'`;
@@ -1971,17 +1996,40 @@ export class ReactFramework extends Framework {
     const useAstPatches = isJavaScriptFile(filePath);
     
     for (const { id, patch, entry } of sortedEntries) {
-      let res = null;
+      // Define a union type for the result
+      type StylePatchResult = 
+        | { ok: boolean; code?: string; error?: string }
+        | { 
+            ok: boolean; 
+            needsExternalPatch?: boolean; 
+            externalStylePath?: string; 
+            styleKey?: string; 
+            styleReference?: string; 
+            patch?: any;
+            code?: string;
+            html?: string;
+          };
+
+      // Then use this type for the res variable
+      let res: StylePatchResult = { ok: false };
       
       // Пробуем AST-based патч для JS/TS файлов
       if (useAstPatches) {
         try {
+          
+          type ApplyStylePatchResult = { 
+            ok: boolean; 
+            code?: string; 
+            error?: string;
+          };
+          
+          // Then use it in the code:
           res = applyStylePatchWithAst({
             code: newContent,
             target: { id },
             patch,
             filePath,
-          });
+          }) as ApplyStylePatchResult;
           
           // Если AST патч успешен, используем его
           if (res?.ok && res.code) {
@@ -2026,7 +2074,7 @@ export class ReactFramework extends Framework {
     // Обновляем workCode после применения всех стилей
     const instResultAfterStyles = this.instrument(newContent, filePath);
     workCode = instResultAfterStyles.code;
-    const instMapAfterStyles = instResultAfterStyles.map;
+    let instMapAfterStyles = instResultAfterStyles.map;
 
     // 3) Применяем ops (insert/delete/reparent/setText) по очереди
     const jsxOps = ops.filter(
@@ -2038,12 +2086,18 @@ export class ReactFramework extends Framework {
         // Пробуем AST-based удаление для JS/TS файлов
         let deleteRes = null;
         if (useAstPatches) {
-          try {
-            deleteRes = applyDeleteWithAst({
+          try {interface DeleteResult {
+              ok: boolean;
+              code?: string;
+              error?: string;
+            }
+            
+            // Then cast the result:
+            const deleteRes = applyDeleteWithAst({
               code: workCode,
               id: op.blockId,
               filePath,
-            });
+            }) as DeleteResult;
             
             if (deleteRes?.ok && deleteRes.code) {
               workCode = deleteRes.code;
@@ -2239,12 +2293,12 @@ export class ReactFramework extends Framework {
         code: styleFileResult.content,
         styleKey: extPatch.styleKey,
         patch: extPatch.patch,
-      });
+      }) as { ok: boolean; code?: string; newStyleName?: string; error?: string; };
       if (!externalPatchResult.ok) {
         throw new Error(externalPatchResult.error || `Не удалось применить патч к файлу стилей: ${resolvedPath}`);
       }
 
-      const writeResult = await writeFile(resolvedPath, externalPatchResult.code);
+      const writeResult = await writeFile(resolvedPath, externalPatchResult.code || '');
       if (!writeResult.success) {
         throw new Error(writeResult.error || `Не удалось записать файл стилей: ${resolvedPath}`);
       }
@@ -2254,6 +2308,13 @@ export class ReactFramework extends Framework {
         console.warn('ReactFramework.commitPatches: cannot replace style reference, block not found', { id: extPatch.blockId });
         continue;
       }
+      type ReplaceStyleReferenceInJsxFunction = (params: {
+        code: string;
+        target: { start: number; end: number; };
+        oldStyleRef: string;
+        newStyleRef: string;
+        isArray: boolean;
+      }) => { ok: boolean; code?: string; error?: string; };
 
       const oldStyleRef = `${extPatch.styleReference.stylesVar}.${extPatch.styleKey}`;
       const newStyleRef = `${extPatch.styleReference.stylesVar}.${externalPatchResult.newStyleName}`;
@@ -2279,7 +2340,7 @@ export class ReactFramework extends Framework {
   /**
    * Добавляет data-no-code-ui-id в JSX сниппет, если атрибут ещё не задан
    */
-  ensureSnippetHasMrpakId(snippet, mrpakId) {
+  ensureSnippetHasMrpakId(snippet: string, mrpakId: string) {
     const s = String(snippet || '').trim();
     if (!s) return s;
     if (/\bdata-no-code-ui-id\s*=/.test(s) || /\bdata-mrpak-id\s*=/.test(s)) return s;
@@ -2293,7 +2354,7 @@ export class ReactFramework extends Framework {
   /**
    * Строит JSX сниппет для вставки нового блока (React Web)
    */
-  buildInsertSnippet({ tag, text, stylePatch }) {
+  buildInsertSnippet({ tag, text, stylePatch } : { tag: string, text: string, stylePatch?: any }) {
     const styleObj = stylePatch ? toReactStyleObjectText(stylePatch) : '';
     const styleAttr = styleObj ? ` style={{${styleObj}}}` : '';
     const tagName = tag || 'div';
