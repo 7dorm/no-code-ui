@@ -9,7 +9,7 @@ let counter = 0;
  * @param {string} name - имя блока
  * @returns {string} уникальный ID
  */
-export function generateId(filePath, type, name = '') {
+export function generateId(filePath: any, type: any, name: any = '') {
   const cleanPath = String(filePath || '').replace(/[\/\\.]/g, '_');
   const cleanName = String(name || '').replace(/[^a-zA-Z0-9]/g, '_') || 'anon';
   return `${cleanPath}__${type}__${cleanName}_${counter++}`;
@@ -27,7 +27,7 @@ export function resetCounter() {
  * @param {string} filePath - путь к файлу
  * @returns {string} расширение файла (с точкой)
  */
-export function getFileExtension(filePath) {
+export function getFileExtension(filePath: any) {
   const match = String(filePath || '').match(/\.([^.]+)$/);
   return match ? match[1].toLowerCase() : '';
 }
@@ -37,7 +37,7 @@ export function getFileExtension(filePath) {
  * @param {string} filePath - путь к файлу
  * @returns {boolean}
  */
-export function isTypeScriptFile(filePath) {
+export function isTypeScriptFile(filePath: any) {
   const ext = getFileExtension(filePath);
   return ext === 'ts' || ext === 'tsx';
 }
@@ -47,8 +47,9 @@ export function isTypeScriptFile(filePath) {
  * @param {string} filePath - путь к файлу
  * @returns {boolean}
  */
-export function isJavaScriptFile(filePath) {
+export function isJavaScriptFile(filePath: any) {
   const ext = getFileExtension(filePath);
   return ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx';
 }
+
 

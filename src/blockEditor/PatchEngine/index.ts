@@ -3,7 +3,7 @@ import { applyHtmlStylePatch } from './applyHtmlStylePatch';
 import { parseStyleImports } from './parseStyleImports';
 import { applyExternalStylePatch } from './applyExternalStylePatch';
 
-export function applyStylePatch({ fileType, fileContent, mapEntry, patch, externalStylesMap }) {
+export function applyStylePatch({ fileType, fileContent, mapEntry, patch, externalStylesMap }: any) {
   if (!mapEntry) {
     return { ok: false, error: 'applyStylePatch: mapEntry is required' };
   }
@@ -33,5 +33,6 @@ export { applyJsxDelete, applyJsxInsert, applyJsxReparent, applyJsxSetText, find
 export { parseStyleImports, extractStyleReference } from './parseStyleImports';
 export { applyExternalStylePatch } from './applyExternalStylePatch';
 export { replaceStyleReferenceInJsx } from './applyJsxStylePatch';
+
 
 

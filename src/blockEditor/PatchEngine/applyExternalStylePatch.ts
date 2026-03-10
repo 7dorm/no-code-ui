@@ -3,10 +3,10 @@
  * вместо изменения существующего
  */
 
-function findMatching(src, from, openCh, closeCh) {
+function findMatching(src: any, from: any, openCh: any, closeCh: any) {
   let i = from;
   let depth = 0;
-  let inS = null; // ', ", `
+  let inS: any = null; // ', ", `
   while (i < src.length) {
     const ch = src[i];
     const next = src[i + 1];
@@ -39,16 +39,16 @@ function findMatching(src, from, openCh, closeCh) {
   return -1;
 }
 
-function parseSimpleObjectLiteral(text) {
+function parseSimpleObjectLiteral(text: any) {
   const src = String(text || '').trim();
-  const map = {};
+  const map: any = {};
   if (!src) return map;
 
   let i = 0;
   let key = '';
   let val = '';
   let mode = 'key';
-  let inS = null;
+  let inS: any = null;
   let depth = 0;
 
   const flush = () => {
@@ -105,7 +105,7 @@ function parseSimpleObjectLiteral(text) {
   return map;
 }
 
-function jsValueLiteral(v) {
+function jsValueLiteral(v: any) {
   if (typeof v === 'number' && Number.isFinite(v)) return String(v);
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   if (v == null) return 'null';
@@ -114,15 +114,15 @@ function jsValueLiteral(v) {
   return JSON.stringify(s);
 }
 
-function serializeObjectLiteral(map) {
-  const parts = Object.entries(map).map(([k, v]) => `${k}: ${v}`);
+function serializeObjectLiteral(map: any) {
+  const parts = Object.entries(map).map(([k, v]: any) => `${k}: ${v}`);
   return parts.join(', ');
 }
 
 /**
  * Находит StyleSheet.create в коде и возвращает диапазон объекта
  */
-function findStyleSheetCreateRange(code) {
+function findStyleSheetCreateRange(code: any) {
   const idx = code.indexOf('StyleSheet.create');
   if (idx < 0) return null;
   const openParen = code.indexOf('(', idx);
@@ -137,22 +137,22 @@ function findStyleSheetCreateRange(code) {
 /**
  * Находит существующий стиль в StyleSheet.create
  */
-function findStyleInSheet(code, styleKey) {
+function findStyleInSheet(code: any, styleKey: any) {
   const range = findStyleSheetCreateRange(code);
   if (!range) return null;
-  
+
   const objText = code.slice(range.objStart, range.objEnd);
   const keyRe = new RegExp(`\\b${styleKey}\\s*:\\s*\\{`, 'm');
   const m = objText.match(keyRe);
   if (!m || m.index == null) return null;
-  
+
   const braceStart = range.objStart + m.index + m[0].lastIndexOf('{');
   const braceEnd = findMatching(code, braceStart, '{', '}');
   if (braceEnd < 0) return null;
-  
+
   const inner = code.slice(braceStart + 1, braceEnd);
   const styleObj = parseSimpleObjectLiteral(inner);
-  
+
   return {
     range: { start: braceStart + 1, end: braceEnd },
     styleObj,
@@ -162,35 +162,35 @@ function findStyleInSheet(code, styleKey) {
 /**
  * Генерирует уникальное имя для нового стиля
  */
-function generateNewStyleName(baseName, existingNames) {
+function generateNewStyleName(baseName: any, existingNames: any) {
   const namesSet = new Set(existingNames);
   let counter = 1;
   let newName = `${baseName}Mrpak${counter}`;
-  
+
   while (namesSet.has(newName)) {
     counter++;
     newName = `${baseName}Mrpak${counter}`;
   }
-  
+
   return newName;
 }
 
 /**
  * Получает все имена стилей из StyleSheet.create
  */
-function getAllStyleNames(code) {
+function getAllStyleNames(code: any) {
   const range = findStyleSheetCreateRange(code);
   if (!range) return [];
-  
+
   const objText = code.slice(range.objStart + 1, range.objEnd - 1);
-  const names = [];
+  const names: any[] = [];
   const nameRegex = /([A-Za-z_$][A-Za-z0-9_$]*)\s*:\s*\{/g;
-  let match;
-  
+  let match: any;
+
   while ((match = nameRegex.exec(objText)) !== null) {
     names.push(match[1]);
   }
-  
+
   return names;
 }
 
@@ -203,48 +203,48 @@ function getAllStyleNames(code) {
  * @param {Object} params.patch - объект с изменениями стиля { left: 10, top: 20 }
  * @returns {Object} { ok: boolean, code?: string, newStyleName?: string, error?: string }
  */
-export function applyExternalStylePatch({ code, styleKey, patch }) {
+export function applyExternalStylePatch({ code, styleKey, patch }: any) {
   const source = String(code ?? '');
-  
+
   if (!styleKey || !patch || Object.keys(patch).length === 0) {
     return { ok: false, error: 'applyExternalStylePatch: styleKey and patch are required' };
   }
-  
+
   // Находим существующий стиль
   const existingStyle = findStyleInSheet(source, styleKey);
   if (!existingStyle) {
     return { ok: false, error: `Style '${styleKey}' not found in StyleSheet.create` };
   }
-  
+
   // Получаем все имена стилей для генерации уникального имени
   const allNames = getAllStyleNames(source);
   const newStyleName = generateNewStyleName(styleKey, allNames);
-  
+
   // Создаём новый стиль на основе существующего с применением патча
   const mergedStyle = { ...existingStyle.styleObj };
   for (const [k, v] of Object.entries(patch || {})) {
     mergedStyle[k] = jsValueLiteral(v);
   }
-  
+
   const newStyleText = serializeObjectLiteral(mergedStyle);
-  
+
   // Находим место для вставки нового стиля (после последнего стиля в StyleSheet.create)
   const range = findStyleSheetCreateRange(source);
   if (!range) {
     return { ok: false, error: 'StyleSheet.create not found' };
   }
-  
+
   // Находим конец объекта StyleSheet.create (перед закрывающей скобкой)
   const objEnd = range.objEnd - 1;
   const beforeClose = source.slice(0, objEnd);
-  
+
   // Определяем, нужна ли запятая перед новым стилем
   const needsComma = !beforeClose.trim().endsWith('{') && !beforeClose.trim().endsWith(',');
   const comma = needsComma ? ', ' : '';
-  
+
   // Вставляем новый стиль перед закрывающей скобкой
   const newCode = beforeClose + comma + `${newStyleName}: {${newStyleText}}` + source.slice(objEnd);
-  
+
   return {
     ok: true,
     code: newCode,
@@ -252,4 +252,5 @@ export function applyExternalStylePatch({ code, styleKey, patch }) {
     changed: true,
   };
 }
+
 

@@ -1,14 +1,14 @@
-function isTagChar(ch) {
+function isTagChar(ch: any) {
   return /[A-Za-z0-9_$.-]/.test(ch);
 }
 
 /**
  * Находит соответствующую закрывающую скобку, учитывая строки и комментарии
  */
-function findMatchingBrace(src, from, openCh, closeCh) {
+function findMatchingBrace(src: any, from: any, openCh: any, closeCh: any) {
   let i = from;
   let depth = 0;
-  let inS = null; // ', ", `
+  let inS: any = null; // ', ", `
   let inLineComment = false;
   let inBlockComment = false;
   
@@ -79,7 +79,7 @@ function findMatchingBrace(src, from, openCh, closeCh) {
  * @param {number} position - позиция в коде
  * @returns {Object|null} { type: 'function'|'arrow'|'class', name: string, bodyStart: number, bodyEnd: number } или null
  */
-function findContainingComponent(code, position) {
+function findContainingComponent(code: any, position: any) {
   const src = String(code || '');
   if (position < 0 || position > src.length) return null;
 
@@ -90,12 +90,12 @@ function findContainingComponent(code, position) {
   // 3. const ComponentName = function() { ... }
   // 4. class ComponentName { ... }
 
-  let bestMatch = null;
+  let bestMatch: any = null;
   let bestStart = -1;
 
   // 1. function ComponentName() { ... }
   const functionRegex = /function\s+([A-Z][A-Za-z0-9_$]*)\s*\([^)]*\)\s*\{/g;
-  let match;
+  let match: any;
   while ((match = functionRegex.exec(src)) !== null) {
     const funcStart = match.index;
     const bodyStart = src.indexOf('{', funcStart + match[0].length - 1);
@@ -182,10 +182,10 @@ function findContainingComponent(code, position) {
   return bestMatch;
 }
 
-function findNextLt(src, from) {
+function findNextLt(src: any, from: any) {
   // грубо пропускаем строки/комменты
   let i = from;
-  let inS = null;
+  let inS: any = null;
   let inLine = false;
   let inBlock = false;
   while (i < src.length) {
@@ -235,7 +235,7 @@ function findNextLt(src, from) {
   return -1;
 }
 
-function readTagName(src, ltIndex) {
+function readTagName(src: any, ltIndex: any) {
   let i = ltIndex + 1;
   while (i < src.length && /\s/.test(src[i])) i++;
   let closing = false;
@@ -252,12 +252,12 @@ function readTagName(src, ltIndex) {
   return { name, closing };
 }
 
-function isSelfClosing(openTagText) {
+function isSelfClosing(openTagText: any) {
   // предполагаем, что openTagText заканчивается на '>' или '/>'
   return /\/>\s*$/.test(openTagText);
 }
 
-function findMatchingCloseTag(src, openEnd, tagName) {
+function findMatchingCloseTag(src: any, openEnd: any, tagName: any) {
   // Ищем </tagName> с учётом вложенности одинаковых тегов
   let depth = 1;
   let i = openEnd;
@@ -288,7 +288,7 @@ function findMatchingCloseTag(src, openEnd, tagName) {
   return -1;
 }
 
-export function findJsxElementRange({ code, entry }) {
+export function findJsxElementRange({ code, entry }: any) {
   const src = String(code ?? '');
   const start = entry?.start;
   const end = entry?.end;
@@ -303,7 +303,7 @@ export function findJsxElementRange({ code, entry }) {
   return { start, end: closeEnd };
 }
 
-export function applyJsxDelete({ code, entry }) {
+export function applyJsxDelete({ code, entry }: any) {
   const src = String(code ?? '');
   const range = findJsxElementRange({ code: src, entry });
   if (!range) return { ok: false, error: 'applyJsxDelete: cannot find element range' };
@@ -314,7 +314,7 @@ export function applyJsxDelete({ code, entry }) {
 /**
  * Извлекает имя обработчика из сниппета (onClick или onPress)
  */
-function extractHandlerName(snippet) {
+function extractHandlerName(snippet: any) {
   const snip = String(snippet || '');
   // Ищем onClick={handlerName} или onPress={handlerName}
   const onClickMatch = snip.match(/\bonClick\s*=\s*\{([A-Za-z_$][A-Za-z0-9_$]*)\}/);
@@ -329,10 +329,10 @@ function extractHandlerName(snippet) {
 /**
  * Находит позицию return в теле компонента
  */
-function findReturnPosition(src, bodyStart, bodyEnd) {
+function findReturnPosition(src: any, bodyStart: any, bodyEnd: any) {
   // Ищем return в теле компонента (не в строках/комментариях)
   let i = bodyStart;
-  let inS = null;
+  let inS: any = null;
   let inLineComment = false;
   let inBlockComment = false;
   
@@ -397,7 +397,7 @@ function findReturnPosition(src, bodyStart, bodyEnd) {
   return -1;
 }
 
-export function applyJsxInsert({ code, entry, mode, snippet }) {
+export function applyJsxInsert({ code, entry, mode, snippet }: any) {
   const src = String(code ?? '');
   
   // Проверяем, есть ли обработчик событий в сниппете
@@ -424,8 +424,8 @@ export function applyJsxInsert({ code, entry, mode, snippet }) {
           // Ищем позицию return в теле компонента
           const returnPos = findReturnPosition(src, component.bodyStart, component.bodyEnd);
           
-          let insertPos;
-          let handlerCode;
+          let insertPos: any;
+          let handlerCode: any;
           
           if (returnPos >= 0) {
             // Вставляем перед return
@@ -446,7 +446,7 @@ export function applyJsxInsert({ code, entry, mode, snippet }) {
       }
     }
   }
-
+  
   // Пересчитываем позиции entry, если функция была вставлена перед ними
   let adjustedEntry = entry;
   if (handlerOffset > 0 && handlerInsertPos >= 0) {
@@ -494,7 +494,7 @@ export function applyJsxInsert({ code, entry, mode, snippet }) {
   return { ok: true, code: out, changed: true };
 }
 
-export function applyJsxReparent({ code, sourceEntry, targetEntry }) {
+export function applyJsxReparent({ code, sourceEntry, targetEntry }: any) {
   const src = String(code ?? '');
   const sourceRange = findJsxElementRange({ code: src, entry: sourceEntry });
   const targetRange = findJsxElementRange({ code: src, entry: targetEntry });
@@ -528,7 +528,7 @@ export function applyJsxReparent({ code, sourceEntry, targetEntry }) {
  * Изменяет текстовое содержимое JSX элемента
  * entry: { start, end } - позиция открывающего тега
  */
-export function applyJsxSetText({ code, entry, text }) {
+export function applyJsxSetText({ code, entry, text }: any) {
   const source = String(code ?? '');
   const start = entry?.start;
   const end = entry?.end;
@@ -552,7 +552,7 @@ export function applyJsxSetText({ code, entry, text }) {
   }
   const tagName = tagMatch[1];
 
-  // Ищем закрывающий тег (самозакрывающийся или парный)
+  // Ищем закрывающий тег </tagName>
   if (openTag.trim().endsWith('/>')) {
     // Самозакрывающийся тег - не можем изменить текст
     return { ok: false, error: 'applyJsxSetText: self-closing tag has no text content' };
@@ -591,5 +591,6 @@ export function applyJsxSetText({ code, entry, text }) {
 
   return { ok: false, error: 'applyJsxSetText: cannot find text content range' };
 }
+
 
 

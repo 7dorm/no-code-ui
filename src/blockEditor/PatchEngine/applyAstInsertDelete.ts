@@ -12,13 +12,13 @@ import * as t from '@babel/types';
  * @param {string} id - ID элемента
  * @returns {Object|null} { path, node, parentPath } или null
  */
-function findElementByIdInAst(ast, id) {
-  let found = null;
-  
+function findElementByIdInAst(ast: any, id: any) {
+  let found: any = null;
+
   traverse(ast, {
-    JSXOpeningElement(path) {
+    JSXOpeningElement(path: any) {
       const node = path.node;
-      
+
       // Ищем атрибут data-no-code-ui-id
       for (const attr of node.attributes) {
         if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
@@ -30,10 +30,10 @@ function findElementByIdInAst(ast, id) {
               while (parentPath && !t.isJSXElement(parentPath.node) && !t.isJSXFragment(parentPath.node)) {
                 parentPath = parentPath.parentPath;
               }
-              
-              found = { 
-                path, 
-                node, 
+
+              found = {
+                path,
+                node,
                 openingElement: node,
                 parentPath: parentPath || path.parentPath
               };
@@ -45,7 +45,7 @@ function findElementByIdInAst(ast, id) {
       }
     }
   });
-  
+
   return found;
 }
 
@@ -55,10 +55,10 @@ function findElementByIdInAst(ast, id) {
  * @param {string} filePath - путь к файлу (для парсинга)
  * @returns {t.JSXElement|null} AST элемент или null
  */
-function parseJsxSnippet(jsxCode, filePath) {
+function parseJsxSnippet(jsxCode: any, filePath: any) {
   const ext = filePath?.split('.').pop()?.toLowerCase();
-  let plugins = ['jsx'];
-  
+  let plugins: any[] = ['jsx'];
+
   if (ext === 'ts' || ext === 'tsx') {
     plugins.push('typescript', 'classProperties', 'decorators-legacy');
   }
@@ -74,9 +74,9 @@ function parseJsxSnippet(jsxCode, filePath) {
     });
 
     // Извлекаем JSX из return statement
-    let jsxNode = null;
+    let jsxNode: any = null;
     traverse(ast, {
-      ReturnStatement(path) {
+      ReturnStatement(path: any) {
         const arg = path.node.argument;
         if (t.isJSXElement(arg) || t.isJSXFragment(arg)) {
           jsxNode = arg;
@@ -89,7 +89,7 @@ function parseJsxSnippet(jsxCode, filePath) {
     });
 
     return jsxNode;
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[applyAstInsertDelete] Failed to parse JSX snippet:', error);
     return null;
   }
@@ -103,15 +103,15 @@ function parseJsxSnippet(jsxCode, filePath) {
  * @param {string} params.filePath - путь к файлу
  * @returns {Object} { ok: boolean, code?: string, error?: string }
  */
-export function applyDeleteWithAst({ code, id, filePath }) {
+export function applyDeleteWithAst({ code, id, filePath }: any) {
   const source = String(code ?? '');
   if (!source.trim()) {
     return { ok: false, error: 'Empty code' };
   }
 
   const ext = filePath?.split('.').pop()?.toLowerCase();
-  let plugins = ['jsx'];
-  
+  let plugins: any[] = ['jsx'];
+
   if (ext === 'ts' || ext === 'tsx') {
     plugins.push(
       'typescript',
@@ -122,7 +122,7 @@ export function applyDeleteWithAst({ code, id, filePath }) {
     );
   }
 
-  let ast;
+  let ast: any;
   try {
     ast = parse(source, {
       sourceType: 'module',
@@ -131,7 +131,7 @@ export function applyDeleteWithAst({ code, id, filePath }) {
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Parse error: ${error.message}` };
   }
 
@@ -164,12 +164,12 @@ export function applyDeleteWithAst({ code, id, filePath }) {
   // Удаляем элемент из родителя
   try {
     jsxElementPath.remove();
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Failed to remove element: ${error.message}` };
   }
 
   // Генерируем код
-  let generatedCode;
+  let generatedCode: any;
   try {
     const result = generate(ast, {
       retainLines: true,
@@ -178,7 +178,7 @@ export function applyDeleteWithAst({ code, id, filePath }) {
       comments: true,
     }, source);
     generatedCode = result.code;
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Generation error: ${error.message}` };
   }
 
@@ -195,15 +195,15 @@ export function applyDeleteWithAst({ code, id, filePath }) {
  * @param {string} params.filePath - путь к файлу
  * @returns {Object} { ok: boolean, code?: string, error?: string }
  */
-export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }) {
+export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }: any) {
   const source = String(code ?? '');
   if (!source.trim()) {
     return { ok: false, error: 'Empty code' };
   }
 
   const ext = filePath?.split('.').pop()?.toLowerCase();
-  let plugins = ['jsx'];
-  
+  let plugins: any[] = ['jsx'];
+
   if (ext === 'ts' || ext === 'tsx') {
     plugins.push(
       'typescript',
@@ -214,7 +214,7 @@ export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }) 
     );
   }
 
-  let ast;
+  let ast: any;
   try {
     ast = parse(source, {
       sourceType: 'module',
@@ -223,7 +223,7 @@ export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }) 
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Parse error: ${error.message}` };
   }
 
@@ -269,12 +269,12 @@ export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }) 
         }
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Failed to insert element: ${error.message}` };
   }
 
   // Генерируем код
-  let generatedCode;
+  let generatedCode: any;
   try {
     const result = generate(ast, {
       retainLines: true,
@@ -283,10 +283,11 @@ export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }) 
       comments: true,
     }, source);
     generatedCode = result.code;
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Generation error: ${error.message}` };
   }
 
   return { ok: true, code: generatedCode, changed: true };
 }
+
 

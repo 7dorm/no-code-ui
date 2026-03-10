@@ -12,11 +12,11 @@ import * as t from '@babel/types';
  * @param {string} id - ID элемента
  * @returns {Object|null} { path, node } или null
  */
-function findElementByIdInAst(ast, id) {
-  let found = null;
+function findElementByIdInAst(ast: any, id: any) {
+  let found: any = null;
   
   traverse(ast, {
-    JSXOpeningElement(path) {
+    JSXOpeningElement(path: any) {
       const node = path.node;
       
       // Ищем атрибут data-no-code-ui-id
@@ -43,8 +43,8 @@ function findElementByIdInAst(ast, id) {
  * @param {t.JSXOpeningElement} node - узел открывающего тега
  * @returns {Object} объект со стилями
  */
-function extractStyleFromNode(node) {
-  const styles = {};
+function extractStyleFromNode(node: any) {
+  const styles: any = {};
   
   for (const attr of node.attributes) {
     if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'style') {
@@ -60,7 +60,7 @@ function extractStyleFromNode(node) {
               const key = prop.key;
               const val = prop.value;
               
-              let keyName = null;
+              let keyName: any = null;
               if (t.isIdentifier(key)) {
                 keyName = key.name;
               } else if (t.isStringLiteral(key)) {
@@ -94,10 +94,10 @@ function extractStyleFromNode(node) {
  * @param {t.JSXOpeningElement} node - узел открывающего тега
  * @param {Object} patch - объект с новыми стилями { property: value }
  */
-function updateStyleAttribute(node, patch) {
+function updateStyleAttribute(node: any, patch: any) {
   // Ищем существующий style атрибут
   let styleAttrIndex = -1;
-  let styleAttr = null;
+  let styleAttr: any = null;
   
   for (let i = 0; i < node.attributes.length; i++) {
     const attr = node.attributes[i];
@@ -122,8 +122,8 @@ function updateStyleAttribute(node, patch) {
   }
   
   // Создаем свойства объекта стилей
-  const properties = Object.entries(updatedStyles).map(([key, value]) => {
-    let valueNode;
+  const properties = Object.entries(updatedStyles).map(([key, value]: any) => {
+    let valueNode: any;
     
     if (typeof value === 'string') {
       valueNode = t.stringLiteral(value);
@@ -172,14 +172,14 @@ function updateStyleAttribute(node, patch) {
  * @param {string} params.filePath - путь к файлу (для парсинга)
  * @returns {Object} { ok: boolean, code?: string, error?: string }
  */
-export function applyStylePatchWithAst({ code, target, patch, filePath }) {
+export function applyStylePatchWithAst({ code, target, patch, filePath }: any) {
   const source = String(code ?? '');
   if (!source.trim()) {
     return { ok: false, error: 'Empty code' };
   }
 
   const ext = filePath?.split('.').pop()?.toLowerCase();
-  let plugins = ['jsx'];
+  let plugins: any[] = ['jsx'];
   
   if (ext === 'ts' || ext === 'tsx') {
     plugins.push(
@@ -191,7 +191,7 @@ export function applyStylePatchWithAst({ code, target, patch, filePath }) {
     );
   }
 
-  let ast;
+  let ast: any;
   try {
     ast = parse(source, {
       sourceType: 'module',
@@ -200,12 +200,12 @@ export function applyStylePatchWithAst({ code, target, patch, filePath }) {
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Parse error: ${error.message}` };
   }
 
   // Находим элемент по ID или по позиции
-  let element = null;
+  let element: any = null;
   
   if (target.id) {
     // Ищем по ID через AST
@@ -216,7 +216,7 @@ export function applyStylePatchWithAst({ code, target, patch, filePath }) {
   } else if (target.start != null && target.end != null) {
     // Ищем по позиции (менее надежно, но для обратной совместимости)
     traverse(ast, {
-      JSXOpeningElement(path) {
+      JSXOpeningElement(path: any) {
         const node = path.node;
         if (node.start === target.start && node.end === target.end) {
           element = { path, node, openingElement: node };
@@ -233,12 +233,12 @@ export function applyStylePatchWithAst({ code, target, patch, filePath }) {
   // Применяем патч стилей
   try {
     updateStyleAttribute(element.node, patch);
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Failed to update style: ${error.message}` };
   }
 
   // Генерируем код с сохранением форматирования
-  let generatedCode;
+  let generatedCode: any;
   try {
     const result = generate(ast, {
       retainLines: true,
@@ -247,10 +247,11 @@ export function applyStylePatchWithAst({ code, target, patch, filePath }) {
       comments: true,
     }, source);
     generatedCode = result.code;
-  } catch (error) {
+  } catch (error: any) {
     return { ok: false, error: `Generation error: ${error.message}` };
   }
 
   return { ok: true, code: generatedCode, changed: true };
 }
+
 

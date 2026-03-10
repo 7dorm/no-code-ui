@@ -9,49 +9,49 @@
  * @returns {Object} маппинг переменных стилей на пути к файлам
  *   { commonStyles: { path: '../styles/commonStyles', type: 'named'|'default'|'namespace' } }
  */
-export function parseStyleImports(code) {
+export function parseStyleImports(code: any) {
   const source = String(code ?? '');
-  const imports = {};
-  
+  const imports: any = {};
+
   // Регулярное выражение для поиска импортов
   // Поддерживает различные форматы:
   // import { a, b } from 'path'
   // import a from 'path'
   // import * as a from 'path'
   const importRegex = /import\s+(?:(?:\{([^}]+)\}|([A-Za-z_$][A-Za-z0-9_$]*)|(?:\*\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)))\s+from\s+)?['"]([^'"]+)['"];?/g;
-  
-  let match;
+
+  let match: any;
   while ((match = importRegex.exec(source)) !== null) {
     const namedImports = match[1]; // { a, b }
     const defaultImport = match[2]; // default import
     const namespaceImport = match[3]; // * as name
     const importPath = match[4]; // путь к файлу
-    
+
     // Пропускаем внешние библиотеки (react, react-native и т.д.)
-    if (importPath.startsWith('react') || 
-        importPath.startsWith('react-native') ||
-        importPath.startsWith('http://') ||
-        importPath.startsWith('https://')) {
+    if (importPath.startsWith('react') ||
+      importPath.startsWith('react-native') ||
+      importPath.startsWith('http://') ||
+      importPath.startsWith('https://')) {
       continue;
     }
-    
+
     // Проверяем, что это файл стилей (содержит 'style' в пути или расширение .js/.jsx)
-    const isStyleFile = /style/i.test(importPath) || 
-                       /\.(js|jsx|ts|tsx)$/.test(importPath);
-    
+    const isStyleFile = /style/i.test(importPath) ||
+      /\.(js|jsx|ts|tsx)$/.test(importPath);
+
     if (!isStyleFile) {
       // Пропускаем явно не стилевые файлы, но оставляем возможность для других
       // Можно добавить более строгую проверку, если нужно
       continue;
     }
-    
+
     // Обрабатываем именованные импорты: import { commonStyles, colors } from '...'
     if (namedImports) {
       const names = namedImports
         .split(',')
-        .map(n => n.trim())
-        .filter(n => n.length > 0);
-      
+        .map((n: any) => n.trim())
+        .filter((n: any) => n.length > 0);
+
       for (const name of names) {
         // Убираем 'as alias' если есть
         const actualName = name.split(/\s+as\s+/)[0].trim();
@@ -61,7 +61,7 @@ export function parseStyleImports(code) {
         };
       }
     }
-    
+
     // Обрабатываем default импорт: import commonStyles from '...'
     if (defaultImport) {
       imports[defaultImport] = {
@@ -69,7 +69,7 @@ export function parseStyleImports(code) {
         type: 'default',
       };
     }
-    
+
     // Обрабатываем namespace импорт: import * as styles from '...'
     if (namespaceImport) {
       imports[namespaceImport] = {
@@ -78,7 +78,7 @@ export function parseStyleImports(code) {
       };
     }
   }
-  
+
   return imports;
 }
 
@@ -87,10 +87,10 @@ export function parseStyleImports(code) {
  * @param {string} openTagText - текст открывающего тега
  * @returns {Object|null} { stylesVar: 'commonStyles', styleKey: 'spacing' } или null
  */
-export function extractStyleReference(openTagText) {
+export function extractStyleReference(openTagText: any) {
   // Ищем style={stylesVar.styleKey} или style={[stylesVar.styleKey, ...]}
   // Поддерживаем простые ссылки и массивы
-  
+
   // Простая ссылка: style={commonStyles.spacing}
   const simpleRef = openTagText.match(/\bstyle\s*=\s*\{\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\}/);
   if (simpleRef) {
@@ -100,7 +100,7 @@ export function extractStyleReference(openTagText) {
       isArray: false,
     };
   }
-  
+
   // Массив: style={[commonStyles.spacing, ...]}
   // Находим начало массива
   const arrayMatch = openTagText.match(/\bstyle\s*=\s*\{\s*\[/);
@@ -117,7 +117,8 @@ export function extractStyleReference(openTagText) {
       };
     }
   }
-  
+
   return null;
 }
+
 

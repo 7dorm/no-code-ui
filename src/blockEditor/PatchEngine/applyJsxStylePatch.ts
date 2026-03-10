@@ -1,19 +1,19 @@
 import { extractStyleReference } from './parseStyleImports';
 
-function isIdentChar(ch) {
+function isIdentChar(ch: any) {
   return /[A-Za-z0-9_$]/.test(ch);
 }
 
-function findMatching(src, from, openCh, closeCh) {
+function findMatching(src: any, from: any, openCh: any, closeCh: any) {
   let i = from;
   let depth = 0;
-  let inS = null; // ', ", `
+  let inS: any = null; // ', ", `
   while (i < src.length) {
     const ch = src[i];
     const next = src[i + 1];
 
     if (inS) {
-      if (ch === '\\\\') {
+      if (ch === '\\') {
         i += 2;
         continue;
       }
@@ -48,17 +48,17 @@ function findMatching(src, from, openCh, closeCh) {
   return -1;
 }
 
-function parseSimpleObjectLiteral(text) {
+function parseSimpleObjectLiteral(text: any) {
   // очень простой парсер плоского объекта: key: value, ...
   const src = String(text || '').trim();
-  const map = {};
+  const map: any = {};
   if (!src) return map;
 
   let i = 0;
   let key = '';
   let val = '';
   let mode = 'key'; // key|val
-  let inS = null;
+  let inS: any = null;
   let depth = 0; // для скобок/функций — не поддерживаем, но поможет не ломаться
 
   const flush = () => {
@@ -75,7 +75,7 @@ function parseSimpleObjectLiteral(text) {
     const next = src[i + 1];
 
     if (inS) {
-      if (ch === '\\\\') {
+      if (ch === '\\') {
         (mode === 'key' ? (key += ch + (next || '')) : (val += ch + (next || '')));
         i += 2;
         continue;
@@ -115,12 +115,12 @@ function parseSimpleObjectLiteral(text) {
   return map;
 }
 
-function serializeObjectLiteral(map) {
-  const parts = Object.entries(map).map(([k, v]) => `${k}: ${v}`);
+function serializeObjectLiteral(map: any) {
+  const parts = Object.entries(map).map(([k, v]: any) => `${k}: ${v}`);
   return parts.join(', ');
 }
 
-function jsValueLiteral(v) {
+function jsValueLiteral(v: any) {
   if (typeof v === 'number' && Number.isFinite(v)) return String(v);
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   if (v == null) return 'null';
@@ -130,7 +130,7 @@ function jsValueLiteral(v) {
   return JSON.stringify(s);
 }
 
-function upsertIntoObjectText(objectInner, patch) {
+function upsertIntoObjectText(objectInner: any, patch: any) {
   const obj = parseSimpleObjectLiteral(objectInner);
   for (const [k, v] of Object.entries(patch || {})) {
     obj[k] = jsValueLiteral(v);
@@ -138,7 +138,7 @@ function upsertIntoObjectText(objectInner, patch) {
   return serializeObjectLiteral(obj);
 }
 
-function findStyleAttrRangeInOpeningTag(openTagText) {
+function findStyleAttrRangeInOpeningTag(openTagText: any) {
   // ищем style={{ ... }} или style={styles.foo}
   const idx = openTagText.search(/\bstyle\s*=/);
   if (idx < 0) return null;
@@ -158,7 +158,7 @@ function findStyleAttrRangeInOpeningTag(openTagText) {
   return null;
 }
 
-function patchOpeningTagStyle(openTagText, patch) {
+function patchOpeningTagStyle(openTagText: any, patch: any) {
   // 1) style={{...}}
   // Важно: сохраняем все другие атрибуты (onClick, onPress и т.д.) при изменении style
   const range = findStyleAttrRangeInOpeningTag(openTagText);
@@ -187,7 +187,7 @@ function patchOpeningTagStyle(openTagText, patch) {
   return { ok: true, text: `${beforeClose} style={{${objInner}}}${close}` };
 }
 
-function findStyleSheetCreateRange(code) {
+function findStyleSheetCreateRange(code: any) {
   // ищем "StyleSheet.create(" и возвращаем диапазон объекта внутри скобок
   const idx = code.indexOf('StyleSheet.create');
   if (idx < 0) return null;
@@ -200,7 +200,7 @@ function findStyleSheetCreateRange(code) {
   return { objStart: openBrace, objEnd: closeBrace + 1 };
 }
 
-function patchStyleSheetCreate(code, styleKey, patch) {
+function patchStyleSheetCreate(code: any, styleKey: any, patch: any) {
   const range = findStyleSheetCreateRange(code);
   if (!range) return { ok: false, error: 'StyleSheet.create(...) not found' };
   const objText = code.slice(range.objStart, range.objEnd); // { ... }
@@ -226,9 +226,9 @@ function patchStyleSheetCreate(code, styleKey, patch) {
  * @param {boolean} isArray - является ли стиль частью массива
  * @returns {Object} { ok: boolean, text?: string, error?: string }
  */
-function replaceStyleReference(openTagText, oldStyleRef, newStyleRef, isArray) {
+function replaceStyleReference(openTagText: any, oldStyleRef: any, newStyleRef: any, isArray: any) {
   const oldPattern = oldStyleRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+
   if (isArray) {
     // Для массива: style={[commonStyles.spacing, ...]} -> style={[commonStyles.spacingMrpak1, ...]}
     const arrayPattern = new RegExp(`(\\[\\s*)${oldPattern}(\\s*[,}])`, 'g');
@@ -244,7 +244,7 @@ function replaceStyleReference(openTagText, oldStyleRef, newStyleRef, isArray) {
       return { ok: true, text: newText };
     }
   }
-  
+
   return { ok: false, error: 'Style reference not found in tag' };
 }
 
@@ -253,7 +253,7 @@ function replaceStyleReference(openTagText, oldStyleRef, newStyleRef, isArray) {
  * target: { start: number, end: number }
  * externalStylesMap: { [varName]: { path: string, type: string } } - маппинг внешних стилей
  */
-export function applyJsxStylePatch({ code, target, patch, externalStylesMap }) {
+export function applyJsxStylePatch({ code, target, patch, externalStylesMap }: any) {
   const source = String(code ?? '');
   const start = target?.start;
   const end = target?.end;
@@ -273,11 +273,11 @@ export function applyJsxStylePatch({ code, target, patch, externalStylesMap }) {
   // Проверяем, используется ли внешний стиль
   const styleRef = extractStyleReference(openTag);
   const hasInline = /\bstyle\s*=\s*\{\s*\{/.test(openTag);
-  
+
   if (styleRef && !hasInline && externalStylesMap) {
     const { stylesVar, styleKey } = styleRef;
     const externalStyle = externalStylesMap[stylesVar];
-    
+
     // Если это внешний стиль, возвращаем информацию для патчинга внешнего файла
     if (externalStyle) {
       return {
@@ -323,11 +323,11 @@ export function applyJsxStylePatch({ code, target, patch, externalStylesMap }) {
  * @param {boolean} isArray - является ли стиль частью массива
  * @returns {Object} { ok: boolean, code?: string, error?: string }
  */
-export function replaceStyleReferenceInJsx({ code, target, oldStyleRef, newStyleRef, isArray }) {
+export function replaceStyleReferenceInJsx({ code, target, oldStyleRef, newStyleRef, isArray }: any) {
   const source = String(code ?? '');
   const start = target?.start;
   const end = target?.end;
-  
+
   if (typeof start !== 'number' || typeof end !== 'number') {
     return { ok: false, error: 'replaceStyleReferenceInJsx: invalid target {start,end}' };
   }
@@ -349,5 +349,6 @@ export function replaceStyleReferenceInJsx({ code, target, oldStyleRef, newStyle
   const newCode = source.slice(0, start) + replaced.text + source.slice(end);
   return { ok: true, code: newCode, changed: true };
 }
+
 
 

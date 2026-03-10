@@ -7,7 +7,7 @@ import generate from '@babel/generator';
 import * as t from '@babel/types';
 import { saveAstTree } from './AstTreeStore';
 
-function safeBasename(path) {
+function safeBasename(path: any) {
   try {
     const norm = String(path || '').replace(/\\/g, '/');
     return norm.split('/').pop() || 'unknown';
@@ -25,7 +25,7 @@ function safeBasename(path) {
  * @param {string} params.tagName - имя тега
  * @returns {string} ID
  */
-function makeMrpakId({ filePath, start, end, tagName }) {
+function makeMrpakId({ filePath, start, end, tagName }: any) {
   const base = safeBasename(filePath);
   return `mrpak:${base}:${start}:${end}:${tagName || 'node'}`;
 }
@@ -35,7 +35,7 @@ function makeMrpakId({ filePath, start, end, tagName }) {
  * @param {t.JSXIdentifier|t.JSXMemberExpression|t.JSXNamespacedName} name - имя JSX элемента
  * @returns {string} имя тега
  */
-function getTagName(name) {
+function getTagName(name: any) {
   if (t.isJSXIdentifier(name)) {
     return name.name;
   }
@@ -61,7 +61,7 @@ function getTagName(name) {
  * @param {t.JSXOpeningElement} node - узел открывающего тега
  * @returns {string|null} существующий ID или null
  */
-function findExistingId(node) {
+function findExistingId(node: any) {
   for (const attr of node.attributes) {
     if (t.isJSXAttribute(attr)) {
       const name = attr.name;
@@ -85,15 +85,15 @@ function findExistingId(node) {
  * @param {Object} opts - опции
  * @returns {{code: string, map: Object}} инструментированный код и карта элементов
  */
-export function instrumentJsxWithAst(code, filePath, opts = {}) {
+export function instrumentJsxWithAst(code: any, filePath: any, opts: any = {}) {
   const source = String(code ?? '');
   if (!source.trim()) {
     return { code: source, map: {} };
   }
 
   const ext = filePath.split('.').pop()?.toLowerCase();
-  let plugins = ['jsx'];
-  
+  let plugins: any[] = ['jsx'];
+
   if (ext === 'ts' || ext === 'tsx') {
     plugins.push(
       'typescript',
@@ -104,7 +104,7 @@ export function instrumentJsxWithAst(code, filePath, opts = {}) {
     );
   }
 
-  let ast;
+  let ast: any;
   try {
     // Парсим через Babel (как в OCHIR-BACKEND)
     ast = parse(source, {
@@ -114,26 +114,26 @@ export function instrumentJsxWithAst(code, filePath, opts = {}) {
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstJsxInstrumenter] Parse error, falling back to manual parser:', error);
     // Fallback на ручной парсинг при ошибках
     throw new Error('AST_PARSING_FAILED');
   }
 
-  const map = {};
+  const map: any = {};
   const usedIds = new Set();
 
   // Обходим AST и находим JSX элементы
   try {
     traverse(ast, {
-      JSXOpeningElement(path) {
+      JSXOpeningElement(path: any) {
         const node = path.node;
         const tagName = getTagName(node.name);
-        
+
         // Получаем позиции из исходного кода
         const start = node.start;
         const end = node.end;
-        
+
         if (start == null || end == null) {
           return;
         }
@@ -149,7 +149,7 @@ export function instrumentJsxWithAst(code, filePath, opts = {}) {
               }
             }
           }
-          
+
           if (!usedIds.has(existingId)) {
             usedIds.add(existingId);
             map[existingId] = {
@@ -190,13 +190,13 @@ export function instrumentJsxWithAst(code, filePath, opts = {}) {
         };
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstJsxInstrumenter] Traverse error:', error);
     throw new Error('AST_TRAVERSAL_FAILED');
   }
 
   // Генерируем код с сохранением форматирования
-  let generatedCode;
+  let generatedCode: any;
   try {
     const result = generate(ast, {
       retainLines: true,
@@ -205,7 +205,7 @@ export function instrumentJsxWithAst(code, filePath, opts = {}) {
       comments: true,
     }, source);
     generatedCode = result.code;
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[AstJsxInstrumenter] Generation error:', error);
     throw new Error('AST_GENERATION_FAILED');
   }
@@ -218,7 +218,7 @@ export function instrumentJsxWithAst(code, filePath, opts = {}) {
       targetFilePath: filePath,
       ast: ast,
       map: map,
-    }).catch(error => {
+    }).catch((error: any) => {
       // Не прерываем выполнение при ошибке сохранения AST
       console.warn('[AstJsxInstrumenter] Failed to save AST tree:', error);
     });
@@ -226,4 +226,5 @@ export function instrumentJsxWithAst(code, filePath, opts = {}) {
 
   return { code: generatedCode, map, ast: opts.includeAst ? ast : undefined };
 }
+
 

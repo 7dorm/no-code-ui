@@ -4,7 +4,7 @@
  * - insert: { type:'insert', targetSelector, targetId?, mode:'child'|'sibling', html }
  * - reparent: { type:'reparent', sourceSelector, sourceId?, targetSelector, targetId? }
  */
-function escapeCssSelector(str) {
+function escapeCssSelector(str: any) {
   if (typeof CSS !== 'undefined' && CSS.escape) {
     return CSS.escape(str);
   }
@@ -12,7 +12,7 @@ function escapeCssSelector(str) {
   return String(str).replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, '\\$&');
 }
 
-function findElement(doc, { selector, id }) {
+function findElement(doc: any, { selector, id }: any) {
   // Приоритет 1: поиск по data-no-code-ui-id (самый надёжный), с поддержкой legacy data-mrpak-id
   if (id) {
     const escaped = escapeCssSelector(String(id));
@@ -27,7 +27,7 @@ function findElement(doc, { selector, id }) {
     try {
       const direct = doc.querySelector(selector);
       if (direct) return direct;
-    } catch (e) {
+    } catch (e: any) {
       // ignore invalid selector
     }
   }
@@ -36,7 +36,7 @@ function findElement(doc, { selector, id }) {
   if (!selector) return null;
   const parts = String(selector)
     .split('>')
-    .map((p) => p.trim())
+    .map((p: any) => p.trim())
     .filter(Boolean);
   if (!parts.length) return null;
 
@@ -56,7 +56,7 @@ function findElement(doc, { selector, id }) {
     const nth = m[2] ? parseInt(m[2], 10) : 1;
     if (!current) return null;
     const children = Array.from(current.children || []).filter(
-      (c) => c.tagName && c.tagName.toLowerCase() === tag
+      (c: any) => c.tagName && c.tagName.toLowerCase() === tag
     );
     if (!children.length) return null;
     // Более гибкий поиск: если nth выходит за границы, берём последний элемент нужного тега
@@ -67,7 +67,7 @@ function findElement(doc, { selector, id }) {
   return current || null;
 }
 
-export function applyHtmlOp({ html, op }) {
+export function applyHtmlOp({ html, op }: any) {
   const source = String(html ?? '');
   if (!op || typeof op !== 'object') return { ok: false, error: 'applyHtmlOp: op required' };
 
@@ -135,5 +135,6 @@ export function applyHtmlOp({ html, op }) {
 
   return { ok: false, error: `applyHtmlOp: unsupported op.type ${op.type}` };
 }
+
 
 

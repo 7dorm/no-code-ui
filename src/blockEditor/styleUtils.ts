@@ -1,16 +1,16 @@
-export function camelToKebab(key) {
+export function camelToKebab(key: any) {
   return String(key || '')
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .replace(/_/g, '-')
     .toLowerCase();
 }
 
-export function kebabToCamel(key) {
+export function kebabToCamel(key: any) {
   const s = String(key || '').trim().toLowerCase();
-  return s.replace(/-([a-z0-9])/g, (_, c) => String(c).toUpperCase());
+  return s.replace(/-([a-z0-9])/g, (_: any, c: any) => String(c).toUpperCase());
 }
 
-export function normalizeStyleKey({ fileType, key }) {
+export function normalizeStyleKey({ fileType, key }: any) {
   const k = String(key || '').trim();
   if (!k) return '';
   if (fileType === 'html') return camelToKebab(k);
@@ -18,7 +18,7 @@ export function normalizeStyleKey({ fileType, key }) {
   return k.includes('-') ? kebabToCamel(k) : k;
 }
 
-export function parseValueForReactLike(value) {
+export function parseValueForReactLike(value: any) {
   const v = String(value ?? '').trim();
   if (!v) return '';
   if (v === 'true') return true;
@@ -35,11 +35,11 @@ export function parseValueForReactLike(value) {
   return v;
 }
 
-export function parseStyleText(text) {
+export function parseStyleText(text: any) {
   // принимает и kebab, и camel: "prop: value; prop2:value2"
   const src = String(text || '');
-  const out = {};
-  src.split(';').forEach((chunk) => {
+  const out: any = {};
+  src.split(';').forEach((chunk: any) => {
     const part = chunk.trim();
     if (!part) return;
     const idx = part.indexOf(':');
@@ -52,9 +52,9 @@ export function parseStyleText(text) {
   return out;
 }
 
-export function buildPatchFromKv({ fileType, rows }) {
-  const patch = {};
-  (rows || []).forEach((r) => {
+export function buildPatchFromKv({ fileType, rows }: any) {
+  const patch: any = {};
+  (rows || []).forEach((r: any) => {
     const rawKey = r?.key;
     const rawVal = r?.value;
     const k = normalizeStyleKey({ fileType, key: rawKey });
@@ -68,23 +68,23 @@ export function buildPatchFromKv({ fileType, rows }) {
   return patch;
 }
 
-export function buildPatchFromText({ fileType, text }) {
+export function buildPatchFromText({ fileType, text }: any) {
   const raw = parseStyleText(text);
-  const rows = Object.entries(raw).map(([key, value]) => ({ key, value }));
+  const rows = Object.entries(raw).map(([key, value]: any) => ({ key, value }));
   return buildPatchFromKv({ fileType, rows });
 }
 
-export function toHtmlStyleAttr(patch) {
+export function toHtmlStyleAttr(patch: any) {
   // patch: {kebab: value}
   return Object.entries(patch || {})
-    .filter(([k, v]) => k && v != null && String(v).trim().length > 0)
-    .map(([k, v]) => `${camelToKebab(k)}: ${String(v).trim()}`)
+    .filter(([k, v]: any) => k && v != null && String(v).trim().length > 0)
+    .map(([k, v]: any) => `${camelToKebab(k)}: ${String(v).trim()}`)
     .join('; ');
 }
 
-export function toReactStyleObjectText(patch) {
+export function toReactStyleObjectText(patch: any) {
   // patch keys assumed camelCase, values can be number/bool/null/string
-  const parts = Object.entries(patch || {}).map(([k, v]) => {
+  const parts = Object.entries(patch || {}).map(([k, v]: any) => {
     if (!k) return null;
     if (typeof v === 'number' || typeof v === 'boolean' || v === null) return `${k}: ${String(v)}`;
     const s = String(v);
@@ -94,9 +94,9 @@ export function toReactStyleObjectText(patch) {
   return parts.join(', ');
 }
 
-export function parseInlineStyleToBaseline({ fileType, inline }) {
+export function parseInlineStyleToBaseline({ fileType, inline }: any) {
   const raw = parseStyleText(inline || '');
-  const norm = {};
+  const norm: any = {};
   for (const [k, v] of Object.entries(raw)) {
     const nk = normalizeStyleKey({ fileType, key: k });
     if (!nk) continue;
@@ -108,5 +108,6 @@ export function parseInlineStyleToBaseline({ fileType, inline }) {
   }
   return norm;
 }
+
 
 

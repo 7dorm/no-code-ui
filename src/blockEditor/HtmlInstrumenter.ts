@@ -1,4 +1,4 @@
-function safeBasename(path) {
+function safeBasename(path: any) {
   try {
     const norm = String(path || '').replace(/\\/g, '/');
     return norm.split('/').pop() || 'unknown';
@@ -7,9 +7,9 @@ function safeBasename(path) {
   }
 }
 
-function makeSelectorForElement(el) {
+function makeSelectorForElement(el: any) {
   // Строим достаточно стабильный и уникальный селектор через цепочку :nth-child
-  const parts = [];
+  const parts: any[] = [];
   let cur = el;
   while (cur && cur.nodeType === 1) {
     const tag = cur.tagName.toLowerCase();
@@ -27,12 +27,12 @@ function makeSelectorForElement(el) {
   return parts.reverse().join(' > ');
 }
 
-function makeMrpakId({ filePath, selector, tagName }) {
+function makeMrpakId({ filePath, selector, tagName }: any) {
   const base = safeBasename(filePath);
   return `mrpak:${base}:${tagName || 'el'}:${selector}`;
 }
 
-export function instrumentHtml(html, filePath) {
+export function instrumentHtml(html: any, filePath: any) {
   const source = String(html ?? '');
   const hasDoctype = /^\s*<!doctype/i.test(source);
 
@@ -40,11 +40,11 @@ export function instrumentHtml(html, filePath) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(source, 'text/html');
 
-  const map = {};
+  const map: any = {};
   const used = new Set();
 
   const all = doc.querySelectorAll('*');
-  all.forEach((el) => {
+  all.forEach((el: any) => {
     const existingNew = el.getAttribute('data-no-code-ui-id');
     const existingOld = el.getAttribute('data-mrpak-id');
     const existing = existingNew || existingOld;

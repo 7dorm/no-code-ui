@@ -3,17 +3,17 @@
 
 import { readFile, writeFile, ensureDir } from '../shared/api/electron-api';
 
-function normalizePath(p) {
+function normalizePath(p: any) {
   return String(p || '').replace(/\\/g, '/');
 }
 
-function joinPath(a, b) {
+function joinPath(a: any, b: any) {
   const aa = normalizePath(a).replace(/\/+$/, '');
   const bb = normalizePath(b).replace(/^\/+/, '');
   return `${aa}/${bb}`;
 }
 
-export function getAstTreeStorePaths(projectRoot) {
+export function getAstTreeStorePaths(projectRoot: any) {
   const root = normalizePath(projectRoot);
   const dirPath = joinPath(root, '.mrpak');
   const filePath = joinPath(dirPath, 'ast-tree.json');
@@ -26,7 +26,7 @@ export function getAstTreeStorePaths(projectRoot) {
  * @param {Object} options - опции
  * @returns {Object} упрощенное представление узла
  */
-function serializeAstNode(node, options = {}) {
+function serializeAstNode(node: any, options: any = {}) {
   if (!node || typeof node !== 'object') {
     return node;
   }
@@ -37,7 +37,7 @@ function serializeAstNode(node, options = {}) {
     return { type: '...', message: 'Max depth reached' };
   }
 
-  const result = {
+  const result: Record<string, any> = {
     type: node.type || 'Unknown',
   };
 
@@ -65,7 +65,7 @@ function serializeAstNode(node, options = {}) {
     }
     
     if (node.attributes && Array.isArray(node.attributes)) {
-      result.attributes = node.attributes.slice(0, 20).map(attr => {
+      result.attributes = node.attributes.slice(0, 20).map((attr: any) => {
         if (attr.type === 'JSXAttribute') {
           return {
             type: 'JSXAttribute',
@@ -99,7 +99,7 @@ function serializeAstNode(node, options = {}) {
 
   // Для детей JSX элементов
   if (node.children && Array.isArray(node.children)) {
-    result.children = node.children.slice(0, 50).map(child => 
+    result.children = node.children.slice(0, 50).map((child: any) => 
       serializeAstNode(child, { ...options, currentDepth: currentDepth + 1 })
     );
     if (node.children.length > 50) {
@@ -115,7 +115,7 @@ function serializeAstNode(node, options = {}) {
 
   if (node.type === 'ImportDeclaration') {
     result.source = node.source?.value || null;
-    result.specifiers = node.specifiers?.map(s => ({
+    result.specifiers = node.specifiers?.map((s: any) => ({
       type: s.type,
       imported: s.imported?.name || null,
       local: s.local?.name || null,
@@ -138,7 +138,7 @@ function serializeAstNode(node, options = {}) {
  * @param {Object} params.map - карта элементов (из instrumentJsxWithAst)
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-export async function saveAstTree({ projectRoot, targetFilePath, ast, map }) {
+export async function saveAstTree({ projectRoot, targetFilePath, ast, map }: any) {
   if (!projectRoot || !targetFilePath) {
     return { ok: false, error: 'projectRoot and targetFilePath are required' };
   }
@@ -149,7 +149,7 @@ export async function saveAstTree({ projectRoot, targetFilePath, ast, map }) {
   try {
     await ensureDir(dirPath);
 
-    let json = {};
+    let json: any = {};
     const readRes = await readFile(filePath);
     if (readRes?.success) {
       try {
@@ -177,7 +177,7 @@ export async function saveAstTree({ projectRoot, targetFilePath, ast, map }) {
     }
     
     return { ok: true };
-  } catch (e) {
+  } catch (e: any) {
     return { ok: false, error: e.message };
   }
 }
@@ -189,7 +189,7 @@ export async function saveAstTree({ projectRoot, targetFilePath, ast, map }) {
  * @param {string} params.targetFilePath - путь к файлу
  * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
  */
-export async function loadAstTree({ projectRoot, targetFilePath }) {
+export async function loadAstTree({ projectRoot, targetFilePath }: any) {
   const { filePath } = getAstTreeStorePaths(projectRoot);
   const key = normalizePath(targetFilePath);
 
@@ -203,8 +203,9 @@ export async function loadAstTree({ projectRoot, targetFilePath }) {
     const data = json && typeof json === 'object' && json[key] ? json[key] : null;
     
     return { ok: true, data };
-  } catch (e) {
+  } catch (e: any) {
     return { ok: false, error: e.message, data: null };
   }
 }
+
 

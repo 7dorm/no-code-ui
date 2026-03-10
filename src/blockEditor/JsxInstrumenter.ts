@@ -1,4 +1,4 @@
-function safeBasename(path) {
+function safeBasename(path: any) {
   try {
     const norm = String(path || '').replace(/\\/g, '/');
     return norm.split('/').pop() || 'unknown';
@@ -7,21 +7,21 @@ function safeBasename(path) {
   }
 }
 
-function makeMrpakId({ filePath, start, end, tagName }) {
+function makeMrpakId({ filePath, start, end, tagName }: any) {
   // Стабильность обеспечиваем через позиции в исходнике (до инструментирования).
   // При изменениях файла map пересобирается заново.
   const base = safeBasename(filePath);
   return `mrpak:${base}:${start}:${end}:${tagName || 'node'}`;
 }
 
-function isIdentStart(ch) {
+function isIdentStart(ch: any) {
   return /[A-Za-z_$]/.test(ch);
 }
-function isIdentPart(ch) {
+function isIdentPart(ch: any) {
   return /[A-Za-z0-9_$.-]/.test(ch);
 }
 
-function scanJsxOpeningEnd(src, fromIndex) {
+function scanJsxOpeningEnd(src: any, fromIndex: any) {
   // fromIndex указывает на '<'
   let i = fromIndex + 1;
 
@@ -41,14 +41,14 @@ function scanJsxOpeningEnd(src, fromIndex) {
   const tagName = src.slice(nameStart, i);
 
   // теперь парсим атрибуты до '>' или '/>'
-  let inQuote = null; // ' или "
+  let inQuote: any = null; // ' или "
   let braceDepth = 0; // для {...}
 
   while (i < src.length) {
     const ch = src[i];
 
     if (inQuote) {
-      if (ch === '\\\\') {
+      if (ch === '\\') {
         i += 2;
         continue;
       }
@@ -91,10 +91,10 @@ function scanJsxOpeningEnd(src, fromIndex) {
   return null;
 }
 
-function findNextInteresting(src, from) {
+function findNextInteresting(src: any, from: any) {
   // Сканер, который пропускает строки/комменты и возвращает индекс следующего '<'
   let i = from;
-  let inS = null; // ', ", `
+  let inS: any = null; // ', ", `
   let inLineComment = false;
   let inBlockComment = false;
   while (i < src.length) {
@@ -102,7 +102,7 @@ function findNextInteresting(src, from) {
     const next = src[i + 1];
 
     if (inLineComment) {
-      if (ch === '\\n') inLineComment = false;
+      if (ch === '\n') inLineComment = false;
       i++;
       continue;
     }
@@ -117,7 +117,7 @@ function findNextInteresting(src, from) {
     }
 
     if (inS) {
-      if (ch === '\\\\') {
+      if (ch === '\\') {
         i += 2;
         continue;
       }
@@ -133,7 +133,7 @@ function findNextInteresting(src, from) {
         i += 2;
         while (i < src.length && depth > 0) {
           const c = src[i];
-          if (c === '\\\\') {
+          if (c === '\\') {
             i += 2;
             continue;
           }
@@ -169,10 +169,10 @@ function findNextInteresting(src, from) {
   return -1;
 }
 
-export function instrumentJsx(code, filePath, opts = {}) {
+export function instrumentJsx(code: any, filePath: any, opts: any = {}) {
   const source = String(code ?? '');
 
-  const map = {};
+  const map: any = {};
   const usedIds = new Set();
 
   let out = '';
