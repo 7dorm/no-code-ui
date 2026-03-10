@@ -11,6 +11,9 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
   return `
       <style>
         [data-no-code-ui-id].mrpak-selected, [data-mrpak-id].mrpak-selected { outline: 2px solid #667eea !important; outline-offset: 2px; }
+        .mrpak-box-overlay { position: fixed; z-index: 9998; pointer-events: none; box-sizing: border-box; }
+        .mrpak-box-overlay.mrpak-margin { border: 1px dashed rgba(245, 158, 11, 0.95); background: rgba(245, 158, 11, 0.06); }
+        .mrpak-box-overlay.mrpak-padding { border: 1px dashed rgba(34, 197, 94, 0.95); background: rgba(34, 197, 94, 0.05); }
         .mrpak-hint { position: fixed; z-index: 9999; bottom: 10px; right: 10px; background: rgba(15,23,42,0.85); color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; }
         ${isEditMode ? `
         /* Блокируем интерактивные элементы только в режиме редактора */
@@ -102,6 +105,84 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           let gridStep = 8;
           let dragging = null; // {sourceId}
           let dropTarget = null;
+
+          const overlay = {
+            margin: null,
+            padding: null,
+          };
+
+          const ensureOverlay = () => {
+            if (!overlay.margin) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-margin';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.margin = el;
+            }
+            if (!overlay.padding) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-padding';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.padding = el;
+            }
+          };
+
+          const toNum = (v) => {
+            const n = parseFloat(String(v || '0'));
+            return Number.isFinite(n) ? n : 0;
+          };
+
+          const setRect = (el, r) => {
+            if (!el) return;
+            if (!r) {
+              el.style.display = 'none';
+              return;
+            }
+            el.style.display = 'block';
+            el.style.left = r.left + 'px';
+            el.style.top = r.top + 'px';
+            el.style.width = Math.max(0, r.width) + 'px';
+            el.style.height = Math.max(0, r.height) + 'px';
+          };
+
+          const updateBoxOverlay = () => {
+            try {
+              ensureOverlay();
+              if (!selected) {
+                setRect(overlay.margin, null);
+                setRect(overlay.padding, null);
+                return;
+              }
+              const rect = selected.getBoundingClientRect();
+              const cs = window.getComputedStyle(selected);
+              const mt = toNum(cs.marginTop);
+              const mr = toNum(cs.marginRight);
+              const mb = toNum(cs.marginBottom);
+              const ml = toNum(cs.marginLeft);
+              const pt = toNum(cs.paddingTop);
+              const pr = toNum(cs.paddingRight);
+              const pb = toNum(cs.paddingBottom);
+              const pl = toNum(cs.paddingLeft);
+              setRect(overlay.margin, {
+                left: rect.left - ml,
+                top: rect.top - mt,
+                width: rect.width + ml + mr,
+                height: rect.height + mt + mb,
+              });
+              setRect(overlay.padding, {
+                left: rect.left + pl,
+                top: rect.top + pt,
+                width: rect.width - pl - pr,
+                height: rect.height - pt - pb,
+              });
+            } catch (e) {
+              try {
+                setRect(overlay.margin, null);
+                setRect(overlay.padding, null);
+              } catch (e2) {}
+            }
+          };
 
           const snap = (v) => {
             if (moveMode !== 'grid8') return v;
@@ -200,6 +281,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               if (selected) selected.classList.remove('mrpak-selected');
             } catch(e) {}
             selected = null;
+            updateBoxOverlay();
           }
 
           function selectEl(el) {
@@ -211,6 +293,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             lastSelectedId = id;
             const rect = selected.getBoundingClientRect();
             post(MSG_SELECT, { id, meta: { tagName: selected.tagName, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } } });
+            updateBoxOverlay();
             buildTree();
             // отправляем снапшот inline style, чтобы UI мог показать базовые стили
             try {
@@ -458,6 +541,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             
             if (drag.mode === 'move') {
               selected.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+              updateBoxOverlay();
               
               // Отправляем промежуточные изменения при каждом движении
               const parent = getOffsetParent(selected);
@@ -505,6 +589,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const h = snap(Math.max(1, drag.rect.height + dy));
               selected.style.width = w + 'px';
               selected.style.height = h + 'px';
+              updateBoxOverlay();
               
               // Отправляем промежуточные изменения при каждом движении
               if ('${type}' === 'html') {
@@ -526,6 +611,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             
             if (drag.mode === 'move') {
               selected.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+              updateBoxOverlay();
               
               // Отправляем промежуточные изменения при каждом движении
               const parent = getOffsetParent(selected);
@@ -573,6 +659,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const h = snap(Math.max(1, drag.rect.height + dy));
               selected.style.width = w + 'px';
               selected.style.height = h + 'px';
+              updateBoxOverlay();
               
               // Отправляем промежуточные изменения при каждом движении
               if ('${type}' === 'html') {
@@ -613,6 +700,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
             if (drag.mode === 'move') {
               selected.style.transform = '';
+
+              updateBoxOverlay();
 
               if (moveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
@@ -666,6 +755,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
               selected.style.width = cw + 'px';
               selected.style.height = ch + 'px';
+              updateBoxOverlay();
               if ('${type}' === 'html') {
                 post(MSG_APPLY, { id, patch: { width: cw + 'px', height: ch + 'px' }, isIntermediate: false });
               } else {
@@ -684,6 +774,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             hint.className = 'mrpak-hint';
             hint.textContent = 'MRPAK Editor: клик = выбрать, Shift+Drag = переместить, Alt+Drag = изменить размер';
             document.body.appendChild(hint);
+          } catch(e) {}
+
+          try {
+            window.addEventListener('scroll', updateBoxOverlay, true);
+            window.addEventListener('resize', updateBoxOverlay, true);
           } catch(e) {}
 
           // Команды из UI (локальные изменения)
@@ -848,6 +943,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           post(MSG_READY, { meta: { mode: 'edit' } });
           buildTree();
+          updateBoxOverlay();
         })();
       </script>
     `;
