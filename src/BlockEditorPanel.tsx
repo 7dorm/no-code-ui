@@ -175,22 +175,6 @@ export default function BlockEditorPanel({
       setStyleMode('text');
       setStyleText(inline);
     }
-    // Читаем moveMode из data-атрибута элемента
-    let elementMoveMode = 'absolute'; // значение по умолчанию
-    if (selectedBlock?.id) {
-      // В React-режиме нужно искать в DOM через data-no-code-ui-id
-      const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
-                      document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
-      if (element) {
-        const savedMoveMode = element.getAttribute('data-move-mode');
-        if (savedMoveMode && ['absolute', 'relative', 'grid8'].includes(savedMoveMode)) {
-          elementMoveMode = savedMoveMode;
-        }
-      }
-    }
-    setMoveMode(elementMoveMode);
-    setIsMoveModeInitialized(true);
-
     // Строим baseline map в нормализованном виде
     const raw = parseStyleText(inline);
     const norm: Record<string, string | number | boolean> = {};
@@ -204,10 +188,58 @@ export default function BlockEditorPanel({
       }
     }
     setBaselineMap(norm);
-    setTextValue(styleSnapshot?.textContent || '');
+    // Инициализируем числовые поля позиции/размера из computedStyle, если оно есть
+    const cs = styleSnapshot?.computedStyle as any | null;
+    const parsePx = (v: any): number | null => {
+      if (v == null) return null;
+      if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+      if (typeof v === 'string') {
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : null;
+      }
+      return null;
+    };
+    if (cs) {
+      const leftVal = parsePx(cs.left);
+      const topVal = parsePx(cs.top);
+      const widthVal = parsePx(cs.width);
+      const heightVal = parsePx(cs.height);
+      if (leftVal !== null) setLeft(leftVal);
+      if (topVal !== null) setTop(topVal);
+      if (widthVal !== null) setWidth(widthVal);
+      if (heightVal !== null) setHeight(heightVal);
+    }
+    // Читаем moveMode из data-атрибута элемента или из computedStyle.position
+    let elementMoveMode: 'absolute' | 'relative' | 'grid8' = 'absolute'; // значение по умолчанию
+    if (selectedBlock?.id) {
+      // В React-режиме нужно искать в DOM через data-no-code-ui-id
+      const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
+                      document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
+      if (element) {
+        const savedMoveMode = element.getAttribute('data-move-mode');
+        if (savedMoveMode && ['absolute', 'relative', 'grid8'].includes(savedMoveMode as any)) {
+          elementMoveMode = savedMoveMode as 'absolute' | 'relative' | 'grid8';
+        }
+      }
+    }
+    // Если data-атрибут не задан, пробуем взять position из computedStyle
+    const computedPosition = cs?.position;
+    if (computedPosition && typeof computedPosition === 'string') {
+      if (computedPosition === 'relative') {
+        elementMoveMode = 'relative';
+      } else if (computedPosition === 'absolute' || computedPosition === 'fixed') {
+        elementMoveMode = 'absolute';
+      }
+    }
+    setMoveMode(elementMoveMode);
+    setIsMoveModeInitialized(true);
+    // Текст: приоритет у textSnapshot (приходит отдельным сообщением), fallback на styleSnapshot.textContent
+    const initialText =
+      (typeof textSnapshot === 'string' ? textSnapshot : styleSnapshot?.textContent) || '';
+    setTextValue(initialText);
     setReparentMode(false);
     setReparentTargetId(null);
-  }, [selectedBlock?.id]);
+  }, [selectedBlock?.id, textSnapshot]);
   useEffect(() => {
     if (!onSendCommand) return;
     onSendCommand({ type: 'MRPAK_CMD_SET_MOVE_MODE', mode: moveMode, grid: 8 });
