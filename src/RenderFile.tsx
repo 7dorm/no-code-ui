@@ -840,7 +840,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
         updateMonacoEditorWithScroll(newContent);
         setRenderVersion((v) => v + 1);
         setChangesLog((prev) => [
-          { ts: Date.now(), filePath, blockId, patch },
+          { ts: Date.now() + Math.random(), filePath, blockId, patch },
           ...prev,
         ]);
 
@@ -990,9 +990,9 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
       setFileContent(newContent);
       setRenderVersion((v) => v + 1);
       setChangesLog((prev) => [
-        ...entries.map(([blockId, patch]) => ({ ts: Date.now(), filePath, blockId, patch })),
+        ...entries.map(([blockId, patch]) => ({ ts: Date.now() + Math.random(), filePath, blockId, patch })),
         ...ops.map((o) => ({
-          ts: Date.now(),
+          ts: Date.now() + Math.random(),
           filePath,
           blockId: o.type === 'insert' ? o.targetId : o.blockId,
           patch: { op: o.type },
@@ -1021,7 +1021,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
       // Это произойдет автоматически через useEffect, который зависит от fileContent
     } catch (e) {
       console.error('commitStagedPatches error:', e);
-      console.error('commitStagedPatches error stack:', e.stack);
+      console.error('commitStagedPatches error stack:', e instanceof Error ? e.stack : String(e));
       // Определяем entries и ops для логирования, если они еще не определены
       const entriesForLog = Object.entries(currentStagedPatches || {}).filter(
         ([id, p]) => id && p && Object.keys(p).length > 0
@@ -1052,7 +1052,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
     async (event: any) => {
       const data = event?.nativeEvent?.data;
       if (!isMrpakMessage(data)) return;
-      console.log("HERREEEE: ", data.type)
+      //console.log("HERREEEE: ", data.type)
 
       if (data.type === MRPAK_MSG.SELECT) {
         setSelectedBlock({ id: data.id, meta: data.meta });
@@ -5384,6 +5384,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
           <View style={{ flex: 1, position: 'relative' }}>
             <BlockEditorPanel
               fileType="react"
+              livePosition={livePosition}
               html={editorHTML || reactHTML}
               selectedBlock={selectedBlock}
               onMessage={handleEditorMessage}
@@ -5593,6 +5594,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
           <View style={{ flex: 1, position: 'relative' }}>
             <BlockEditorPanel
               fileType="react-native"
+              livePosition={livePosition}
               html={editorHTML || reactNativeHTML}
               selectedBlock={selectedBlock}
               onMessage={handleEditorMessage}

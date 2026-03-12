@@ -14,6 +14,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         .mrpak-box-overlay { position: fixed; z-index: 9998; pointer-events: none; box-sizing: border-box; }
         .mrpak-box-overlay.mrpak-margin { border: 1px dashed rgba(245, 158, 11, 0.95); background: rgba(245, 158, 11, 0.06); }
         .mrpak-box-overlay.mrpak-padding { border: 1px dashed rgba(34, 197, 94, 0.95); background: rgba(34, 197, 94, 0.05); }
+        .mrpak-box-overlay.mrpak-parent { border: 2px dashed rgba(246, 85, 49, 0.8); background: rgba(59, 131, 246, 0); pointer-events: none; }
         .mrpak-hint { position: fixed; z-index: 9999; bottom: 10px; right: 10px; background: rgba(15,23,42,0.85); color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; }
         ${isEditMode ? `
         /* Блокируем интерактивные элементы только в режиме редактора */
@@ -109,6 +110,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const overlay = {
             margin: null,
             padding: null,
+            parent: null,
           };
 
           const ensureOverlay = () => {
@@ -125,6 +127,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               el.style.display = 'none';
               document.body.appendChild(el);
               overlay.padding = el;
+            }
+            if (!overlay.parent) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-parent';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.parent = el;
             }
           };
 
@@ -152,6 +161,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               if (!selected) {
                 setRect(overlay.margin, null);
                 setRect(overlay.padding, null);
+                setRect(overlay.parent, null);
                 return;
               }
               const rect = selected.getBoundingClientRect();
@@ -164,6 +174,27 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const pr = toNum(cs.paddingRight);
               const pb = toNum(cs.paddingBottom);
               const pl = toNum(cs.paddingLeft);
+              
+              // Показываем родительскую рамку
+              const parent = getOffsetParent(selected);
+              if (parent && parent !== document.body) {
+                const parentRect = parent.getBoundingClientRect();
+                const parentCs = window.getComputedStyle(parent);
+                const parentPt = toNum(parentCs.paddingTop);
+                const parentPr = toNum(parentCs.paddingRight);
+                const parentPb = toNum(parentCs.paddingBottom);
+                const parentPl = toNum(parentCs.paddingLeft);
+                
+                setRect(overlay.parent, {
+                  left: parentRect.left + parentPl,
+                  top: parentRect.top + parentPt,
+                  width: parentRect.width - parentPl - parentPr,
+                  height: parentRect.height - parentPt - parentPb,
+                });
+              } else {
+                setRect(overlay.parent, null);
+              }
+              
               setRect(overlay.margin, {
                 left: rect.left - ml,
                 top: rect.top - mt,
@@ -180,6 +211,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               try {
                 setRect(overlay.margin, null);
                 setRect(overlay.padding, null);
+                setRect(overlay.parent, null);
               } catch (e2) {}
             }
           };
@@ -190,7 +222,29 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             return Math.round(v / step) * step;
           };
 
-          const getOffsetParent = (el) => el && (el.offsetParent || el.parentElement || document.body);
+          const getOffsetParent = (el) => {
+            if (!el) return document.body;
+            
+            // Ищем родителя с ограничениями (с position: relative/absolute или с overflow)
+            let parent = el.parentElement;
+            while (parent && parent !== document.body && parent !== document.documentElement) {
+              const cs = window.getComputedStyle(parent);
+              const position = cs.position;
+              const overflow = cs.overflow;
+              const overflowX = cs.overflowX;
+              const overflowY = cs.overflowY;
+              
+              // Если родитель имеет позиционирование или overflow, это наш контейнер
+              if (position !== 'static' || overflow !== 'visible' || overflowX !== 'visible' || overflowY !== 'visible') {
+                return parent;
+              }
+              
+              parent = parent.parentElement;
+            }
+            
+            // Если не нашли подходящего родителя, используем offsetParent или body
+            return el.offsetParent || document.body;
+          };
 
           const pxToNum = (s) => {
             const m = String(s || '').match(/(-?\\d+(?:\\.\\d+)?)px/);
@@ -540,10 +594,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const id = ensureId(selected);
             
             if (drag.mode === 'move') {
-              selected.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-              updateBoxOverlay();
-              
-              // Отправляем промежуточные изменения при каждом движении
+              // Получаем родительские ограничения для real-time проверки
               const parent = getOffsetParent(selected);
               const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
               const ps = parent ? window.getComputedStyle(parent) : null;
@@ -552,51 +603,52 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
               const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
               
-              if (moveMode === 'relative') {
-                const cs = window.getComputedStyle(selected);
-                const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
-                const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
-                const left = snap(baseLeft + dx);
-                const top = snap(baseTop + dy);
-                
-                if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left + 'px', top: top + 'px' }, isIntermediate: true });
-                } else {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left, top: top }, isIntermediate: true });
-                }
-              } else {
-                const startLeft = drag.rect.left - parentRect.left - padLeft;
-                const startTop = drag.rect.top - parentRect.top - padTop;
-                
-                let left = snap(startLeft + dx);
-                let top = snap(startTop + dy);
-                
+              // Рассчитываем ограничения
+              const startLeft = drag.rect.left - parentRect.left - padLeft;
+              const startTop = drag.rect.top - parentRect.top - padTop;
+              let constrainedDx = dx;
+              let constrainedDy = dy;
+              
+              if (moveMode === 'absolute') {
                 const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
                 const maxTop = parentRect.height - padBottom - snap(drag.rect.height);
                 const minLeft = padLeft;
                 const minTop = padTop;
-                left = Math.min(Math.max(left, minLeft), maxLeft);
-                top = Math.min(Math.max(top, minTop), maxTop);
                 
-                if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left + 'px', top: top + 'px' }, isIntermediate: true });
-                } else {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left, top: top }, isIntermediate: true });
-                }
+                const potentialLeft = snap(startLeft + dx);
+                const potentialTop = snap(startTop + dy);
+                
+                if (potentialLeft < minLeft) constrainedDx = minLeft - startLeft;
+                else if (potentialLeft > maxLeft) constrainedDx = maxLeft - startLeft;
+                
+                if (potentialTop < minTop) constrainedDy = minTop - startTop;
+                else if (potentialTop > maxTop) constrainedDy = maxTop - startTop;
               }
+              
+              selected.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
+              updateBoxOverlay();
             } else {
+              // Изменение размера с ограничениями
+              const parent = getOffsetParent(selected);
+              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+              const ps = parent ? window.getComputedStyle(parent) : null;
+              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
+              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
+              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
+              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
+              
               const w = snap(Math.max(1, drag.rect.width + dx));
               const h = snap(Math.max(1, drag.rect.height + dy));
-              selected.style.width = w + 'px';
-              selected.style.height = h + 'px';
-              updateBoxOverlay();
               
-              // Отправляем промежуточные изменения при каждом движении
-              if ('${type}' === 'html') {
-                post(MSG_APPLY, { id, patch: { width: w + 'px', height: h + 'px' }, isIntermediate: true });
-              } else {
-                post(MSG_APPLY, { id, patch: { width: w, height: h }, isIntermediate: true });
-              }
+              // Ограничиваем размер чтобы не выходить за padding-box родителя
+              const maxW = parentRect.width - padLeft - padRight;
+              const maxH = parentRect.height - padTop - padBottom;
+              const cw = Math.min(w, maxW);
+              const ch = Math.min(h, maxH);
+              
+              selected.style.width = cw + 'px';
+              selected.style.height = ch + 'px';
+              updateBoxOverlay();
             }
           }, true);
 
@@ -610,10 +662,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const id = ensureId(selected);
             
             if (drag.mode === 'move') {
-              selected.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-              updateBoxOverlay();
-              
-              // Отправляем промежуточные изменения при каждом движении
+              // Получаем родительские ограничения для real-time проверки
               const parent = getOffsetParent(selected);
               const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
               const ps = parent ? window.getComputedStyle(parent) : null;
@@ -622,50 +671,141 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
               const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
               
-              if (moveMode === 'relative') {
-                const cs = window.getComputedStyle(selected);
-                const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
-                const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
-                const left = snap(baseLeft + dx);
-                const top = snap(baseTop + dy);
-                
-                // Сохраняем финальные координаты в drag объект
-                drag.finalLeft = left;
-                drag.finalTop = top;
-                drag.finalPosition = 'relative';
-              } else {
-                const startLeft = drag.rect.left - parentRect.left - padLeft;
-                const startTop = drag.rect.top - parentRect.top - padTop;
-                
-                let left = snap(startLeft + dx);
-                let top = snap(startTop + dy);
-                
+              // Рассчитываем ограничения
+              const startLeft = drag.rect.left - parentRect.left - padLeft;
+              const startTop = drag.rect.top - parentRect.top - padTop;
+              let constrainedDx = dx;
+              let constrainedDy = dy;
+              
+              if (moveMode === 'absolute') {
                 const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
                 const maxTop = parentRect.height - padBottom - snap(drag.rect.height);
                 const minLeft = padLeft;
                 const minTop = padTop;
-                left = Math.min(Math.max(left, minLeft), maxLeft);
-                top = Math.min(Math.max(top, minTop), maxTop);
                 
-                // Сохраняем финальные координаты в drag объект
+                const potentialLeft = snap(startLeft + dx);
+                const potentialTop = snap(startTop + dy);
+                
+                if (potentialLeft < minLeft) constrainedDx = minLeft - startLeft;
+                else if (potentialLeft > maxLeft) constrainedDx = maxLeft - startLeft;
+                
+                if (potentialTop < minTop) constrainedDy = minTop - startTop;
+                else if (potentialTop > maxTop) constrainedDy = maxTop - startTop;
+              }
+              
+              selected.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
+              updateBoxOverlay();
+              
+              // Сохраняем финальные координаты в drag объект
+              if (moveMode === 'relative') {
+                const cs = window.getComputedStyle(selected);
+                const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
+                const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
+                const left = snap(baseLeft + constrainedDx);
+                const top = snap(baseTop + constrainedDy);
+                
+                drag.finalLeft = left;
+                drag.finalTop = top;
+                drag.finalPosition = 'relative';
+              } else {
+                const left = snap(startLeft + constrainedDx);
+                const top = snap(startTop + constrainedDy);
+                
                 drag.finalLeft = left;
                 drag.finalTop = top;
                 drag.finalPosition = 'absolute';
               }
             } else {
+              // Изменение размера с ограничениями
+              const parent = getOffsetParent(selected);
+              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+              const ps = parent ? window.getComputedStyle(parent) : null;
+              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
+              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
+              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
+              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
+              
               const w = snap(Math.max(1, drag.rect.width + dx));
               const h = snap(Math.max(1, drag.rect.height + dy));
-              selected.style.width = w + 'px';
-              selected.style.height = h + 'px';
+              
+              // Ограничиваем размер чтобы не выходить за padding-box родителя
+              const maxW = parentRect.width - padLeft - padRight;
+              const maxH = parentRect.height - padTop - padBottom;
+              const cw = Math.min(w, maxW);
+              const ch = Math.min(h, maxH);
+              
+              selected.style.width = cw + 'px';
+              selected.style.height = ch + 'px';
               updateBoxOverlay();
               
-              // Отправляем промежуточные изменения при каждом движении
-              if ('${type}' === 'html') {
-                post(MSG_APPLY, { id, patch: { width: w + 'px', height: h + 'px' }, isIntermediate: true });
-              } else {
-                post(MSG_APPLY, { id, patch: { width: w, height: h }, isIntermediate: true });
+              // Сохраняем финальные размеры в drag объект
+              drag.finalWidth = cw;
+              drag.finalHeight = ch;
+            }
+          }, { passive: false });
+
+          document.addEventListener('touchend', (ev) => {
+            // reparent drag (Ctrl/Cmd + drag) - не поддерживается для touch
+            if (dragging && dragging.mode === 'reparent') {
+              dragging = null;
+              dropTarget = null;
+              drag = null;
+              return;
+            }
+
+            if (!drag || !selected) return;
+            const id = ensureId(selected);
+
+            if (drag.mode === 'move') {
+              selected.style.transform = '';
+
+              // Используем сохраненные финальные значения
+              if (drag.finalLeft !== undefined && drag.finalTop !== undefined) {
+                if (drag.finalPosition === 'relative') {
+                  selected.style.position = 'relative';
+                  selected.style.left = drag.finalLeft + 'px';
+                  selected.style.top = drag.finalTop + 'px';
+
+                  if ('${type}' === 'html') {
+                    post(MSG_APPLY, { id, patch: { position: 'relative', left: drag.finalLeft + 'px', top: drag.finalTop + 'px' }, isIntermediate: false });
+                  } else {
+                    post(MSG_APPLY, { id, patch: { position: 'relative', left: drag.finalLeft, top: drag.finalTop }, isIntermediate: false });
+                  }
+                } else {
+                  selected.style.position = 'absolute';
+                  selected.style.left = drag.finalLeft + 'px';
+                  selected.style.top = drag.finalTop + 'px';
+
+                  const patch = { position: 'absolute' };
+                  if ('${type}' === 'html') {
+                    patch.left = drag.finalLeft + 'px';
+                    patch.top = drag.finalTop + 'px';
+                  } else {
+                    patch.left = drag.finalLeft;
+                    patch.top = drag.finalTop;
+                  }
+                  
+                  post(MSG_APPLY, { id, patch, isIntermediate: false });
+                }
+              }
+            } else {
+              // Используем сохраненные финальные размеры
+              if (drag.finalWidth !== undefined && drag.finalHeight !== undefined) {
+                selected.style.width = drag.finalWidth + 'px';
+                selected.style.height = drag.finalHeight + 'px';
+                updateBoxOverlay();
+                
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, { id, patch: { width: drag.finalWidth + 'px', height: drag.finalHeight + 'px' }, isIntermediate: false });
+                } else {
+                  post(MSG_APPLY, { id, patch: { width: drag.finalWidth, height: drag.finalHeight }, isIntermediate: false });
+                }
               }
             }
+
+            drag = null;
+            dragging = null;
+            dropTarget = null;
           }, { passive: false });
 
           document.addEventListener('mouseup', (ev) => {
@@ -698,6 +838,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
             if (drag.mode === 'move') {
               selected.style.transform = '';
+              
+              //updateBoxOverlay();
 
               if (moveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
@@ -773,7 +915,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           try {
             const hint = document.createElement('div');
             hint.className = 'mrpak-hint';
-            hint.textContent = 'MRPAK Editor: клик = выбрать, Shift+Drag = переместить, Alt+Drag = изменить размер';
+            hint.textContent = 'MRPAK Editor: клик = выбрать, Shift+Drag = переместить, Alt+Drag = изменить размер. Синяя рамка = границы родителя';
             document.body.appendChild(hint);
           } catch(e) {}
 
