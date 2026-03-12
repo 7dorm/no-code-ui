@@ -232,6 +232,7 @@ export function createReactHTMLTemplate({
 }) {
   const inst = instrumentJsx(processedCode, basePath);
   const instrumentedCode = inst.code;
+  console.log("HEREEEE");
   
   return {
     html: `
@@ -372,8 +373,10 @@ export function createReactHTMLTemplate({
           });
         }
         
+        console.log('[React Debug] Starting React component execution...');
         try {
             ${instrumentedCode}
+            console.log('[React Debug] Component code executed successfully');
             
             // Автоматически находим компонент для рендеринга
             let Component = null;
@@ -381,22 +384,28 @@ export function createReactHTMLTemplate({
               `// Используем автоматически найденный компонент: ${componentName}
               if (typeof ${componentName} !== 'undefined') {
                 Component = ${componentName};
+                console.log('[React Debug] Found component:', '${componentName}');
               }` : 
               `// Пробуем стандартные имена как fallback
               if (typeof App !== 'undefined') {
                 Component = App;
+                console.log('[React Debug] Found component: App');
               } else if (typeof MyComponent !== 'undefined') {
                 Component = MyComponent;
+                console.log('[React Debug] Found component: MyComponent');
               } else if (typeof Component !== 'undefined') {
                 Component = Component;
+                console.log('[React Debug] Found component: Component');
               } else {
                 // Пробуем найти любой компонент с заглавной буквы
                 const allVars = Object.keys(typeof window !== 'undefined' ? window : {});
+                console.log('[React Debug] Searching for component in vars:', allVars.filter(v => v[0] === v[0].toUpperCase()));
                 for (const varName of allVars) {
                   if (varName[0] === varName[0].toUpperCase() && 
                       typeof window[varName] === 'function' &&
                       varName !== 'React' && varName !== 'ReactDOM') {
                     Component = window[varName];
+                    console.log('[React Debug] Found component:', varName);
                     break;
                   }
                 }
@@ -404,20 +413,28 @@ export function createReactHTMLTemplate({
             }
             
             if (Component) {
+                console.log('[React Debug] Component found, creating root and rendering...');
                 const root = ReactDOM.createRoot(document.getElementById('root'));
                 root.render(React.createElement(Component));
+                console.log('[React Debug] ReactDOM.render called');
                 
                 // После рендеринга React инструментируем DOM и блокируем интерактивные элементы
                 setTimeout(() => {
+                  console.log('[React Debug] Post-render timeout, checking root content...');
                   const rootElement = document.getElementById('root');
                   const filePath = window.__MRPAK_FILE_PATH__ || '';
+                  console.log('[React Debug] Root element:', rootElement);
+                  console.log('[React Debug] Root content length:', rootElement ? rootElement.innerHTML.length : 'null');
+                  console.log('[React Debug] Root children count:', rootElement ? rootElement.children.length : 'null');
                   
                   // Инструментируем DOM элементы с data-no-code-ui-id (legacy data-mrpak-id поддерживаем)
                   instrumentReactDOM(rootElement, filePath);
+                  console.log('[React Debug] DOM instrumentation completed');
                   
                   // Обновляем дерево слоев после инструментирования
                   if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
                     window.__MRPAK_BUILD_TREE__();
+                    console.log('[React Debug] Build tree called');
                   }
                   
                   // Используем MutationObserver для отслеживания новых элементов
@@ -455,9 +472,12 @@ export function createReactHTMLTemplate({
                 const errorMsg = foundComponents.length > 0 
                   ? 'Найдены компоненты: ' + foundComponents.join(', ') + '. Но не удалось их использовать для рендеринга.'
                   : 'Не найден компонент для рендеринга. Убедитесь, что файл содержит React компонент (функцию с заглавной буквы, возвращающую JSX).';
+                console.log('[React Debug] No component found, available components:', foundComponents);
                 document.getElementById('root').innerHTML = '<div class="error">' + errorMsg + '</div>';
             }
         } catch (error) {
+            console.log('[React Debug] Execution error:', error);
+            console.log('[React Debug] Error stack:', error.stack);
             document.getElementById('root').innerHTML = '<div class="error"><strong>Ошибка выполнения:</strong><br>' + error.message + '</div>';
             console.error('React execution error:', error);
         }

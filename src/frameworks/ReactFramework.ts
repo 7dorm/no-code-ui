@@ -1751,33 +1751,53 @@ export class ReactFramework extends Framework {
         
         console.log('Available modules:', Object.keys(window.__modules__ || {}));
         
+        console.log('[React Debug] Starting React component execution...');
         try {
             ${processedCode}
+            console.log('[React Debug] Component code executed successfully');
             
             let Component = null;
             ${componentToRender ? 
               `if (typeof ${componentName} !== 'undefined') {
                 Component = ${componentName};
+                console.log('[React Debug] Found component:', '${componentName}');
               }` : 
               `if (typeof App !== 'undefined') {
                 Component = App;
+                console.log('[React Debug] Found component: App');
               } else if (typeof MyComponent !== 'undefined') {
                 Component = MyComponent;
+                console.log('[React Debug] Found component: MyComponent');
               } else if (typeof Component !== 'undefined') {
                 Component = Component;
+                console.log('[React Debug] Found component: Component');
               }`
             }
             
             if (Component) {
+                console.log('[React Debug] Component found, creating root and rendering...');
                 const root = ReactDOM.createRoot(document.getElementById('root'));
                 root.render(React.createElement(Component));
+                console.log('[React Debug] ReactDOM.render called');
                 
                 setTimeout(() => {
+                  console.log('[React Debug] Post-render timeout, checking root content...');
                   const rootElement = document.getElementById('root');
                   const filePath = window.__MRPAK_FILE_PATH__ || '';
+                  console.log('[React Debug] Root element:', rootElement);
+                  console.log('[React Debug] Root content length:', rootElement ? rootElement.innerHTML.length : 'null');
+                  console.log('[React Debug] Root children count:', rootElement ? rootElement.children.length : 'null');
+                  
+                  // Скрываем заглушку после успешного рендеринга
+                  const infoElement = document.querySelector('.info');
+                  if (infoElement) {
+                    console.log('[React Debug] Hiding loading placeholder...');
+                    infoElement.style.display = 'none';
+                  }
                   
                   if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
                     window.__MRPAK_BUILD_TREE__();
+                    console.log('[React Debug] Build tree called');
                   }
                   
                   const observer = new MutationObserver((mutations) => {
@@ -1796,12 +1816,15 @@ export class ReactFramework extends Framework {
                 }, 100);
             } else {
                 const foundComponents = ${JSON.stringify(detectedComponents.map(c => c.name))};
+                console.log('[React Debug] No component found, available components:', foundComponents);
                 const errorMsg = foundComponents.length > 0 
                   ? 'Найдены компоненты: ' + foundComponents.join(', ') + '. Но не удалось их использовать для рендеринга.'
                   : 'Не найден компонент для рендеринга.';
                 document.getElementById('root').innerHTML = '<div class="error">' + errorMsg + '</div>';
             }
         } catch (error) {
+            console.log('[React Debug] Execution error:', error);
+            console.log('[React Debug] Error stack:', error.stack);
             document.getElementById('root').innerHTML = '<div class="error"><strong>Ошибка выполнения:</strong><br>' + error.message + '</div>';
             console.error('React execution error:', error);
         }

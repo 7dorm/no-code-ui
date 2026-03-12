@@ -169,6 +169,8 @@ export class AstBidirectionalManager {
    * Обновляет стили в JSX узле
    */
   updateStyleInNode(node: any, patch: any) {
+    console.log('[updateStyleInNode] Called with patch:', patch);
+    
     // Находим или создаем style атрибут
     let styleAttr = node.attributes.find(
       (attr: any) => t.isJSXAttribute(attr) &&

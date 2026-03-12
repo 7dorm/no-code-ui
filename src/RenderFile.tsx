@@ -63,6 +63,7 @@ type HistoryOperation =
   | PatchHistoryOperation
   | InsertHistoryOperation
   | DeleteHistoryOperation
+  | StagedOpReparent
   | SetTextHistoryOperation;
 
 type StagedOpInsert = {
@@ -90,7 +91,16 @@ type StagedOpSetText = {
   filePath: string;
 };
 
-type StagedOp = StagedOpInsert | StagedOpDelete | StagedOpSetText;
+type StagedOpReparent = {
+  type: 'reparent';
+  blockId: string;
+  oldParentId: string;
+  newParentId: string;
+  fileType: string | null;
+  filePath: string;
+};
+
+type StagedOp = StagedOpInsert | StagedOpDelete | StagedOpSetText | StagedOpReparent;
 
 type BlockMap = Record<string, any>;
 
@@ -108,7 +118,7 @@ type LivePosition = {
   height: number | null;
 };
 
-function RenderFile({ filePath }: { filePath: string }) {
+function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: string | null }) {
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -372,6 +382,28 @@ function RenderFile({ filePath }: { filePath: string }) {
         });
         break;
       }
+      case 'reparent': {
+        console.log('⏮️ [Undo] Отменяю перемещение элемента:', {
+          blockId: operation.blockId,
+          oldParentId: operation.oldParentId,
+          newParentId: operation.newParentId
+        });
+        // Отменяем перемещение элемента
+        updateStagedOps((prev) => {
+          const filtered = prev.filter(
+            op => !(op.type === 'reparent' && op.blockId === operation.blockId)
+          );
+          console.log('⏮️ [Undo] Обновлены stagedOps:', filtered);
+          return filtered;
+        });
+        console.log('⏮️ [Undo] Отправляю команду REPARENT в iframe для отмены');
+        sendIframeCommand({
+          type: MRPAK_CMD.REPARENT,
+          sourceId: operation.blockId,
+          targetParentId: operation.oldParentId,
+        });
+        break;
+      }
       default:
         console.warn('⏮️ [Undo] Неизвестный тип операции:', (operation as any).type);
     }
@@ -503,6 +535,35 @@ function RenderFile({ filePath }: { filePath: string }) {
         });
         break;
       }
+      case 'reparent': {
+        console.log('⏭️ [Redo] Повторяю перемещение элемента:', {
+          blockId: operation.blockId,
+          oldParentId: operation.oldParentId,
+          newParentId: operation.newParentId
+        });
+        updateStagedOps((prev: StagedOp[]) => {
+          const updated: StagedOp[] = [
+            ...prev,
+            {
+              type: 'reparent',
+              blockId: operation.blockId,
+              oldParentId: operation.oldParentId,
+              newParentId: operation.newParentId,
+              fileType: operation.fileType,
+              filePath: operation.filePath,
+            },
+          ];
+          console.log('⏭️ [Redo] Обновлены stagedOps:', updated);
+          return updated;
+        });
+        console.log('⏭️ [Redo] Отправляю команду REPARENT в iframe');
+        sendIframeCommand({
+          type: MRPAK_CMD.REPARENT,
+          sourceId: operation.blockId,
+          targetParentId: operation.newParentId,
+        });
+        break;
+      }
       default:
         console.warn('⏭️ [Redo] Неизвестный тип операции:', (operation as any).type);
     }
@@ -563,6 +624,7 @@ function RenderFile({ filePath }: { filePath: string }) {
 
   const applyBlockPatch = useCallback(
     async (blockId: any, patch: any, isIntermediate = false) => {
+      console.log('[applyBlockPatch] ENTRY:', { blockId, patch, isIntermediate, patchKeys: Object.keys(patch), patchValues: Object.values(patch) });
       try {
         // Bidirectional editing через AST: применяем изменения к constructorAST
         if (!blockId) return;
@@ -617,10 +679,35 @@ function RenderFile({ filePath }: { filePath: string }) {
             // Fallback: используем старый метод через framework, если projectRoot еще не загружен
             console.warn('[applyBlockPatch] projectRoot not available yet, using framework fallback');
 
-            // Во время перетаскивания (isIntermediate) не запускаем тяжелый fallback,
-            // иначе это приводит к частым setFileContent/setRenderVersion и морганию превью.
-            // Визуальная обратная связь во время drag уже есть внутри iframe через transform.
+            // Для промежуточных изменений (перетаскивание) применяем легкий fallback только для стилей позиции
             if (isIntermediate) {
+              const framework = createFramework(fileType as string, filePath);
+              if (!framework) {
+                console.warn('[applyBlockPatch] Unsupported file type for fallback:', fileType);
+                return;
+              }
+              
+              // Применяем только позиционные стили для немедленной обратной связи
+              const positionPatch: Record<string, any> = {};
+              if (patch.position !== undefined) positionPatch.position = patch.position;
+              if (patch.left !== undefined) positionPatch.left = patch.left;
+              if (patch.top !== undefined) positionPatch.top = patch.top;
+              if (patch.right !== undefined) positionPatch.right = patch.right;
+              if (patch.bottom !== undefined) positionPatch.bottom = patch.bottom;
+              
+              if (Object.keys(positionPatch).length > 0) {
+                await framework.commitPatches({
+                  originalCode: fileContent || '',
+                  stagedPatches: { [blockId]: positionPatch },
+                  stagedOps: [],
+                  blockMapForFile: blockMapForFile || {},
+                  externalStylesMap: {},
+                  filePath,
+                  resolvePath: resolvePathForFramework,
+                  readFile: (path: string) => ({ success: true, content: '' }),
+                  writeFile: (path: string, content: string) => ({ success: true }),
+                });
+              }
               return;
             }
             const framework = createFramework(fileType as string, filePath);
@@ -637,8 +724,8 @@ function RenderFile({ filePath }: { filePath: string }) {
               externalStylesMap: {},
               filePath,
               resolvePath: resolvePathForFramework,
-              readFile: (path: string) => ({ success: true, content: '' }),
-              writeFile: (path: string, content: string) => ({ success: true })
+              readFile: readFile as any,
+              writeFile: writeFile as any
             });
             
             if (commitResult.ok && commitResult.code) {
@@ -954,7 +1041,7 @@ function RenderFile({ filePath }: { filePath: string }) {
   }, [fileContent, fileType, filePath, blockMap, externalStylesMap, updateStagedPatches, updateStagedOps, updateHasStagedChanges]);
 
   const applyAndCommitPatch = useCallback(
-    async (blockId, patch) => {
+    async (blockId: string, patch: any) => {
       // Bidirectional editing: применяем сразу через applyBlockPatch
       await applyBlockPatch(blockId, patch);
     },
@@ -962,9 +1049,10 @@ function RenderFile({ filePath }: { filePath: string }) {
   );
 
   const handleEditorMessage = useCallback(
-    async (event) => {
+    async (event: any) => {
       const data = event?.nativeEvent?.data;
       if (!isMrpakMessage(data)) return;
+      console.log("HERREEEE: ", data.type)
 
       if (data.type === MRPAK_MSG.SELECT) {
         setSelectedBlock({ id: data.id, meta: data.meta });
@@ -1004,6 +1092,7 @@ function RenderFile({ filePath }: { filePath: string }) {
         const id = data.id;
         const patch = data.patch || {};
         const isIntermediate = data.isIntermediate === true; // Промежуточное изменение (при перетаскивании)
+        console.log('[handleEditorMessage] APPLY received:', { id, patch, isIntermediate });
         if (!id) return;
 
         // Если из iframe пришло reparent, используем ref на stageReparentBlock
@@ -1046,6 +1135,13 @@ function RenderFile({ filePath }: { filePath: string }) {
           });
         }
 
+        // Проверяем, доступен ли projectRoot для редактирования
+        if (!projectRoot && !isIntermediate) {
+          console.warn('[handleEditorMessage] Cannot apply patch - projectRoot not available');
+          setError('Невозможно применить изменения: проект еще не загружен. Подождите немного и попробуйте снова.');
+          return;
+        }
+        
         // Bidirectional editing: применяем сразу (даже промежуточные изменения)
         await applyBlockPatch(id, patch, isIntermediate);
         return;
@@ -1142,9 +1238,51 @@ function RenderFile({ filePath }: { filePath: string }) {
                 }
                 astManagerRef.current = newManager;
                 // Продолжаем с новым менеджером
-                return await stageDeleteBlock({ blockId });
+                return await stageDeleteBlock(blockId);
               } else {
-                throw new Error('projectRoot not available for AST bidirectional editing');
+                // Fallback: пока projectRoot не загружен, удаляем через framework.commitPatches
+                const entry = blockMapForFile ? blockMapForFile[blockId] : null;
+                const framework = createFramework(fileType as string, filePath);
+                if (!framework) {
+                  throw new Error('Unsupported file type for fallback delete');
+                }
+
+                const commitResult = await framework.commitPatches({
+                  originalCode: String(fileContent ?? ''),
+                  stagedPatches: {},
+                  stagedOps: [
+                    {
+                      type: 'delete',
+                      blockId,
+                      fileType,
+                      filePath,
+                      mapEntry: entry || null,
+                    },
+                  ],
+                  blockMapForFile: blockMapForFile || {},
+                  externalStylesMap,
+                  filePath,
+                  resolvePath: resolvePathForFramework,
+                  readFile: readFile as any,
+                  writeFile: writeFile as any,
+                });
+
+                if (!commitResult.ok || !commitResult.code) {
+                  throw new Error(`Framework fallback failed: ${commitResult.error || 'Unknown error'}`);
+                }
+
+                const newContent = commitResult.code;
+                await writeFile(filePath, newContent || '', { backup: true });
+                setFileContent(newContent || '');
+                updateMonacoEditorWithScroll(newContent);
+                setRenderVersion((v) => v + 1);
+
+                addToHistory({
+                  type: 'delete',
+                  blockId,
+                });
+
+                return;
               }
             }
 
@@ -1181,7 +1319,8 @@ function RenderFile({ filePath }: { filePath: string }) {
             });
           } catch (e) {
             console.error('stageDeleteBlock error:', e);
-            setError(`Ошибка удаления блока: ${e.message}`);
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setError(`Ошибка удаления блока: ${errorMessage}`);
           }
         })();
         // Локально удаляем в iframe
@@ -1265,7 +1404,54 @@ function RenderFile({ filePath }: { filePath: string }) {
                 // Продолжаем с новым менеджером
                 return await stageInsertBlock({ targetId, mode, snippet: snippetWithId });
               } else {
-                throw new Error('projectRoot not available for AST bidirectional editing');
+                // Fallback: пока projectRoot не загружен, вставляем через framework.commitPatches
+                const framework = createFramework(fileType as string, filePath);
+                if (!framework) {
+                  throw new Error('Unsupported file type for fallback insert');
+                }
+
+                const commitResult = await framework.commitPatches({
+                  originalCode: String(fileContent ?? ''),
+                  stagedPatches: {},
+                  stagedOps: [
+                    {
+                      type: 'insert',
+                      targetId,
+                      mode: mode === 'sibling' ? 'after' : 'child',
+                      snippet: String(snippetWithId || ''),
+                      blockId: newId,
+                      fileType,
+                      filePath,
+                      mapEntry: entry || null,
+                    },
+                  ],
+                  blockMapForFile: blockMapForFile || {},
+                  externalStylesMap,
+                  filePath,
+                  resolvePath: resolvePathForFramework,
+                  readFile: readFile as any,
+                  writeFile: writeFile as any,
+                });
+
+                if (!commitResult.ok || !commitResult.code) {
+                  throw new Error(`Framework fallback failed: ${commitResult.error || 'Unknown error'}`);
+                }
+
+                const newContent = commitResult.code;
+                await writeFile(filePath, newContent || '', { backup: true });
+                setFileContent(newContent || '');
+                updateMonacoEditorWithScroll(newContent);
+                setRenderVersion((v) => v + 1);
+
+                addToHistory({
+                  type: 'insert',
+                  blockId: newId,
+                  targetId,
+                  mode: mode === 'sibling' ? 'after' : 'child',
+                  snippet: String(snippetWithId || ''),
+                });
+
+                return;
               }
             }
 
@@ -1308,7 +1494,8 @@ function RenderFile({ filePath }: { filePath: string }) {
             });
           } catch (e) {
             console.error('stageInsertBlock error:', e);
-            setError(`Ошибка вставки блока: ${e.message}`);
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setError(`Ошибка вставки блока: ${errorMessage}`);
           }
         })();
 
@@ -1952,7 +2139,6 @@ function RenderFile({ filePath }: { filePath: string }) {
 
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Ошибка: ${errorMessage}`);
-      setError(`Ошибка: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -1963,9 +2149,39 @@ function RenderFile({ filePath }: { filePath: string }) {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if ((viewMode !== 'edit' && viewMode !== 'split') || !filePath) return;
+        console.log("[RenderFile] Project root loading...", { viewMode, filePath });
+      if ((viewMode !== 'edit' && viewMode !== 'split') || !filePath) {
+        console.log("[RenderFile] Skipping project root load:", { viewMode, filePath });
+        return;
+      }
       try {
-        const root = await findProjectRoot(filePath);
+        // Используем projectPath как корень проекта
+        let root = projectPath;
+        console.log("[RenderFile] Using projectPath as root:", projectPath);
+        
+        // Если projectPath недоступен, пробуем определить из filePath
+        if (!root && filePath) {
+          const normalizedPath = filePath.replace(/\\/g, '/');
+          console.log("[RenderFile] Normalized path:", normalizedPath);
+          const lastSlash = normalizedPath.lastIndexOf('/');
+          console.log("[RenderFile] Last slash index:", lastSlash);
+          if (lastSlash > 0) {
+            root = normalizedPath.substring(0, lastSlash);
+            console.log("[RenderFile] Initial root:", root);
+            // Если это директория src, поднимемся еще на уровень вверх
+            if (root.endsWith('/src')) {
+              root = root.substring(0, root.length - 4);
+              console.log("[RenderFile] Adjusted root (removed /src):", root);
+            }
+          }
+        }
+        
+        // Fallback: пробуем найти projectRoot через API (для Electron)
+        if (!root) {
+          root = await findProjectRoot(filePath);
+        }
+        
+        console.log('[RenderFile] Project root set to:', root);
         if (cancelled) return;
         setProjectRoot(root);
         if (root) {
@@ -4963,6 +5179,7 @@ function RenderFile({ filePath }: { filePath: string }) {
           <View style={{ flex: 1, position: 'relative' }}>
             <BlockEditorPanel
               fileType="html"
+              livePosition={livePosition}
               html={editorHTML || htmlToRender}
               selectedBlock={selectedBlock}
               onMessage={handleEditorMessage}

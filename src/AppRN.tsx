@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import RenderFile from './RenderFile';
 import FileTree from './FileTree';
@@ -10,8 +10,36 @@ function AppRN() {
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const leftPanelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [createProjectDialogVisible, setCreateProjectDialogVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);;
+
+  // Обработчики для сворачивания левой панели
+  const handleLeftPanelMouseEnter = () => {
+    // Отменяем таймер сворачивания при наведении
+    if (leftPanelTimeoutRef.current) {
+      clearTimeout(leftPanelTimeoutRef.current);
+      leftPanelTimeoutRef.current = null;
+    }
+    setIsLeftPanelCollapsed(false);
+  };
+
+  const handleLeftPanelMouseLeave = () => {
+    leftPanelTimeoutRef.current = setTimeout(() => {
+      setIsLeftPanelCollapsed(true);
+      leftPanelTimeoutRef.current = null;
+    }, 350);
+  };
+
+  // Очистка таймера при размонтировании
+  useEffect(() => {
+    return () => {
+      if (leftPanelTimeoutRef.current) {
+        clearTimeout(leftPanelTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSelectProject = async () => {
     try {
@@ -151,15 +179,31 @@ function AppRN() {
       {/* Основной контент: две колонки */}
       <View style={styles.mainContent}>
         {/* Левая панель: файловое дерево */}
-        <View style={[styles.sidebar, { width: sidebarWidth }]}>
-          <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Файлы проекта</Text>
+        <View 
+          style={[
+            styles.sidebar,
+            isLeftPanelCollapsed ? styles.sidebarCollapsed : { width: sidebarWidth }
+          ]}
+          onPointerEnter={handleLeftPanelMouseEnter}
+          onPointerLeave={handleLeftPanelMouseLeave}
+        >
+          
+          {/* Содержимое левой панели */}
+          <View 
+            style={[
+              styles.sidebarContent,
+              isLeftPanelCollapsed && styles.sidebarContentCollapsed
+            ]}
+          >
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Файлы проекта</Text>
+            </View>
+            <FileTree
+              rootPath={projectPath!}
+              onSelectFile={handleSelectFile}
+              selectedPath={selectedFilePath!}
+            />
           </View>
-          <FileTree
-            rootPath={projectPath}
-            onSelectFile={handleSelectFile}
-            selectedPath={selectedFilePath}
-          />
         </View>
 
         {/* Разделитель */}
@@ -168,7 +212,7 @@ function AppRN() {
         {/* Правая панель: рендеринг файла */}
         <View style={styles.content}>
           {selectedFilePath ? (
-            <RenderFile filePath={selectedFilePath} />
+            <RenderFile filePath={selectedFilePath} projectPath={projectPath} />
           ) : (
             <View style={styles.placeholder}>
               <Text style={styles.placeholderIcon}>📄</Text>
@@ -271,6 +315,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e1e1e',
     borderRightWidth: 1,
     borderRightColor: 'rgba(255, 255, 255, 0.1)',
+    transition: 'width 0.3s ease',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  sidebarCollapsed: {
+    width: 40,
+  },
+  sidebarContent: {
+    width: '100%',
+    minWidth: 260, // Минимальная ширина для комфортного отображения
+    transition: 'opacity 0.2s ease',
+  },
+  sidebarContentCollapsed: {
+    opacity: 0,
+    pointerEvents: 'none',
+  },
+  sidebarToggle: {
+    position: 'absolute',
+    right: -20,
+    top: '50%',
+    transform: [{ translateY: -20 }],
+    width: 40,
+    height: 40,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 11,
+  },
+  sidebarToggleText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   sidebarHeader: {
     padding: 16,
@@ -292,6 +372,44 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
     zIndex: -1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  rightPanel: {
+    width: 400,
+    backgroundColor: '#1e1e1e',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 10,
+    transition: 'width 0.3s ease',
+  },
+  rightPanelCollapsed: {
+    width: 40,
+  },
+  rightPanelToggle: {
+    position: 'absolute',
+    left: -20,
+    top: '50%',
+    transform: [{ translateY: -20 }],
+    width: 40,
+    height: 40,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 11,
+  },
+  rightPanelToggleText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   placeholder: {
     flex: 1,

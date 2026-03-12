@@ -126,7 +126,7 @@ function App() {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>🚀 Добро пожаловать в ${projectName}</h1>
-      <p>Это базовый React компонент</p>
+      <div>Это базовый React компонент</div>
       
       <div style={{ marginTop: '20px' }}>
         <button 

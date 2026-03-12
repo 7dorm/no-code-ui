@@ -629,11 +629,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 const left = snap(baseLeft + dx);
                 const top = snap(baseTop + dy);
                 
-                if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left + 'px', top: top + 'px' }, isIntermediate: true });
-                } else {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left, top: top }, isIntermediate: true });
-                }
+                // Сохраняем финальные координаты в drag объект
+                drag.finalLeft = left;
+                drag.finalTop = top;
+                drag.finalPosition = 'relative';
               } else {
                 const startLeft = drag.rect.left - parentRect.left - padLeft;
                 const startTop = drag.rect.top - parentRect.top - padTop;
@@ -648,11 +647,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 left = Math.min(Math.max(left, minLeft), maxLeft);
                 top = Math.min(Math.max(top, minTop), maxTop);
                 
-                if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left + 'px', top: top + 'px' }, isIntermediate: true });
-                } else {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left, top: top }, isIntermediate: true });
-                }
+                // Сохраняем финальные координаты в drag объект
+                drag.finalLeft = left;
+                drag.finalTop = top;
+                drag.finalPosition = 'absolute';
               }
             } else {
               const w = snap(Math.max(1, drag.rect.width + dx));
@@ -701,8 +699,6 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (drag.mode === 'move') {
               selected.style.transform = '';
 
-              updateBoxOverlay();
-
               if (moveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
                 const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
@@ -738,11 +734,16 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 selected.style.left = left + 'px';
                 selected.style.top = top + 'px';
 
+                const patch= { position: 'absolute' };
                 if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left + 'px', top: top + 'px' }, isIntermediate: false });
+                  patch.left = left + 'px';
+                  patch.top = top + 'px';
                 } else {
-                  post(MSG_APPLY, { id, patch: { position: 'absolute', left: left, top: top }, isIntermediate: false });
+                  patch.left = left;
+                  patch.top = top;
                 }
+                
+                post(MSG_APPLY, { id, patch, isIntermediate: false });
               }
             } else {
               const w = snap(Math.max(1, drag.rect.width + dx));
@@ -946,8 +947,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           updateBoxOverlay();
         })();
       </script>
-    `;
-}
+     `;
+ }
 
 /**
  * Инжектирует скрипт блочного редактора в HTML

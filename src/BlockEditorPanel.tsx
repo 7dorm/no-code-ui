@@ -82,10 +82,69 @@ export default function BlockEditorPanel({
   canRedo: boolean;
   livePosition: { left: number | null; top: number | null; width: number | null; height: number | null } | null;
 }) {
-  const [left, setLeft] = useState(null);
-  const [top, setTop] = useState(null);
-  const [width, setWidth] = useState(null);
-  const [height, setHeight] = useState(null);
+  const [left, setLeft] = useState<number | null>(null);
+  const [top, setTop] = useState<number | null>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  // Обработчики для отправки патчей позиционирования
+  const handleLeftChange = (value: number | null) => {
+    console.log('[handleLeftChange] Called with:', { value, selectedBlockId: selectedBlock?.id, typeofValue: typeof value });
+    setLeft(value);
+    if (selectedBlock?.id && value !== null && value !== undefined && !isNaN(value)) {
+      const patch: any = { left: fileType === 'html' ? `${value}px` : value };
+      if (moveMode !== 'relative') {
+        patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
+      }
+      console.log('[handleLeftChange] Sending patch:', { blockId: selectedBlock.id, patch });
+      onApplyPatch(selectedBlock.id, patch);
+    } else {
+      console.log('[handleLeftChange] Not sending patch:', { selectedBlockId: selectedBlock?.id, value, isValid: value !== null && value !== undefined && !isNaN(value) });
+    }
+  };
+
+  const handleTopChange = (value: number | null) => {
+    setTop(value);
+    if (selectedBlock?.id && value !== null) {
+      const patch: any = { top: fileType === 'html' ? `${value}px` : value };
+      if (moveMode !== 'relative') {
+        patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
+      }
+      onApplyPatch(selectedBlock.id, patch);
+    }
+  };
+
+  const handleWidthChange = (value: number | null) => {
+    setWidth(value);
+    if (selectedBlock?.id && value !== null) {
+      onApplyPatch(selectedBlock.id, { 
+        width: fileType === 'html' ? `${value}px` : value 
+      });
+    }
+  };
+
+  const handleHeightChange = (value: number | null) => {
+    setHeight(value);
+    if (selectedBlock?.id && value !== null) {
+      onApplyPatch(selectedBlock.id, { 
+        height: fileType === 'html' ? `${value}px` : value 
+      });
+    }
+  };
+
+  // Обработчик для изменения moveMode
+  const handleMoveModeChange = (newMoveMode: string) => {
+    console.log('[handleMoveModeChange] Called with:', { newMoveMode, oldMoveMode: moveMode, selectedBlockId: selectedBlock?.id });
+    setMoveMode(newMoveMode);
+    
+    if (selectedBlock?.id) {
+      const patch: any = { position: newMoveMode === 'grid8' ? 'absolute' : newMoveMode };
+      console.log('[handleMoveModeChange] Sending patch:', { blockId: selectedBlock.id, patch });
+      onApplyPatch(selectedBlock.id, patch);
+    } else {
+      console.log('[handleMoveModeChange] Not sending patch:', { selectedBlockId: selectedBlock?.id, newMoveMode });
+    }
+  };
   const [bg, setBg] = useState('');
   const [color, setColor] = useState('');
   const [editingLayerId, setEditingLayerId] = useState(null);
@@ -98,6 +157,7 @@ export default function BlockEditorPanel({
   const [reparentMode, setReparentMode] = useState(false);
   const [reparentTargetId, setReparentTargetId] = useState(null);
   const [moveMode, setMoveMode] = useState('absolute'); // absolute | relative | grid8
+  const [isMoveModeInitialized, setIsMoveModeInitialized] = useState(false);
 
   useEffect(() => {
     // При выборе блока сбрасываем форму (MVP: не пытаемся читать текущие стили)
@@ -115,6 +175,22 @@ export default function BlockEditorPanel({
       setStyleMode('text');
       setStyleText(inline);
     }
+    // Читаем moveMode из data-атрибута элемента
+    let elementMoveMode = 'absolute'; // значение по умолчанию
+    if (selectedBlock?.id) {
+      // В React-режиме нужно искать в DOM через data-no-code-ui-id
+      const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
+                      document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
+      if (element) {
+        const savedMoveMode = element.getAttribute('data-move-mode');
+        if (savedMoveMode && ['absolute', 'relative', 'grid8'].includes(savedMoveMode)) {
+          elementMoveMode = savedMoveMode;
+        }
+      }
+    }
+    setMoveMode(elementMoveMode);
+    setIsMoveModeInitialized(true);
+
     // Строим baseline map в нормализованном виде
     const raw = parseStyleText(inline);
     const norm: Record<string, string | number | boolean> = {};
@@ -136,6 +212,29 @@ export default function BlockEditorPanel({
     if (!onSendCommand) return;
     onSendCommand({ type: 'MRPAK_CMD_SET_MOVE_MODE', mode: moveMode, grid: 8 });
   }, [moveMode, onSendCommand]);
+
+  // Отдельный useEffect для сохранения moveMode в data-атрибут и создания патча
+  useEffect(() => {
+    if (!selectedBlock?.id || !isMoveModeInitialized) return;
+    
+    const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
+                    document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
+    if (element) {
+      element.setAttribute('data-move-mode', moveMode);
+      
+      // Создаем патч для обновления position в стиле элемента
+      console.log('[moveMode change] Processing moveMode:', { moveMode, selectedBlockId: selectedBlock?.id, isInitialized: isMoveModeInitialized });
+      if (moveMode !== 'relative') {
+        const patch: any = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
+        console.log('[moveMode change] Created patch:', { patch, patchKeys: Object.keys(patch), patchValues: Object.values(patch) });
+        console.log('[moveMode change] About to call onApplyPatch:', { blockId: selectedBlock.id, onApplyPatch: typeof onApplyPatch });
+        onApplyPatch(selectedBlock.id, patch);
+        console.log('[moveMode change] onApplyPatch called successfully');
+      } else {
+        console.log('[moveMode change] Skipping patch for relative mode');
+      }
+    }
+  }, [moveMode, selectedBlock?.id, isMoveModeInitialized]);
 
   const canApply = !!selectedBlock?.id;
 
@@ -680,16 +779,21 @@ export default function BlockEditorPanel({
           <select
             style={{ ...htmlInputStyle, height: '36px', marginBottom: '10px' }}
             value={moveMode}
-            onChange={(e) => setMoveMode(e.target.value)}
+            onChange={(e) => handleMoveModeChange(e.target.value)}
           >
             <option value="absolute">AbsoluteToParent</option>
             <option value="relative">Relative</option>
             <option value="grid8">GridSnap(8)</option>
           </select>
-          <NumberField label="left" value={livePosition?.left !== null && livePosition?.left !== undefined ? livePosition.left : left} onChange={setLeft} />
-          <NumberField label="top" value={livePosition?.top !== null && livePosition?.top !== undefined ? livePosition.top : top} onChange={setTop} />
-          <NumberField label="width" value={livePosition?.width !== null && livePosition?.width !== undefined ? livePosition.width : width} onChange={setWidth} />
-          <NumberField label="height" value={livePosition?.height !== null && livePosition?.height !== undefined ? livePosition.height : height} onChange={setHeight} />
+          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginBottom: '10px' }}>
+            {moveMode === 'absolute' && 'Позиционирование относительно родителя с точными координатами'}
+            {moveMode === 'relative' && 'Позиционирование относительно текущей позиции элемента'}
+            {moveMode === 'grid8' && 'Позиционирование с привязкой к сетке 8px для точного выравнивания'}
+          </Text>
+          <NumberField label="left" value={livePosition?.left !== null && livePosition?.left !== undefined ? livePosition.left : left} onChange={handleLeftChange} />
+          <NumberField label="top" value={livePosition?.top !== null && livePosition?.top !== undefined ? livePosition.top : top} onChange={handleTopChange} />
+          <NumberField label="width" value={livePosition?.width !== null && livePosition?.width !== undefined ? livePosition.width : width} onChange={handleWidthChange} />
+          <NumberField label="height" value={livePosition?.height !== null && livePosition?.height !== undefined ? livePosition.height : height} onChange={handleHeightChange} />
           {livePosition && (livePosition.left !== null || livePosition.top !== null || livePosition.width !== null || livePosition.height !== null) && (
             <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginTop: '6px', fontStyle: 'italic' }}>
               ● Обновляется в реальном времени
