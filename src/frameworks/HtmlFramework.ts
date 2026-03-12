@@ -41,9 +41,13 @@ export class HtmlFramework extends Framework {
           const tryPaths = [
             resolvedPath + '.js',
             resolvedPath + '.jsx',
+            resolvedPath + '.ts',
+            resolvedPath + '.tsx',
             resolvedPath + '.css',
             resolvedPath + '/index.js',
-            resolvedPath + '/index.jsx'
+            resolvedPath + '/index.jsx',
+            resolvedPath + '/index.ts',
+            resolvedPath + '/index.tsx'
           ];
           
           for (const tryPath of tryPaths) {
@@ -106,6 +110,12 @@ export class HtmlFramework extends Framework {
       const scriptPath = match[1];
       // Пропускаем внешние URL и CDN
       if (scriptPath.startsWith('http://') || scriptPath.startsWith('https://') || scriptPath.startsWith('//')) {
+        continue;
+      }
+      // Пропускаем TypeScript/TSX файлы — браузер их не выполнит как обычный JS
+      const lowerScriptPath = scriptPath.toLowerCase();
+      if (lowerScriptPath.endsWith('.ts') || lowerScriptPath.endsWith('.tsx')) {
+        console.warn('HtmlFramework: Skipping TS/TSX script for inlining:', scriptPath);
         continue;
       }
       

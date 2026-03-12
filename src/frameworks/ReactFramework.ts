@@ -112,9 +112,13 @@ export class ReactFramework extends Framework {
         const tryPaths = [
           resolvedPath + '.js',
           resolvedPath + '.jsx',
+          resolvedPath + '.ts',
+          resolvedPath + '.tsx',
           resolvedPath + '.css',
           resolvedPath + '/index.js',
-          resolvedPath + '/index.jsx'
+          resolvedPath + '/index.jsx',
+          resolvedPath + '/index.ts',
+          resolvedPath + '/index.tsx'
         ];
         
         for (const tryPath of tryPaths) {
@@ -1713,7 +1717,7 @@ export class ReactFramework extends Framework {
         Компонент загружается из выбранного файла...
     </div>
     <div id="root"></div>
-    <script type="text/babel" data-type="module">
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
         // Делаем все React хуки доступными в Babel скрипте
         const React = window.React;
         

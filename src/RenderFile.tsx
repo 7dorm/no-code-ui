@@ -2555,9 +2555,13 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
         const tryPaths = [
           resolvedPath + '.js',
           resolvedPath + '.jsx',
+          resolvedPath + '.ts',
+          resolvedPath + '.tsx',
           resolvedPath + '.css',
           resolvedPath + '/index.js',
-          resolvedPath + '/index.jsx'
+          resolvedPath + '/index.jsx',
+          resolvedPath + '/index.ts',
+          resolvedPath + '/index.tsx'
         ];
 
         for (const tryPath of tryPaths) {
@@ -2914,8 +2918,10 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
       for (const [key, value] of Object.entries(pathMap)) {
         const valueStr = String(value);
         if (valueStr.includes(fileName + '.js') || valueStr.includes(fileName + '.jsx') ||
+            valueStr.includes(fileName + '.ts') || valueStr.includes(fileName + '.tsx') ||
             valueStr.endsWith('/' + fileName) || valueStr.endsWith('/' + fileName + '.js') ||
-            valueStr.endsWith('/' + fileName + '.jsx')) {
+            valueStr.endsWith('/' + fileName + '.jsx') || valueStr.endsWith('/' + fileName + '.ts') ||
+            valueStr.endsWith('/' + fileName + '.tsx')) {
           // Проверяем, что это действительно нужный файл по последним частям пути
           const valueParts = valueStr.split('/');
           const resolvedParts = resolvedPath.split('/');
@@ -3765,17 +3771,15 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
           const moduleExports = {};
           
           // Добавляем named exports - используем прямую проверку в текущей области видимости
-          ${namedExports.length > 0 ? namedExports.map(name => 
-            `// #region agent log
-            ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Checking export variable',data:{name:'${name}',importPath:'${importPath}',isDefined:typeof ${name} !== "undefined",valueType:typeof ${name}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
-            if (typeof ${name} !== "undefined") { 
-              moduleExports.${name} = ${name}; 
+          ${namedExports.length > 0 ? namedExports
+            .map(
+              (name) => `if (typeof ${name} !== "undefined") {
+              moduleExports.${name} = ${name};
               // #region agent log
               ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Export added successfully',data:{name:'${name}',importPath:'${importPath}',exportKeys:Object.keys(moduleExports)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
               console.log('Added named export ${name} to module ${importPath}:', ${name});
-            } else { 
+            } else {
               // #region agent log
               ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-export',message:'Export variable undefined',data:{name:'${name}',importPath:'${importPath}'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
               // #endregion
@@ -3793,8 +3797,8 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
                     if (typeof this !== 'undefined' && typeof this.${name} !== 'undefined') {
                       moduleExports.${name} = this.${name};
                       console.log('Found ${name} on this object');
-                    }
-                  } catch(e) {}
+                }
+              } catch(e) {}
                   // Если не нашли, выводим отладочную информацию
                   if (!moduleExports.${name}) {
                     console.error('Could not find ${name} in any scope');
@@ -3865,7 +3869,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
           
           console.log('Registered module under keys:', allPossiblePaths);
           // #region agent log
-          ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-register',message:'Module registered',data:{importPath:'${importPath}',absolutePath:'${moduleAbsolutePath}',allModules:Object.keys(window.__modules__||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+          {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:module-register',message:'Module registered',data:{importPath:'${importPath}',absolutePath:'${moduleAbsolutePath}',allModules:Object.keys(window.__modules__||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
           // #endregion
         })();
       `;
@@ -3919,7 +3923,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
               // Добавляем проверку и логирование для отладки
               return `const ${alias} = (() => {
                 // #region agent log
-                ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Resolving import',data:{orig:'${orig}',alias:'${alias}',importPath:'${importPath}',absolutePath:'${absolutePath}',modulesAvailable:Object.keys(window.__modules__||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Resolving import',data:{orig:'${orig}',alias:'${alias}',importPath:'${importPath}',absolutePath:'${absolutePath}',modulesAvailable:Object.keys(window.__modules__||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
                 // Ищем модуль по всем возможным путям
                 const module1 = window.__modules__ && window.__modules__['${absolutePath}'];
@@ -3936,7 +3940,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
                   }
                 }
                 // #region agent log
-                ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Module lookup',data:{orig:'${orig}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Module lookup',data:{orig:'${orig}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
                 // #endregion
                 const module = module1 || module2 || module3;
                 if (!module) {
@@ -3946,7 +3950,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
                 }
                 const value = module.${orig} || module.default?.${orig};
                 // #region agent log
-                ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Import result',data:{orig:'${orig}',alias:'${alias}',valueDefined:value!==undefined,valueType:typeof value,moduleKeys:Object.keys(module)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Import result',data:{orig:'${orig}',alias:'${alias}',valueDefined:value!==undefined,valueType:typeof value,moduleKeys:Object.keys(module)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
                 // #endregion
                 if (value === undefined) {
                   console.error('Failed to import ${orig} from ${importPath}.');
@@ -4010,12 +4014,12 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
                 }
               }
               // #region agent log
-              ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Module lookup for default import',data:{importSpec:'${importSpec}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Module lookup for default import',data:{importSpec:'${importSpec}',hasModule1:!!module1,hasModule2:!!module2,hasModule3:!!module3,module1Keys:module1?Object.keys(module1):[],module2Keys:module2?Object.keys(module2):[],module3Keys:module3?Object.keys(module3):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
               // #endregion
               const module = module1 || module2 || module3;
               const value = module?.default || module?.styles || module;
               // #region agent log
-              ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Default import result',data:{importSpec:'${importSpec}',valueDefined:value!==undefined,valueType:typeof value,isFunction:typeof value==='function'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Default import result',data:{importSpec:'${importSpec}',valueDefined:value!==undefined,valueType:typeof value,isFunction:typeof value==='function'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
               if (value === undefined) {
                 console.error('Failed to import default from ${importPath}. Available modules:', Object.keys(window.__modules__ || {}));
@@ -4337,7 +4341,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
         Компонент загружается из выбранного файла...
     </div>
     <div id="root"></div>
-    <script type="text/babel" data-type="module">
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
         // React доступен глобально через CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         
@@ -4879,7 +4883,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
         Компонент загружается из выбранного файла...
     </div>
     <div id="root"></div>
-    <script type="text/babel" data-type="module">
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
         // React и React Native Web доступны глобально через CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         const ReactNative = window.ReactNative || {};
@@ -4996,7 +5000,7 @@ function RenderFile({ filePath, projectPath }: { filePath: string; projectPath: 
         
         try {
             // #region agent log
-            ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:main-code',message:'About to execute processed code',data:{modulesAvailable:Object.keys(window.__modules__||{}).length,codeLength:${processedCode.length}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+            {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:main-code',message:'About to execute processed code',data:{modulesAvailable:Object.keys(window.__modules__||{}).length,codeLength:${processedCode.length}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
             // #endregion
             ${processedCode}
             

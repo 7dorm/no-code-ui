@@ -562,7 +562,7 @@ export class ReactNativeFramework extends ReactFramework {
 </head>
 <body>
     <div id="root"></div>
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react,typescript">
         // Ждем загрузки React Native Web
         (async () => {
           // Ждем пока RNW загрузится

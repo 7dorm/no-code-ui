@@ -50,7 +50,7 @@ function WebView({
       return;
     }
 
-    const container = containerRef.current as HTMLElement;
+    const container = containerRef.current as HTMLElement | null;
     console.log('WebView: useEffect triggered', { 
       hasHtml: !!source.html, 
       hasUri: !!source.uri,

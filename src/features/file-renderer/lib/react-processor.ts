@@ -285,7 +285,7 @@ export function createReactHTMLTemplate({
         Компонент загружается из выбранного файла...
     </div>
     <div id="root"></div>
-    <script type="text/babel" data-type="module">
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
         // React доступен глобально через CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         
