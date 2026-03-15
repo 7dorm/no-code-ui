@@ -6,8 +6,11 @@ if (typeof process === 'undefined') {
 
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
+import * as ReactNativeWeb from 'react-native-web';
 import AppRN from './AppRN';
 import './index.css';
+
+(window as any).__NO_CODE_UI_REACT_NATIVE_WEB__ = ReactNativeWeb;
 
 const rootElement = document.getElementById('root');
 
