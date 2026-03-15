@@ -14,7 +14,7 @@ import {
   applyExternalStylePatch, 
   replaceStyleReferenceInJsx 
 } from '../blockEditor/PatchEngine';
-import { extractImports, detectComponents } from '../features/file-renderer/lib/react-processor';
+import { extractImports, detectComponents, normalizeReactModuleCode } from '../features/file-renderer/lib/react-processor';
 import { readFile, writeFile } from '../shared/api/electron-api';
 import { resolvePath, resolvePathSync } from '../features/file-renderer/lib/path-resolver';
 import { injectBlockEditorScript } from '../features/file-renderer/lib/block-editor-script';
@@ -483,17 +483,11 @@ export class ReactFramework extends Framework {
       }
     }
     
-    // Обрабатываем код - удаляем импорты React, но сохраняем локальные
-    let defaultExportInfo = null;
-    const defaultExportMatch = code.match(/export\s+default\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
-    if (defaultExportMatch) {
-      defaultExportInfo = {
-        name: defaultExportMatch[1],
-        type: 'default-export'
-      };
-    }
+    // Обрабатываем код - нормализуем экспорты и удаляем импорты React, но сохраняем локальные
+    const normalizedMainModule = normalizeReactModuleCode(code);
+    const defaultExportInfo = normalizedMainModule.defaultExportInfo || null;
     
-    let processedCode = code
+    let processedCode = normalizedMainModule.code
       // Удаляем все варианты импортов React (включая смешанные)
       .replace(/import\s+React\s*,\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '') // import React, { useState } from 'react'
       .replace(/import\s+\{[^}]*\}\s*,\s*React\s*from\s+['"]react['"];?\s*/gi, '') // import { useState }, React from 'react'
@@ -501,7 +495,6 @@ export class ReactFramework extends Framework {
       .replace(/import\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '')           // import { useState } from 'react'
       // Удаляем импорты react-native (они будут доступны глобально)
       .replace(/import\s*\{[^}]*\}\s*from\s+['"]react-native['"];?\s*/gi, '')
-      .replace(/export\s+default\s+/g, '')
       .trim();
     
     console.log('[ProcessReactCode] Initial processedCode length:', processedCode.length);
@@ -637,29 +630,21 @@ export class ReactFramework extends Framework {
         pathMapKeys: Object.keys(pathMap).slice(0, 10)
       });
       
-      // Обрабатываем экспорты
-      let processedDep = content;
+      // Обрабатываем экспорты через AST, чтобы корректно поддерживать TS/TSX и anonymous default export
+      const normalizedDependency = normalizeReactModuleCode(content);
+      let processedDep = normalizedDependency.code;
       
-      // СНАЧАЛА обрабатываем экспорты, ПОТОМ удаляем импорты
-      // Named exports: export const/let/var (обрабатываем ДО удаления импортов)
-      const namedConstExports = [];
-      processedDep = processedDep.replace(/export\s+(const|let|var)\s+(\w+)\s*=/g, (match, keyword, name) => {
-        namedConstExports.push(name);
-        if (!namedExports.includes(name)) {
-          namedExports.push(name);
+      normalizedDependency.namedExports.forEach(({ localName, exportedName }) => {
+        moduleExports[exportedName] = localName;
+        if (!namedExports.includes(localName)) {
+          namedExports.push(localName);
         }
-        return `${keyword} ${name} =`;
       });
       
-      // Named exports: export function (обрабатываем ДО удаления импортов)
-      const namedFunctionExports = [];
-      processedDep = processedDep.replace(/export\s+function\s+(\w+)/g, (match, name) => {
-        namedFunctionExports.push(name);
-        if (!namedExports.includes(name)) {
-          namedExports.push(name);
-        }
-        return `function ${name}`;
-      });
+      if (normalizedDependency.defaultExportInfo?.name) {
+        hasDefaultExport = true;
+        defaultExportName = normalizedDependency.defaultExportInfo.name;
+      }
       
       // Обрабатываем импорты из зависимого файла перед встраиванием
       // Импорты React и React Native будут доступны глобально
@@ -900,47 +885,11 @@ export class ReactFramework extends Framework {
         })
         .trim();
       
-      // Default export: export default ...
-      const defaultExportMatch = processedDep.match(/export\s+default\s+(.+?)(;|$)/s);
-      if (defaultExportMatch) {
-        hasDefaultExport = true;
-        const exportValue = defaultExportMatch[1].trim();
-        // Если это переменная или выражение
-        if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(exportValue)) {
-          defaultExportName = exportValue;
-          // Удаляем строку export default полностью
-          processedDep = processedDep.replace(/export\s+default\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*;?\s*/g, '');
-        } else {
-          defaultExportName = '__defaultExport';
-          processedDep = processedDep.replace(/export\s+default\s+/g, 'const __defaultExport = ');
-        }
-      }
-      
-      // Named exports: export { ... }
-      const namedExportsMatch = processedDep.match(/export\s+\{([^}]+)\}/);
-      if (namedExportsMatch) {
-        const exports = namedExportsMatch[1].split(',').map(e => e.trim()).filter(e => e);
-        exports.forEach(exp => {
-          const parts = exp.includes(' as ') ? exp.split(' as ') : [exp, exp];
-          const orig = parts[0].trim();
-          const alias = parts[1].trim();
-          moduleExports[alias] = orig;
-          if (!namedExports.includes(orig)) {
-            namedExports.push(orig);
-          }
-        });
-        processedDep = processedDep.replace(/export\s+\{([^}]+)\}/g, '');
-      }
-      
       // Если нет default export, но есть named export 'styles', используем его как default
       if (!hasDefaultExport && namedExports.includes('styles')) {
         defaultExportName = 'styles';
         hasDefaultExport = true;
       }
-      
-      // Удаляем все оставшиеся экспорты (на случай, если что-то пропустили)
-      processedDep = processedDep.replace(/export\s+default\s+.*?;?\s*/g, '');
-      processedDep = processedDep.replace(/export\s+\{[^}]+\}\s*;?\s*/g, '');
       
       // Получаем абсолютный путь для этого модуля (importPath уже равен absolutePath из цикла)
       const moduleAbsolutePath = dependencyModules[importPath] || importPath;
@@ -1072,7 +1021,7 @@ export class ReactFramework extends Framework {
           });
           
           // Дополнительно регистрируем по имени файла без расширения для лучшей совместимости
-          const fileName = '${moduleAbsolutePath}'.split('/').pop().replace(/\.(js|jsx)$/, '');
+          const fileName = '${moduleAbsolutePath}'.split('/').pop().replace(/\.(js|jsx|ts|tsx)$/, '');
           if (fileName) {
             window.__modules__[fileName] = moduleExports;
           }
@@ -1475,45 +1424,25 @@ export class ReactFramework extends Framework {
     let componentToRender = null;
     let componentName = null;
     
-    // Приоритет: default export > named exports > остальные компоненты
     for (const comp of detectedComponents) {
       const name = comp.name;
-      
-      // Проверяем, что это не ключевое слово JavaScript
       const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
       if (jsKeywords.includes(name)) {
         console.log(`ReactFramework: Skipping JS keyword: ${name}`);
         continue;
       }
-      
-      // Проверяем, что компонент действительно существует в коде
-      const componentExists = 
-        new RegExp(`(?:const|let|var|function)\\s+${name}\\s*[=(]`).test(processedCode) ||
-        new RegExp(`\\b${name}\\s*=`).test(processedCode) ||
-        new RegExp(`export\\s+default\\s+function\\s+${name}`).test(processedCode) ||
-        new RegExp(`export\\s+default\\s+${name}`).test(processedCode);
-      
-      console.log(`ReactFramework: Checking component ${name}:`, {
-        type: comp.type,
-        exists: componentExists,
-        priority: comp.priority,
-        isAnonymous: comp.isAnonymous,
-        isInferred: comp.isInferred
-      });
-      
-      if (componentExists) {
-        componentToRender = comp.name;
-        componentName = comp.name;
-        console.log('ReactFramework: Selected component:', name);
-        break;
-      }
+
+      componentToRender = comp.name;
+      componentName = comp.name;
+      console.log('ReactFramework: Selected component:', name, comp);
+      break;
     }
     
     // Если не нашли компонент, пробуем найти по имени из defaultExportInfo
     if (!componentToRender && defaultExportInfo) {
       const name = defaultExportInfo.name;
       const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
-      if (!jsKeywords.includes(name) && new RegExp(`(?:const|let|var|function)\\s+${name}\\s*[=(]`).test(processedCode)) {
+      if (!jsKeywords.includes(name)) {
         componentToRender = name;
         componentName = name;
         console.log('ReactFramework: Selected component from defaultExportInfo:', name);
@@ -2395,4 +2324,3 @@ export class ReactFramework extends Framework {
     return `<${tagName}${styleAttr}${onClickAttr}>${body}</${tagName}>`;
   }
 }
-

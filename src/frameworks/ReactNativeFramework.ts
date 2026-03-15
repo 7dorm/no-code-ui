@@ -86,46 +86,25 @@ export class ReactNativeFramework extends ReactFramework {
     let componentToRender = null;
     let componentName = null;
     
-    // Приоритет: default export > named exports > остальные компоненты
     for (const comp of detectedComponents) {
       const name = comp.name;
-      
-      // Проверяем, что это не ключевое слово JavaScript
       const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
       if (jsKeywords.includes(name)) {
         console.log(`ReactNativeFramework: Skipping JS keyword: ${name}`);
         continue;
       }
-      
-      // Проверяем, что компонент действительно существует в коде
-      // Улучшенная проверка для поддержки export default function ComponentName
-      const componentExists = 
-        new RegExp(`(?:const|let|var|function)\\s+${name}\\s*[=(]`).test(processedCode) ||
-        new RegExp(`\\b${name}\\s*=`).test(processedCode) ||
-        new RegExp(`export\\s+default\\s+function\\s+${name}`).test(processedCode) ||
-        new RegExp(`export\\s+default\\s+${name}`).test(processedCode);
-      
-      console.log(`ReactNativeFramework: Checking component ${name}:`, {
-        type: comp.type,
-        exists: componentExists,
-        priority: comp.priority,
-        isAnonymous: comp.isAnonymous,
-        isInferred: comp.isInferred
-      });
-      
-      if (componentExists) {
-        componentToRender = comp.name;
-        componentName = name;
-        console.log('ReactNativeFramework: Selected component:', name);
-        break;
-      }
+
+      componentToRender = comp.name;
+      componentName = name;
+      console.log('ReactNativeFramework: Selected component:', name, comp);
+      break;
     }
     
     // Если не нашли компонент, пробуем найти по имени из defaultExportInfo
     if (!componentToRender && defaultExportInfo) {
       const name = defaultExportInfo.name;
       const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
-      if (!jsKeywords.includes(name) && new RegExp(`(?:const|let|var|function)\\s+${name}\\s*[=(]`).test(processedCode)) {
+      if (!jsKeywords.includes(name)) {
         componentToRender = name;
         componentName = name;
         console.log('ReactNativeFramework: Selected component from defaultExportInfo:', name);
@@ -171,6 +150,16 @@ export class ReactNativeFramework extends ReactFramework {
         componentToRender = potentialComponents[0];
         componentName = potentialComponents[0];
         console.log('ReactNativeFramework: Auto-selected renderable component:', componentToRender);
+      } else {
+        const standardNames = ['App', 'Main', 'Screen', 'Component'];
+        for (const name of standardNames) {
+          if (new RegExp(`(?:const|let|var|function|class)\\s+${name}\\s*[=(]`).test(processedCode)) {
+            componentToRender = name;
+            componentName = name;
+            console.log('ReactNativeFramework: Fallback to standard name:', name);
+            break;
+          }
+        }
       }
     }
     
@@ -366,10 +355,49 @@ export class ReactNativeFramework extends ReactFramework {
       initializeReactGlobals();
     </script>
     
-    <!-- Создаем простую обертку React Native используя только глобальный React -->
+    <!-- Пытаемся использовать реальный React Native Web runtime из родителя, иначе включаем локальный shim -->
     <script>
       (function() {
         try {
+          const parentRuntime = (() => {
+            try {
+              return window.parent && window.parent !== window
+                ? window.parent.__NO_CODE_UI_REACT_NATIVE_WEB__
+                : null;
+            } catch (error) {
+              console.warn('[RNW Shim] Parent runtime is not accessible:', error);
+              return null;
+            }
+          })();
+
+          if (parentRuntime) {
+            window.ReactNativeWeb = parentRuntime;
+            [
+              'View',
+              'Text',
+              'StyleSheet',
+              'TouchableOpacity',
+              'ScrollView',
+              'Image',
+              'Button',
+              'Pressable',
+              'TextInput',
+              'SafeAreaView',
+              'FlatList',
+              'ActivityIndicator',
+              'Dimensions',
+              'Platform',
+              'useWindowDimensions'
+            ].forEach((key) => {
+              if (typeof parentRuntime[key] !== 'undefined') {
+                window[key] = parentRuntime[key];
+              }
+            });
+            console.log('[RNW Shim] Using parent React Native Web runtime');
+            window.__RNW_READY__ = true;
+            return;
+          }
+
           console.log('[RNW Shim] Creating React Native shim using global React...');
           
           const React = window.React;
@@ -409,11 +437,65 @@ export class ReactNativeFramework extends ReactFramework {
             }
             return cssStyle;
           };
+
+          const resolveStyle = (style, state = { pressed: false }) => {
+            if (typeof style === 'function') {
+              return flattenStyle(style(state));
+            }
+            return flattenStyle(style);
+          };
+
+          const renderComponentLike = (candidate, key) => {
+            if (!candidate) {
+              return null;
+            }
+            if (React.isValidElement(candidate)) {
+              return candidate.key == null ? React.cloneElement(candidate, { key }) : candidate;
+            }
+            if (typeof candidate === 'function') {
+              return React.createElement(candidate, { key });
+            }
+            return candidate;
+          };
+
+          const createInteractiveProps = (props = {}) => {
+            const {
+              onPress,
+              onLongPress,
+              disabled,
+              onClick,
+              onMouseDown,
+              onMouseUp,
+              ...rest
+            } = props;
+
+            return {
+              ...rest,
+              onClick: disabled ? undefined : (event) => {
+                if (typeof onClick === 'function') {
+                  onClick(event);
+                }
+                if (typeof onPress === 'function') {
+                  onPress(event);
+                }
+              },
+              onMouseDown: disabled ? undefined : (event) => {
+                if (typeof onMouseDown === 'function') {
+                  onMouseDown(event);
+                }
+                if (typeof onLongPress === 'function') {
+                  onLongPress(event);
+                }
+              },
+              onMouseUp: disabled ? undefined : onMouseUp,
+              'aria-disabled': disabled ? 'true' : undefined
+            };
+          };
           
           // View компонент
           const View = React.forwardRef((props, ref) => {
             const { style, children, ...otherProps } = props;
-            const flatStyle = flattenStyle(style);
+            const flatStyle = resolveStyle(style);
             const cssStyle = transformRNStyleToCSS(flatStyle);
             
             return React.createElement('div', {
@@ -426,7 +508,7 @@ export class ReactNativeFramework extends ReactFramework {
           // Text компонент
           const Text = React.forwardRef((props, ref) => {
             const { style, children, ...otherProps } = props;
-            const flatStyle = flattenStyle(style);
+            const flatStyle = resolveStyle(style);
             const cssStyle = transformRNStyleToCSS(flatStyle);
             
             return React.createElement('span', {
@@ -438,35 +520,57 @@ export class ReactNativeFramework extends ReactFramework {
           
           // TouchableOpacity компонент
           const TouchableOpacity = React.forwardRef((props, ref) => {
-            const { style, children, onPress, ...otherProps } = props;
-            const flatStyle = flattenStyle(style);
+            const { style, children, disabled, ...otherProps } = props;
+            const flatStyle = resolveStyle(style, { pressed: false });
             const cssStyle = transformRNStyleToCSS(flatStyle);
             
             return React.createElement('div', {
               ref,
-              style: { cursor: 'pointer', userSelect: 'none', ...cssStyle },
-              onClick: onPress,
-              ...otherProps
+              style: {
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                userSelect: 'none',
+                opacity: disabled ? 0.5 : 1,
+                ...cssStyle
+              },
+              ...createInteractiveProps({ disabled, ...otherProps })
             }, children);
+          });
+
+          const Pressable = React.forwardRef((props, ref) => {
+            const { style, children, disabled, ...otherProps } = props;
+            const flatStyle = resolveStyle(style, { pressed: false });
+            const cssStyle = transformRNStyleToCSS(flatStyle);
+
+            return React.createElement('div', {
+              ref,
+              style: {
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                userSelect: 'none',
+                opacity: disabled ? 0.5 : 1,
+                ...cssStyle
+              },
+              ...createInteractiveProps({ disabled, ...otherProps })
+            }, typeof children === 'function' ? children({ pressed: false }) : children);
           });
           
           // ScrollView компонент
           const ScrollView = React.forwardRef((props, ref) => {
-            const { style, children, ...otherProps } = props;
-            const flatStyle = flattenStyle(style);
+            const { style, contentContainerStyle, children, ...otherProps } = props;
+            const flatStyle = resolveStyle(style);
             const cssStyle = transformRNStyleToCSS(flatStyle);
+            const innerStyle = transformRNStyleToCSS(resolveStyle(contentContainerStyle));
             
             return React.createElement('div', {
               ref,
               style: { overflow: 'auto', ...cssStyle },
               ...otherProps
-            }, children);
+            }, React.createElement('div', { style: innerStyle }, children));
           });
           
           // Image компонент
           const Image = React.forwardRef((props, ref) => {
             const { style, source, ...otherProps } = props;
-            const flatStyle = flattenStyle(style);
+            const flatStyle = resolveStyle(style);
             const cssStyle = transformRNStyleToCSS(flatStyle);
             const src = source?.uri || source;
             
@@ -477,24 +581,193 @@ export class ReactNativeFramework extends ReactFramework {
               ...otherProps
             });
           });
+
+          const TextInput = React.forwardRef((props, ref) => {
+            const {
+              style,
+              multiline,
+              onChangeText,
+              editable = true,
+              value,
+              defaultValue,
+              ...otherProps
+            } = props;
+            const flatStyle = resolveStyle(style);
+            const cssStyle = transformRNStyleToCSS(flatStyle);
+            const sharedProps = {
+              ref,
+              style: cssStyle,
+              value,
+              defaultValue,
+              disabled: editable === false || otherProps.disabled,
+              onChange: (event) => {
+                if (typeof otherProps.onChange === 'function') {
+                  otherProps.onChange(event);
+                }
+                if (typeof onChangeText === 'function') {
+                  onChangeText(event.target.value);
+                }
+              },
+              ...otherProps
+            };
+
+            return multiline
+              ? React.createElement('textarea', sharedProps)
+              : React.createElement('input', sharedProps);
+          });
+
+          const Button = React.forwardRef((props, ref) => {
+            const { title, color, disabled, onPress, style, ...otherProps } = props;
+            const cssStyle = transformRNStyleToCSS(resolveStyle(style));
+            return React.createElement('button', {
+              ref,
+              type: 'button',
+              disabled,
+              style: {
+                backgroundColor: color || '#007AFF',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 6,
+                padding: '10px 14px',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                ...cssStyle
+              },
+              ...createInteractiveProps({ disabled, onPress, ...otherProps })
+            }, title || otherProps.children || 'Button');
+          });
+
+          const FlatList = React.forwardRef((props, ref) => {
+            const {
+              data = [],
+              renderItem,
+              keyExtractor,
+              ListHeaderComponent,
+              ListEmptyComponent,
+              ListFooterComponent,
+              ItemSeparatorComponent,
+              contentContainerStyle,
+              style,
+              ...otherProps
+            } = props;
+            const cssStyle = transformRNStyleToCSS(resolveStyle(style));
+            const innerStyle = transformRNStyleToCSS(resolveStyle(contentContainerStyle));
+            const items = Array.isArray(data) ? data : [];
+
+            const children = [];
+
+            const header = renderComponentLike(ListHeaderComponent, 'header');
+            if (header) {
+              children.push(header);
+            }
+
+            if (items.length === 0) {
+              const empty = renderComponentLike(ListEmptyComponent, 'empty');
+              if (empty) {
+                children.push(empty);
+              }
+            }
+
+            items.forEach((item, index) => {
+              const rendered = typeof renderItem === 'function'
+                ? renderItem({ item, index, separators: { highlight() {}, unhighlight() {}, updateProps() {} } })
+                : null;
+              if (rendered) {
+                const key = typeof keyExtractor === 'function' ? keyExtractor(item, index) : item?.key ?? item?.id ?? index;
+                children.push(
+                  React.isValidElement(rendered) && rendered.key == null
+                    ? React.cloneElement(rendered, { key })
+                    : rendered
+                );
+              }
+
+              if (ItemSeparatorComponent && index < items.length - 1) {
+                const separator = renderComponentLike(ItemSeparatorComponent, 'separator-' + index);
+                if (separator) {
+                  children.push(separator);
+                }
+              }
+            });
+
+            const footer = renderComponentLike(ListFooterComponent, 'footer');
+            if (footer) {
+              children.push(footer);
+            }
+
+            return React.createElement('div', {
+              ref,
+              style: { display: 'flex', flexDirection: 'column', ...cssStyle },
+              ...otherProps
+            }, React.createElement('div', { style: innerStyle }, children));
+          });
+
+          const ActivityIndicator = React.forwardRef((props, ref) => {
+            const { style, color = '#667eea', size = 'small', ...otherProps } = props;
+            const cssStyle = transformRNStyleToCSS(resolveStyle(style));
+            const dimension = size === 'large' ? 32 : Number(size) || 20;
+            return React.createElement('div', {
+              ref,
+              style: {
+                width: dimension,
+                height: dimension,
+                borderRadius: '50%',
+                border: '3px solid rgba(0, 0, 0, 0.12)',
+                borderTopColor: color,
+                animation: 'rn-spin 1s linear infinite',
+                ...cssStyle
+              },
+              ...otherProps
+            });
+          });
+
+          const Dimensions = {
+            get: () => ({
+              width: window.innerWidth,
+              height: window.innerHeight,
+              scale: window.devicePixelRatio || 1,
+              fontScale: 1
+            }),
+            addEventListener: () => ({ remove() {} }),
+            removeEventListener: () => {}
+          };
+
+          const useWindowDimensions = () => {
+            const [dimensions, setDimensions] = React.useState(Dimensions.get('window'));
+
+            React.useEffect(() => {
+              const handleResize = () => setDimensions(Dimensions.get('window'));
+              window.addEventListener('resize', handleResize);
+              return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            return dimensions;
+          };
           
           // StyleSheet API
           const StyleSheet = {
             create: (styles) => styles,
             flatten: flattenStyle,
+            compose: (first, second) => [first, second].filter(Boolean),
             absoluteFill: {
               position: 'absolute',
               left: 0,
               right: 0,
               top: 0,
               bottom: 0
-            }
+            },
+            absoluteFillObject: {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0
+            },
+            hairlineWidth: 1
           };
           
           // Platform API
           const Platform = {
             OS: 'web',
-            select: (obj) => obj.web || obj.default
+            select: (obj) => obj?.web || obj?.default
           };
           
           // Собираем все в ReactNativeWeb объект
@@ -502,16 +775,18 @@ export class ReactNativeFramework extends ReactFramework {
             View,
             Text,
             TouchableOpacity,
+            Pressable,
             ScrollView,
             Image,
             StyleSheet,
             Platform,
-            // Алиасы
-            Button: TouchableOpacity,
-            Pressable: TouchableOpacity,
-            TextInput: (props) => React.createElement('input', props),
+            Button,
+            TextInput,
             SafeAreaView: View,
-            FlatList: View
+            FlatList,
+            ActivityIndicator,
+            Dimensions,
+            useWindowDimensions
           };
           
           // Делаем компоненты доступными глобально
@@ -519,13 +794,16 @@ export class ReactNativeFramework extends ReactFramework {
           window.Text = Text;
           window.StyleSheet = StyleSheet;
           window.TouchableOpacity = TouchableOpacity;
+          window.Pressable = Pressable;
           window.ScrollView = ScrollView;
           window.Image = Image;
-          window.Button = TouchableOpacity;
-          window.TextInput = (props) => React.createElement('input', props);
-          window.FlatList = View;
-          window.Pressable = TouchableOpacity;
+          window.Button = Button;
+          window.TextInput = TextInput;
+          window.FlatList = FlatList;
           window.SafeAreaView = View;
+          window.ActivityIndicator = ActivityIndicator;
+          window.Dimensions = Dimensions;
+          window.useWindowDimensions = useWindowDimensions;
           window.Platform = Platform;
           
           console.log('[RNW Shim] React Native shim created successfully');
@@ -562,7 +840,7 @@ export class ReactNativeFramework extends ReactFramework {
 </head>
 <body>
     <div id="root"></div>
-    <script type="text/babel" data-presets="react,typescript">
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
         // Ждем загрузки React Native Web
         (async () => {
           // Ждем пока RNW загрузится
@@ -652,9 +930,13 @@ export class ReactNativeFramework extends ReactFramework {
               ${processedCode}
               
               // Регистрируем основной модуль
-              const moduleExports = {
-                default: typeof ${componentToRender} !== 'undefined' ? ${componentToRender} : null
-              };
+              const moduleExports = {};
+              if (typeof ${componentToRender} !== 'undefined') {
+                moduleExports.default = ${componentToRender};
+                moduleExports[${JSON.stringify(componentToRender)}] = ${componentToRender};
+              } else {
+                moduleExports.default = null;
+              }
               
               console.log('Main module loaded:', ${JSON.stringify(filePath)});
               console.log('Component ${componentToRender}:', typeof ${componentToRender});
@@ -726,4 +1008,3 @@ export class ReactNativeFramework extends ReactFramework {
     return `<${tagName}${styleAttr}${onPressAttr}><Text>${body}</Text></${tagName}>`;
   }
 }
-

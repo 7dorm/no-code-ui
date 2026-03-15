@@ -2,6 +2,44 @@
  * Утилиты для определения типа файла
  */
 
+function hasModuleImport(content, moduleName) {
+  const escapedModuleName = moduleName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const moduleRegex = new RegExp(
+    `(?:from\\s+['"]${escapedModuleName}['"]|require\\s*\\(\\s*['"]${escapedModuleName}['"]\\s*\\))`
+  );
+  return moduleRegex.test(content);
+}
+
+function hasJsxLikeSyntax(content) {
+  return (
+    /return\s*\(?\s*</.test(content) ||
+    /=>\s*</.test(content) ||
+    /React\.createElement\s*\(/.test(content) ||
+    /<[A-Z][a-zA-Z0-9_$.-]*(\s|\/?>)/.test(content) ||
+    /<[a-z][a-z0-9-]*(\s|\/?>)/.test(content)
+  );
+}
+
+function hasTypedComponentSignature(content) {
+  return (
+    /:\s*(?:React\.)?(?:FC|FunctionComponent|ComponentType)\b/.test(content) ||
+    /\)\s*:\s*(?:JSX\.Element|React\.ReactElement|ReactElement|ReactNode)\b/.test(content) ||
+    /satisfies\s+(?:React\.)?(?:FC|FunctionComponent|ComponentType)\b/.test(content)
+  );
+}
+
+function hasComponentDeclaration(content) {
+  return (
+    /(?:export\s+default\s+)?(?:async\s+)?function\s+[A-Z][a-zA-Z0-9_$]*\s*\(/.test(content) ||
+    /class\s+[A-Z][a-zA-Z0-9_$]*\s+extends\s+(?:React\.)?(?:Component|PureComponent)\b/.test(content) ||
+    /(?:const|let|var)\s+[A-Z][a-zA-Z0-9_$]*\s*(?::[^=]+)?=\s*(?:\(|async\s*\(|React\.memo\(|memo\(|forwardRef\()/.test(content)
+  );
+}
+
+function looksLikeReactComponentFile(content) {
+  return hasJsxLikeSyntax(content) || hasTypedComponentSignature(content) || hasComponentDeclaration(content);
+}
+
 /**
  * Определяет тип файла по расширению и содержимому
  * @param {string} path - путь к файлу
@@ -18,8 +56,7 @@ export function getFileType(path, content = '') {
   
   // React/JSX/TSX
   if (lowerPath.endsWith('.jsx') || lowerPath.endsWith('.tsx')) {
-    const hasRNImport = /from\s+['"]react-native['"]/.test(content) || 
-                        /require\s*\(\s*['"]react-native['"]/.test(content);
+    const hasRNImport = hasModuleImport(content, 'react-native');
     if (hasRNImport || lowerPath.endsWith('.rn.jsx') || lowerPath.endsWith('.rn.js')) {
       return 'react-native';
     }
@@ -28,8 +65,7 @@ export function getFileType(path, content = '') {
   
   // JavaScript
   if (lowerPath.endsWith('.js') || lowerPath.endsWith('.mjs') || lowerPath.endsWith('.cjs')) {
-    const hasRNImport = /from\s+['"]react-native['"]/.test(content) || 
-                        /require\s*\(\s*['"]react-native['"]/.test(content);
+    const hasRNImport = hasModuleImport(content, 'react-native');
     if (hasRNImport || lowerPath.includes('react-native')) {
       return 'react-native';
     }
@@ -38,6 +74,22 @@ export function getFileType(path, content = '') {
   
   // TypeScript
   if (lowerPath.endsWith('.ts') || lowerPath.endsWith('.d.ts')) {
+    if (lowerPath.endsWith('.d.ts')) {
+      return 'typescript';
+    }
+
+    const hasRNImport = hasModuleImport(content, 'react-native');
+    const hasReactImport = hasModuleImport(content, 'react');
+    const looksLikeComponent = looksLikeReactComponentFile(content);
+
+    if (hasRNImport && looksLikeComponent) {
+      return 'react-native';
+    }
+
+    if ((hasReactImport || hasJsxLikeSyntax(content)) && looksLikeComponent) {
+      return 'react';
+    }
+
     return 'typescript';
   }
   
@@ -182,7 +234,7 @@ export function getMonacoLanguage(type, filePath) {
   
   // React/JSX/TSX
   if (type === 'react' || type === 'react-native') {
-    if (lowerPath.endsWith('.tsx')) return 'typescript';
+    if (lowerPath.endsWith('.tsx') || lowerPath.endsWith('.ts')) return 'typescript';
     return 'javascript';
   }
   
@@ -274,4 +326,3 @@ export function getMonacoLanguage(type, filePath) {
   // По умолчанию
   return 'plaintext';
 }
-

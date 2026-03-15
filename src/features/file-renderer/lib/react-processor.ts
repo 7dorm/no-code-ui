@@ -1,214 +1,543 @@
+import { parse } from '@babel/parser';
+import generate from '@babel/generator';
+import traverse from '@babel/traverse';
+import * as t from '@babel/types';
 import { instrumentJsx } from '../../../blockEditor/JsxInstrumenter';
 
-/**
- * Извлекает импорты из кода
- */
-export function extractImports(code: string, sourceFile = 'unknown') {
-  const imports: { path: string; fullStatement: string; line: number }[] = [];
+type ExtractedImport = {
+  path: string;
+  fullStatement: string;
+  line: number;
+};
+
+type DetectedComponent = {
+  name: string;
+  type: string;
+  priority: number;
+  isAnonymous?: boolean;
+  isInferred?: boolean;
+};
+
+type NamedExportInfo = {
+  localName: string;
+  exportedName: string;
+};
+
+type DefaultExportInfo = {
+  name: string;
+  type: string;
+};
+
+const DEFAULT_EXPORT_COMPONENT_NAME = 'MrpakDefaultExportComponent';
+const JS_KEYWORDS = new Set([
+  'function',
+  'class',
+  'const',
+  'let',
+  'var',
+  'if',
+  'else',
+  'for',
+  'while',
+  'return',
+]);
+
+function parseModule(code: string) {
+  return parse(String(code ?? ''), {
+    sourceType: 'module',
+    plugins: [
+      'jsx',
+      'typescript',
+      'classProperties',
+      'decorators-legacy',
+      'optionalChaining',
+      'nullishCoalescingOperator',
+    ],
+    allowImportExportEverywhere: true,
+    allowReturnOutsideFunction: true,
+    errorRecovery: true,
+  });
+}
+
+function isPascalCase(name: string | null | undefined) {
+  return Boolean(name && /^[A-Z]/.test(name) && !JS_KEYWORDS.has(name));
+}
+
+function unwrapNode(node: t.Node | null | undefined): t.Node | null {
+  let current = node ?? null;
+
+  while (current) {
+    if (t.isTSAsExpression(current) || t.isTSSatisfiesExpression(current) || t.isTSTypeAssertion(current)) {
+      current = current.expression;
+      continue;
+    }
+
+    if (t.isTSNonNullExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+
+    if (t.isParenthesizedExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+
+    break;
+  }
+
+  return current;
+}
+
+function declarationToExpression(
+  declaration: t.ExportDefaultDeclaration['declaration']
+): t.Expression | null {
+  const unwrapped = unwrapNode(declaration);
+
+  if (!unwrapped) {
+    return null;
+  }
+
+  if (t.isFunctionDeclaration(unwrapped)) {
+    return t.functionExpression(
+      unwrapped.id,
+      unwrapped.params,
+      unwrapped.body,
+      unwrapped.generator,
+      unwrapped.async
+    );
+  }
+
+  if (t.isClassDeclaration(unwrapped)) {
+    return t.classExpression(
+      unwrapped.id,
+      unwrapped.superClass,
+      unwrapped.body,
+      unwrapped.decorators || []
+    );
+  }
+
+  if (t.isExpression(unwrapped)) {
+    return unwrapped;
+  }
+
+  return null;
+}
+
+function collectProgramBindings(ast: t.File) {
+  const bindings = new Set<string>();
+
+  traverse(ast, {
+    Program(path) {
+      Object.keys(path.scope.bindings).forEach((name) => bindings.add(name));
+      path.stop();
+    },
+  });
+
+  return bindings;
+}
+
+function createUniqueIdentifier(usedNames: Set<string>, baseName = DEFAULT_EXPORT_COMPONENT_NAME) {
+  let candidate = baseName;
+  let index = 2;
+
+  while (usedNames.has(candidate)) {
+    candidate = `${baseName}${index}`;
+    index += 1;
+  }
+
+  usedNames.add(candidate);
+  return candidate;
+}
+
+function collectRuntimeNamesFromDeclaration(declaration: t.Declaration) {
+  const names: string[] = [];
+
+  if (t.isFunctionDeclaration(declaration) || t.isClassDeclaration(declaration)) {
+    if (declaration.id?.name) {
+      names.push(declaration.id.name);
+    }
+    return names;
+  }
+
+  if (t.isVariableDeclaration(declaration)) {
+    declaration.declarations.forEach((item) => {
+      if (t.isIdentifier(item.id)) {
+        names.push(item.id.name);
+      }
+    });
+  }
+
+  return names;
+}
+
+function hasRenderableReturn(fn: t.FunctionExpression | t.ArrowFunctionExpression | t.FunctionDeclaration) {
+  if (t.isArrowFunctionExpression(fn) && !t.isBlockStatement(fn.body)) {
+    const body = unwrapNode(fn.body);
+    return Boolean(
+      body &&
+      (t.isJSXElement(body) ||
+        t.isJSXFragment(body) ||
+        isReactCreateElementCall(body) ||
+        (t.isCallExpression(body) && isComponentFactoryCall(body)))
+    );
+  }
+
+  let found = false;
+
+  traverse(
+    t.file(t.program([t.expressionStatement(t.functionExpression(null, fn.params, fn.body as t.BlockStatement, fn.generator, fn.async))])),
+    {
+      ReturnStatement(path) {
+        const argument = unwrapNode(path.node.argument);
+        if (
+          argument &&
+          (t.isJSXElement(argument) ||
+            t.isJSXFragment(argument) ||
+            isReactCreateElementCall(argument) ||
+            (t.isCallExpression(argument) && isComponentFactoryCall(argument)))
+        ) {
+          found = true;
+          path.stop();
+        }
+      },
+    }
+  );
+
+  return found;
+}
+
+function isReactCreateElementCall(node: t.Node | null | undefined) {
+  return Boolean(
+    node &&
+    t.isCallExpression(node) &&
+    t.isMemberExpression(node.callee) &&
+    t.isIdentifier(node.callee.object, { name: 'React' }) &&
+    t.isIdentifier(node.callee.property, { name: 'createElement' })
+  );
+}
+
+function isClassComponent(node: t.Node | null | undefined) {
+  const unwrapped = unwrapNode(node);
+  if (!unwrapped || (!t.isClassDeclaration(unwrapped) && !t.isClassExpression(unwrapped))) {
+    return false;
+  }
+
+  const superClass = unwrapNode(unwrapped.superClass);
+  if (
+    superClass &&
+    ((t.isIdentifier(superClass) &&
+      (superClass.name === 'Component' || superClass.name === 'PureComponent')) ||
+      (t.isMemberExpression(superClass) &&
+        t.isIdentifier(superClass.object, { name: 'React' }) &&
+        t.isIdentifier(superClass.property) &&
+        (superClass.property.name === 'Component' || superClass.property.name === 'PureComponent')))
+  ) {
+    return true;
+  }
+
+  return unwrapped.body.body.some(
+    (member) => t.isClassMethod(member) && t.isIdentifier(member.key, { name: 'render' })
+  );
+}
+
+function isComponentFactoryCall(node: t.CallExpression) {
+  const callee = unwrapNode(node.callee);
+  const calleeName =
+    (t.isIdentifier(callee) && callee.name) ||
+    (t.isMemberExpression(callee) && t.isIdentifier(callee.property) ? callee.property.name : null);
+
+  const supportedFactories = new Set(['memo', 'forwardRef', 'observer', 'styled']);
+  if (!calleeName || !supportedFactories.has(calleeName)) {
+    return false;
+  }
+
+  return node.arguments.some((argument) => isComponentLikeNode(argument));
+}
+
+function isComponentLikeNode(node: t.Node | null | undefined): boolean {
+  const unwrapped = unwrapNode(node);
+
+  if (!unwrapped) {
+    return false;
+  }
+
+  if (t.isIdentifier(unwrapped)) {
+    return isPascalCase(unwrapped.name);
+  }
+
+  if (t.isFunctionExpression(unwrapped) || t.isArrowFunctionExpression(unwrapped) || t.isFunctionDeclaration(unwrapped)) {
+    return hasRenderableReturn(unwrapped);
+  }
+
+  if (t.isClassExpression(unwrapped) || t.isClassDeclaration(unwrapped)) {
+    return isClassComponent(unwrapped);
+  }
+
+  if (t.isCallExpression(unwrapped)) {
+    return isComponentFactoryCall(unwrapped);
+  }
+
+  return false;
+}
+
+function fallbackExtractImports(code: string, sourceFile = 'unknown') {
+  const imports: ExtractedImport[] = [];
   const importRegex = /import\s+.*?\s+from\s+['"](.*?)['"];?/g;
   let match;
-  
+
   while ((match = importRegex.exec(code)) !== null) {
     const importPath = match[1];
-    const fullImport = match[0];
-    const lineNumber = code.substring(0, match.index).split('\n').length;
-    
-    // Пропускаем только внешние библиотеки (npm пакеты)
-    // Теперь обрабатываем локальные импорты, включая относительные и @ пути
-    if (!importPath.startsWith('react') && 
-        !importPath.startsWith('react-dom') &&
-        !importPath.startsWith('react-native') &&
-        !importPath.startsWith('node_modules') &&
-        !importPath.startsWith('http://') &&
-        !importPath.startsWith('https://')) {
-      imports.push({
-        path: importPath,
-        fullStatement: fullImport,
-        line: lineNumber
-      });
-      
-      console.log(`[Import Extraction] Found import in ${sourceFile}:`, {
-        file: sourceFile,
-        importPath,
-        line: lineNumber,
-        fullStatement: fullImport.trim()
-      });
+    if (
+      importPath.startsWith('react') ||
+      importPath.startsWith('react-dom') ||
+      importPath.startsWith('react-native') ||
+      importPath.startsWith('node_modules') ||
+      importPath.startsWith('http://') ||
+      importPath.startsWith('https://')
+    ) {
+      continue;
     }
+
+    imports.push({
+      path: importPath,
+      fullStatement: match[0],
+      line: code.substring(0, match.index).split('\n').length,
+    });
   }
-  
+
   if (imports.length > 0) {
-    console.log(`[Import Extraction] Total imports found in ${sourceFile}:`, imports.length, imports.map(i => `${i.path} (line ${i.line})`));
+    console.log(
+      `[Import Extraction] Total imports found in ${sourceFile}:`,
+      imports.length,
+      imports.map((item) => `${item.path} (line ${item.line})`)
+    );
   }
-  
+
   return imports;
 }
 
-/**
- * Детектирует React компоненты в коде
- */
-export function detectComponents(code: string): { name: string; type: string; priority: number; isAnonymous?: boolean; isInferred?: boolean }[] {
-  const components: { name: string; type: string; priority: number; isAnonymous?: boolean; isInferred?: boolean }[] = [];
-  
-  // 1. Поиск default export (высший приоритет)
-  
-  // Паттерн 1: export default function ComponentName() { ... }
-  // ВАЖНО: Имя должно быть ПОСЛЕ function и ПЕРЕД (
-  const defaultFunctionMatch = code.match(/export\s+default\s+function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/);
-  if (defaultFunctionMatch) {
-    const componentName = defaultFunctionMatch[1];
-    // Проверяем, что это не ключевое слово JavaScript
-    const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
-    if (!jsKeywords.includes(componentName)) {
-      components.push({
-        name: componentName,
-        type: 'default-export-function',
-        priority: 0 // Наивысший приоритет
-      });
-    }
-  }
-  
-  // Паттерн 2: export default function() { ... } (анонимная функция)
-  const defaultAnonymousFunctionMatch = code.match(/export\s+default\s+function\s*\(/);
-  if (defaultAnonymousFunctionMatch && components.length === 0) {
-    // Ищем любую функцию или const с заглавной буквы в файле
-    const allFunctionsMatch = code.match(/(?:function|const|let|var)\s+([A-Z][a-zA-Z0-9_$]*)\s*[=(]/g);
-    if (allFunctionsMatch) {
-      // Берем первую найденную функцию с заглавной буквы
-      const firstMatch = allFunctionsMatch[0].match(/([A-Z][a-zA-Z0-9_$]*)/);
-      if (firstMatch) {
-        components.push({
-          name: firstMatch[1],
-          type: 'default-export-anonymous',
-          priority: 0.1,
-          isAnonymous: true
-        });
+export function extractImports(code: string, sourceFile = 'unknown'): ExtractedImport[] {
+  try {
+    const ast = parseModule(code);
+    const imports: ExtractedImport[] = [];
+
+    ast.program.body.forEach((statement) => {
+      if (!t.isImportDeclaration(statement) || typeof statement.source.value !== 'string') {
+        return;
       }
+
+      const importPath = statement.source.value;
+      const isTypeOnly =
+        statement.importKind === 'type' ||
+        (statement.specifiers.length > 0 &&
+          statement.specifiers.every((specifier) => {
+            if (t.isImportSpecifier(specifier)) {
+              return specifier.importKind === 'type';
+            }
+            return false;
+          }));
+
+      if (
+        isTypeOnly ||
+        importPath.startsWith('react') ||
+        importPath.startsWith('react-dom') ||
+        importPath.startsWith('react-native') ||
+        importPath.startsWith('node_modules') ||
+        importPath.startsWith('http://') ||
+        importPath.startsWith('https://')
+      ) {
+        return;
+      }
+
+      imports.push({
+        path: importPath,
+        fullStatement: String(code ?? '').slice(statement.start ?? 0, statement.end ?? 0),
+        line: statement.loc?.start.line || 1,
+      });
+    });
+
+    if (imports.length > 0) {
+      console.log(
+        `[Import Extraction] Total imports found in ${sourceFile}:`,
+        imports.length,
+        imports.map((item) => `${item.path} (line ${item.line})`)
+      );
     }
+
+    return imports;
+  } catch (error) {
+    console.warn(`[Import Extraction] AST parsing failed in ${sourceFile}, falling back:`, error);
+    return fallbackExtractImports(code, sourceFile);
   }
-  
-  // Паттерн 3: export default ComponentName
-  const defaultExportMatch = code.match(/export\s+default\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
-  if (defaultExportMatch) {
-    const componentName = defaultExportMatch[1];
-    const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
-    if (!jsKeywords.includes(componentName) && !components.find(c => c.name === componentName)) {
+}
+
+export function normalizeReactModuleCode(code: string): {
+  code: string;
+  defaultExportInfo: DefaultExportInfo | null;
+  namedExports: NamedExportInfo[];
+} {
+  try {
+    const ast = parseModule(code);
+    const usedNames = collectProgramBindings(ast);
+    const namedExports: NamedExportInfo[] = [];
+    let defaultExportInfo: DefaultExportInfo | null = null;
+    const nextBody: t.Statement[] = [];
+
+    ast.program.body.forEach((statement) => {
+      if (t.isExportDefaultDeclaration(statement)) {
+        const declaration = unwrapNode(statement.declaration);
+
+        if (
+          (t.isFunctionDeclaration(declaration) || t.isClassDeclaration(declaration)) &&
+          declaration.id?.name
+        ) {
+          defaultExportInfo = {
+            name: declaration.id.name,
+            type: t.isFunctionDeclaration(declaration)
+              ? 'default-export-function'
+              : 'default-export-class',
+          };
+          nextBody.push(declaration);
+          return;
+        }
+
+        if (t.isIdentifier(declaration)) {
+          defaultExportInfo = {
+            name: declaration.name,
+            type: 'default-export',
+          };
+          return;
+        }
+
+        const expression = declarationToExpression(statement.declaration);
+        if (!expression) {
+          return;
+        }
+
+        const defaultName = createUniqueIdentifier(usedNames);
+        nextBody.push(
+          t.variableDeclaration('const', [
+            t.variableDeclarator(t.identifier(defaultName), expression),
+          ])
+        );
+        defaultExportInfo = {
+          name: defaultName,
+          type: 'default-export-expression',
+        };
+        return;
+      }
+
+      if (t.isExportNamedDeclaration(statement)) {
+        if (statement.declaration) {
+          const runtimeNames = collectRuntimeNamesFromDeclaration(statement.declaration);
+          runtimeNames.forEach((name) => {
+            namedExports.push({ localName: name, exportedName: name });
+          });
+          nextBody.push(statement.declaration);
+          return;
+        }
+
+        if (!statement.source) {
+          statement.specifiers.forEach((specifier) => {
+            if (t.isExportSpecifier(specifier)) {
+              const localName =
+                t.isIdentifier(specifier.local) ? specifier.local.name : null;
+              const exportedName =
+                t.isIdentifier(specifier.exported)
+                  ? specifier.exported.name
+                  : t.isStringLiteral(specifier.exported)
+                    ? specifier.exported.value
+                    : null;
+
+              if (localName && exportedName) {
+                namedExports.push({ localName, exportedName });
+              }
+            }
+          });
+        }
+
+        return;
+      }
+
+      if (t.isExportAllDeclaration(statement)) {
+        return;
+      }
+
+      nextBody.push(statement);
+    });
+
+    ast.program.body = nextBody;
+
+    return {
+      code: generate(ast, {
+        retainLines: true,
+        compact: false,
+        comments: true,
+      }).code,
+      defaultExportInfo,
+      namedExports,
+    };
+  } catch (error) {
+    console.warn('[normalizeReactModuleCode] AST normalization failed, using fallback:', error);
+
+    const defaultExportMatch = String(code ?? '').match(/export\s+default\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
+    return {
+      code: String(code ?? '').replace(/export\s+default\s+/g, ''),
+      defaultExportInfo: defaultExportMatch
+        ? { name: defaultExportMatch[1], type: 'default-export' }
+        : null,
+      namedExports: [],
+    };
+  }
+}
+
+export function detectComponents(code: string): DetectedComponent[] {
+  const components: DetectedComponent[] = [];
+  const seen = new Set<string>();
+  let priority = 0;
+
+  const addComponent = (name: string | null | undefined, type: string, extra: Partial<DetectedComponent> = {}) => {
+    if (!name || !isPascalCase(name) || seen.has(name)) {
+      return;
+    }
+
+    seen.add(name);
     components.push({
-        name: componentName,
-      type: 'default-export',
-      priority: 1
+      name,
+      type,
+      priority: priority++,
+      ...extra,
     });
-    }
-  }
-  
-  // Паттерн 4: export default () => { ... } (стрелочная функция)
-  // В этом случае попробуем найти ближайшую функцию с заглавной буквы
-  const defaultArrowMatch = code.match(/export\s+default\s+\(/);
-  if (defaultArrowMatch && components.length === 0) {
-    // Ищем функцию или const перед export default
-    const beforeExport = code.substring(0, defaultArrowMatch.index);
-    const nearestFunctionMatch = beforeExport.match(/(?:const|let|var|function)\s+([A-Z][a-zA-Z0-9_$]*)[^;]*$/);
-    if (nearestFunctionMatch) {
-      components.push({
-        name: nearestFunctionMatch[1],
-        type: 'default-export-arrow',
-        priority: 0.5
-      });
-    } else {
-      // Ищем любую функцию с заглавной буквы в файле
-      const allFunctionsMatch = code.match(/(?:function|const|let|var)\s+([A-Z][a-zA-Z0-9_$]*)\s*[=(]/g);
-      if (allFunctionsMatch) {
-        const firstMatch = allFunctionsMatch[0].match(/([A-Z][a-zA-Z0-9_$]*)/);
-        if (firstMatch) {
-          components.push({
-            name: firstMatch[1],
-            type: 'default-export-arrow-inferred',
-            priority: 0.6,
-            isInferred: true
-          });
-        }
+  };
+
+  try {
+    const ast = parseModule(code);
+
+    ast.program.body.forEach((statement) => {
+      if (t.isFunctionDeclaration(statement) && isPascalCase(statement.id?.name) && hasRenderableReturn(statement)) {
+        addComponent(statement.id?.name, 'function-component');
+        return;
       }
-    }
-  }
-  
-  // 2. Поиск named exports
-  const namedExportsMatch = code.match(/export\s+(?:const|let|var|function)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g);
-  if (namedExportsMatch) {
-    namedExportsMatch.forEach((match, index) => {
-      const nameMatch = match.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\s*[;=]/);
-      if (nameMatch) {
-        const name = nameMatch[1];
-        // Проверяем, что это не служебная функция
-        if (!name.startsWith('use') && name[0] === name[0].toUpperCase()) {
-          components.push({
-            name: name,
-            type: 'named-export',
-            priority: 2 + index
-          });
-        }
+
+      if (t.isClassDeclaration(statement) && isPascalCase(statement.id?.name) && isClassComponent(statement)) {
+        addComponent(statement.id?.name, 'class-component');
+        return;
       }
-    });
-  }
-  
-  // 3. Поиск компонентов по паттернам (функции с заглавной буквы)
-  // function ComponentName() { ... }
-  const functionComponentRegex = /function\s+([A-Z][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/g;
-  let match;
-  while ((match = functionComponentRegex.exec(code)) !== null) {
-    const name = match[1];
-    // Проверяем, что функция возвращает JSX или React элемент
-    const functionBody = code.substring(match.index);
-    const returnMatch = functionBody.match(/\{[\s\S]{0,500}return\s+(?:<|React\.createElement|jsx|JSX)/i);
-    if (returnMatch && !components.find(c => c.name === name)) {
-      components.push({
-        name: name,
-        type: 'function-component',
-        priority: 100 + components.length
-      });
-    }
-  }
-  
-  // const ComponentName = () => { ... } или const ComponentName = function() { ... }
-  const constComponentRegex = /const\s+([A-Z][a-zA-Z0-9_$]*)\s*=\s*(?:\([^)]*\)\s*=>|function\s*\([^)]*\))\s*\{/g;
-  while ((match = constComponentRegex.exec(code)) !== null) {
-    const name = match[1];
-    // Проверяем, что функция возвращает JSX или React элемент
-    const functionBody = code.substring(match.index);
-    const returnMatch = functionBody.match(/\{[\s\S]{0,500}return\s+(?:<|React\.createElement|jsx|JSX)/i);
-    if (returnMatch && !components.find(c => c.name === name)) {
-      components.push({
-        name: name,
-        type: 'arrow-component',
-        priority: 200 + components.length
-      });
-    }
-  }
-  
-  // 4. Поиск любых переменных/функций с заглавной буквы, которые могут быть компонентами
-  // Это fallback для случаев, когда паттерн не совпадает точно
-  const anyComponentRegex = /(?:const|let|var|function)\s+([A-Z][a-zA-Z0-9_$]*)/g;
-  while ((match = anyComponentRegex.exec(code)) !== null) {
-    const name = match[1];
-    // Пропускаем стандартные имена и уже найденные
-    if (['React', 'ReactDOM', 'Component', 'PureComponent', 'Fragment'].includes(name)) {
-      continue;
-    }
-    if (!components.find(c => c.name === name)) {
-      // Проверяем контекст - есть ли рядом JSX или React.createElement
-      const context = code.substring(Math.max(0, match.index - 100), match.index + 200);
-      if (context.match(/(?:return|=>)\s*(?:<|React\.createElement)/i)) {
-        components.push({
-          name: name,
-          type: 'potential-component',
-          priority: 300 + components.length
+
+      if (t.isVariableDeclaration(statement)) {
+        statement.declarations.forEach((declaration) => {
+          if (t.isIdentifier(declaration.id) && isPascalCase(declaration.id.name) && isComponentLikeNode(declaration.init)) {
+            addComponent(declaration.id.name, 'variable-component');
+          }
         });
       }
-    }
+    });
+
+    return components;
+  } catch (error) {
+    console.warn('[detectComponents] AST analysis failed, returning empty list:', error);
+    return components;
   }
-  
-  // Сортируем по приоритету
-  components.sort((a, b) => a.priority - b.priority);
-  
-  return components;
 }
 
 /**
@@ -319,9 +648,9 @@ export function createReactHTMLTemplate({
             const parts = [];
             let cur = el;
             while (cur && cur.nodeType === 1) {
-              const tag = cur.tagName.toLowerCase();
+              const tag = (cur.tagName || 'div').toLowerCase();
               const parent = cur.parentElement;
-              if (!parent || parent === rootElement || parent === document.body || parent === document.documentElement) {
+              if (!parent) {
                 parts.push(tag);
                 break;
               }
@@ -334,158 +663,31 @@ export function createReactHTMLTemplate({
             return parts.reverse().join(' > ');
           };
           
-          const makeMrpakId = (filePath, selector, tagName) => {
-            const base = safeBasename(filePath);
-            return \`mrpak:\${base}:\${tagName || 'el'}:\${selector}\`;
-          };
-          
           const used = new Set();
-          const all = rootElement.querySelectorAll ? Array.from(rootElement.querySelectorAll('*')) : [];
-          
-          all.forEach((el) => {
-            // Пропускаем элементы, которые уже имеют id-атрибут
-            const existing = (el.getAttribute && (el.getAttribute('data-no-code-ui-id') || el.getAttribute('data-mrpak-id'))) || null;
-            if (existing) {
-              used.add(existing);
-              return;
-            }
-            
-            // Пропускаем script, style и другие служебные элементы
-            const tagName = (el.tagName || '').toLowerCase();
-            if (['script', 'style', 'meta', 'link', 'title', 'head'].includes(tagName)) {
-              return;
-            }
-            
-            const selector = makeSelectorForElement(el);
-            let id = makeMrpakId(filePath, selector, tagName);
-            
-            // Убеждаемся, что ID уникален
+          const walk = (node) => {
+            if (!node || node.nodeType !== 1) return;
+            const existing = node.getAttribute('data-no-code-ui-id') || node.getAttribute('data-mrpak-id');
+            const selector = makeSelectorForElement(node);
+            const tagName = (node.tagName || 'div').toLowerCase();
+            let id = existing || \`mrpak:\${safeBasename(filePath)}:\${tagName}:\${selector}\`;
             if (used.has(id)) {
               let i = 2;
               while (used.has(\`\${id}:\${i}\`)) i += 1;
               id = \`\${id}:\${i}\`;
             }
             used.add(id);
-            
-            if (el.setAttribute) {
-              el.setAttribute('data-no-code-ui-id', id);
-            }
-          });
+            node.setAttribute('data-no-code-ui-id', id);
+            node.removeAttribute('data-mrpak-id');
+            Array.from(node.children || []).forEach(walk);
+          };
+          
+          walk(rootElement);
         }
         
-        console.log('[React Debug] Starting React component execution...');
-        try {
-            ${instrumentedCode}
-            console.log('[React Debug] Component code executed successfully');
-            
-            // Автоматически находим компонент для рендеринга
-            let Component = null;
-            ${componentToRender ? 
-              `// Используем автоматически найденный компонент: ${componentName}
-              if (typeof ${componentName} !== 'undefined') {
-                Component = ${componentName};
-                console.log('[React Debug] Found component:', '${componentName}');
-              }` : 
-              `// Пробуем стандартные имена как fallback
-              if (typeof App !== 'undefined') {
-                Component = App;
-                console.log('[React Debug] Found component: App');
-              } else if (typeof MyComponent !== 'undefined') {
-                Component = MyComponent;
-                console.log('[React Debug] Found component: MyComponent');
-              } else if (typeof Component !== 'undefined') {
-                Component = Component;
-                console.log('[React Debug] Found component: Component');
-              } else {
-                // Пробуем найти любой компонент с заглавной буквы
-                const allVars = Object.keys(typeof window !== 'undefined' ? window : {});
-                console.log('[React Debug] Searching for component in vars:', allVars.filter(v => v[0] === v[0].toUpperCase()));
-                for (const varName of allVars) {
-                  if (varName[0] === varName[0].toUpperCase() && 
-                      typeof window[varName] === 'function' &&
-                      varName !== 'React' && varName !== 'ReactDOM') {
-                    Component = window[varName];
-                    console.log('[React Debug] Found component:', varName);
-                    break;
-                  }
-                }
-              }`
-            }
-            
-            if (Component) {
-                console.log('[React Debug] Component found, creating root and rendering...');
-                const root = ReactDOM.createRoot(document.getElementById('root'));
-                root.render(React.createElement(Component));
-                console.log('[React Debug] ReactDOM.render called');
-                
-                // После рендеринга React инструментируем DOM и блокируем интерактивные элементы
-                setTimeout(() => {
-                  console.log('[React Debug] Post-render timeout, checking root content...');
-                  const rootElement = document.getElementById('root');
-                  const filePath = window.__MRPAK_FILE_PATH__ || '';
-                  console.log('[React Debug] Root element:', rootElement);
-                  console.log('[React Debug] Root content length:', rootElement ? rootElement.innerHTML.length : 'null');
-                  console.log('[React Debug] Root children count:', rootElement ? rootElement.children.length : 'null');
-                  
-                  // Инструментируем DOM элементы с data-no-code-ui-id (legacy data-mrpak-id поддерживаем)
-                  instrumentReactDOM(rootElement, filePath);
-                  console.log('[React Debug] DOM instrumentation completed');
-                  
-                  // Обновляем дерево слоев после инструментирования
-                  if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
-                    window.__MRPAK_BUILD_TREE__();
-                    console.log('[React Debug] Build tree called');
-                  }
-                  
-                  // Используем MutationObserver для отслеживания новых элементов
-                  let mutationTimeout = null;
-                  const observer = new MutationObserver((mutations) => {
-                    console.log('[MutationObserver] Обнаружены изменения DOM, mutations:', mutations.length);
-                    
-                    // Debounce для избежания множественных вызовов
-                    if (mutationTimeout) {
-                      clearTimeout(mutationTimeout);
-                    }
-                    
-                    mutationTimeout = setTimeout(() => {
-                      console.log('[MutationObserver] Инструментирую новые элементы...');
-                      // Инструментируем новые элементы
-                      const rootElement = document.getElementById('root');
-                      if (rootElement) {
-                        instrumentReactDOM(rootElement, filePath);
-                        // Обновляем дерево слоев после инструментирования
-                        if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
-                          console.log('[MutationObserver] Вызываю buildTree...');
-                          window.__MRPAK_BUILD_TREE__();
-                        }
-                      }
-                    }, 50); // 50ms debounce
-                  });
-                  
-                  observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
-                  });
-                }, 100);
-            } else {
-                const foundComponents = ${JSON.stringify((detectedComponents || []).map(c => c.name))};
-                const errorMsg = foundComponents.length > 0 
-                  ? 'Найдены компоненты: ' + foundComponents.join(', ') + '. Но не удалось их использовать для рендеринга.'
-                  : 'Не найден компонент для рендеринга. Убедитесь, что файл содержит React компонент (функцию с заглавной буквы, возвращающую JSX).';
-                console.log('[React Debug] No component found, available components:', foundComponents);
-                document.getElementById('root').innerHTML = '<div class="error">' + errorMsg + '</div>';
-            }
-        } catch (error) {
-            console.log('[React Debug] Execution error:', error);
-            console.log('[React Debug] Error stack:', error.stack);
-            document.getElementById('root').innerHTML = '<div class="error"><strong>Ошибка выполнения:</strong><br>' + error.message + '</div>';
-            console.error('React execution error:', error);
-        }
+        ${instrumentedCode}
     </script>
 </body>
 </html>
-    `,
-    blockMap: inst.map
+`,
   };
 }
-
