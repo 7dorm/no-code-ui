@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import WebView from './WebView';
 import {
   buildPatchFromKv,
@@ -26,31 +26,7 @@ const htmlInputStyle = {
   outline: 'none',
 };
 
-export default function BlockEditorPanel({
-  fileType,
-  html,
-  selectedBlock,
-  onMessage,
-  onApplyPatch,
-  onStagePatch,
-  styleSnapshot,
-  textSnapshot,
-  layersTree,
-  layerNames,
-  onRenameLayer,
-  outgoingMessage,
-  onSendCommand,
-  onInsertBlock,
-  onDeleteBlock,
-  onReparentBlock,
-  onSetText,
-  framework,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
-  livePosition,
-}: {
+export type BlockEditorPanelProps = {
   fileType: 'html' | 'react' | 'react-native';
   html: string;
   selectedBlock: any;
@@ -68,20 +44,45 @@ export default function BlockEditorPanel({
     targetId: any;
     mode: any;
     snippet: any;
-}) => void;
+  }) => void;
   onDeleteBlock: (id: string) => void;
   onReparentBlock: ({ sourceId, targetParentId }: { sourceId: any; targetParentId: any; }) => void;
   onSetText: ({ blockId, text }: {
     blockId: any;
     text: any;
-}) => void;
+  }) => void;
   framework: HtmlFramework | ReactFramework | null;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
   livePosition: { left: number | null; top: number | null; width: number | null; height: number | null } | null;
-}) {
+};
+
+type BlockEditorSidebarControllerProps = Omit<BlockEditorPanelProps, 'html' | 'onMessage' | 'outgoingMessage'>;
+
+export function useBlockEditorSidebarController({
+  fileType,
+  selectedBlock,
+  onApplyPatch,
+  onStagePatch,
+  styleSnapshot,
+  textSnapshot,
+  layersTree,
+  layerNames,
+  onRenameLayer,
+  onSendCommand,
+  onInsertBlock,
+  onDeleteBlock,
+  onReparentBlock,
+  onSetText,
+  framework,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  livePosition,
+}: BlockEditorSidebarControllerProps) {
   const [left, setLeft] = useState<number | null>(null);
   const [top, setTop] = useState<number | null>(null);
   const [width, setWidth] = useState<number | null>(null);
@@ -377,6 +378,7 @@ export default function BlockEditorPanel({
   const lastDeleteTimeRef = useRef(0);
   const lastStageTimeRef = useRef(0);
   const lastSetTextTimeRef = useRef(0);
+  const styles = blockEditorPanelStyles;
 
   const buildInsertSnippet = () => {
     const patch =
@@ -439,12 +441,6 @@ export default function BlockEditorPanel({
 
   // ВАЖНО: стабилизируем source объект, иначе WebView пересоздаёт iframe на каждый ререндер
   // (например, при клике по блоку и обновлении selectedBlock).
-  const webSource = useMemo(() => ({ html }), [html]);
-  const webViewKey = useMemo(
-    () => `block-editor-webview-${fileType}-${html ? html.length : 0}`,
-    [fileType, html]
-  );
-
   const shortId = (id: any) => {
     const s = String(id || '');
     return s.length > 28 ? s.slice(0, 28) + '…' : s;
@@ -462,9 +458,9 @@ export default function BlockEditorPanel({
       <View key={id} style={{ marginLeft: depth * 10, marginBottom: 6 }}>
         <TouchableOpacity
           style={[
-            styles.layerRow,
-            isSelected && styles.layerRowSelected,
-            isDrop && styles.layerRowDropTarget,
+            blockEditorPanelStyles.layerRow,
+            isSelected && blockEditorPanelStyles.layerRowSelected,
+            isDrop && blockEditorPanelStyles.layerRowDropTarget,
           ]}
           onPress={() => {
             if (reparentMode) {
@@ -474,14 +470,14 @@ export default function BlockEditorPanel({
             }
           }}
         >
-          <Text style={styles.layerRowText} numberOfLines={1}>{title}</Text>
+          <Text style={blockEditorPanelStyles.layerRowText} numberOfLines={1}>{title}</Text>
           {reparentMode && (
-            <Text style={styles.reparentMark}>
+            <Text style={blockEditorPanelStyles.reparentMark}>
               {reparentTargetId === id ? '✓' : ''}
             </Text>
           )}
           <TouchableOpacity
-            style={styles.layerEditBtn}
+            style={blockEditorPanelStyles.layerEditBtn}
             onPress={() => {
               setEditingLayerId(id);
               setEditingLayerName(customName || '');
@@ -492,7 +488,7 @@ export default function BlockEditorPanel({
         </TouchableOpacity>
 
         {editingLayerId === id && (
-          <View style={styles.layerEditBox}>
+          <View style={blockEditorPanelStyles.layerEditBox}>
             <input
               style={htmlInputStyle}
               type="text"
@@ -500,7 +496,7 @@ export default function BlockEditorPanel({
               placeholder="Имя слоя"
               onChange={(e) => setEditingLayerName(e.target.value)}
             />
-            <View style={styles.layerEditActions}>
+            <View style={blockEditorPanelStyles.layerEditActions}>
               <TouchableOpacity
                 style={styles.layerSaveBtn}
                 onPress={() => {
@@ -529,501 +525,72 @@ export default function BlockEditorPanel({
     );
   };
 
+  return {
+    styles: blockEditorPanelStyles,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
+    selectedBlock,
+    layersTree,
+    renderTreeNode,
+    setInsertMode,
+    onDeleteBlock,
+    lastDeleteTimeRef,
+    livePosition,
+    left,
+    top,
+    width,
+    height,
+    handleLeftChange,
+    handleTopChange,
+    handleWidthChange,
+    handleHeightChange,
+    NumberField,
+    textValue,
+    setTextValue,
+    onSetText,
+    lastSetTextTimeRef,
+    TextField,
+    bg,
+    setBg,
+    color,
+    setColor,
+    canApply,
+    handleApply,
+  };
+}
+
+export default function BlockEditorPanel({
+  fileType,
+  html,
+  onMessage,
+  outgoingMessage,
+}: Pick<BlockEditorPanelProps, 'fileType' | 'html' | 'onMessage' | 'outgoingMessage'>) {
+  const webSource = useMemo(() => ({ html }), [html]);
+  const webViewKey = useMemo(
+    () => `block-editor-webview-${fileType}-${html ? html.length : 0}`,
+    [fileType, html]
+  );
+
   return (
-    <View style={styles.container}>
-      <View style={styles.sidebar}>
-        <ScrollView style={styles.sidebarScroll} contentContainerStyle={styles.sidebarScrollContent}>
-        
-        {/* Кнопки Undo/Redo */}
-        <View style={styles.undoRedoContainer}>
-          <TouchableOpacity
-            style={[styles.undoRedoBtn, !canUndo && styles.undoRedoBtnDisabled]}
-            onPress={onUndo}
-            disabled={!canUndo}
-          >
-            <Text style={styles.undoRedoBtnText}>↶ Отменить (Ctrl+Z)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.undoRedoBtn, !canRedo && styles.undoRedoBtnDisabled]}
-            onPress={onRedo}
-            disabled={!canRedo}
-          >
-            <Text style={styles.undoRedoBtnText}>↷ Повторить (Ctrl+Shift+Z)</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <Text style={styles.sidebarTitle}>Блок</Text>
-        <Text style={styles.sidebarMeta}>
-          {selectedBlock?.id ? selectedBlock.id : 'Ничего не выбрано'}
-        </Text>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Слои</Text>
-          {layersTree?.rootIds?.length ? (
-            <div style={{ maxHeight: 240, overflow: 'auto' }}>
-              {layersTree.rootIds.map((rid: any) => renderTreeNode(rid, 0))}
-            </div>
-          ) : (
-            <Text style={styles.hint}>Дерево слоёв загружается…</Text>
-          )}
-
-          <View style={styles.layerOpsRow}>
-            <TouchableOpacity
-              style={[styles.layerOpBtn, !selectedBlock?.id && styles.layerOpBtnDisabled]}
-              disabled={!selectedBlock?.id}
-              onPress={() => {
-                if (!selectedBlock?.id) return;
-                setInsertMode('child');
-              }}
-            >
-              <Text style={styles.layerOpBtnText}>+ child</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.layerOpBtn, !selectedBlock?.id && styles.layerOpBtnDisabled]}
-              disabled={!selectedBlock?.id}
-              onPress={() => {
-                if (!selectedBlock?.id) return;
-                setInsertMode('sibling');
-              }}
-            >
-              <Text style={styles.layerOpBtnText}>+ sibling</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.layerOpBtnDanger, !selectedBlock?.id && styles.layerOpBtnDisabled]}
-              disabled={!selectedBlock?.id}
-              onPress={() => {
-                if (!selectedBlock?.id) return;
-                
-                // Защита от двойного клика (debounce 300ms)
-                const now = Date.now();
-                if (now - lastDeleteTimeRef.current < 300) {
-                  return;
-                }
-                lastDeleteTimeRef.current = now;
-                
-                onDeleteBlock && onDeleteBlock(selectedBlock.id);
-              }}
-            >
-              <Text style={styles.layerOpBtnText}>Удалить</Text>
-            </TouchableOpacity>
-          </View>
-
-          {insertMode && (
-            <View style={styles.insertBox}>
-              <Text style={styles.insertTitle}>Добавить блок ({insertMode})</Text>
-
-              <Text style={styles.insertLabel}>Тип</Text>
-              <select
-                style={{ ...htmlInputStyle, height: '36px' }}
-                value={insertTag}
-                onChange={(e) => setInsertTag(e.target.value)}
-              >
-                {fileType === 'react-native' ? (
-                  <>
-                    <option value="View">View</option>
-                    <option value="Text">Text</option>
-                    <option value="TouchableOpacity">TouchableOpacity</option>
-                  </>
-                ) : fileType === 'react' ? (
-                  <>
-                    <option value="div">div</option>
-                    <option value="span">span</option>
-                    <option value="button">button</option>
-                    <option value="section">section</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="div">div</option>
-                    <option value="span">span</option>
-                    <option value="button">button</option>
-                    <option value="section">section</option>
-                  </>
-                )}
-              </select>
-
-              <Text style={styles.insertLabel}>Текст</Text>
-              <input
-                style={htmlInputStyle}
-                type="text"
-                value={insertText}
-                onChange={(e) => setInsertText(e.target.value)}
-              />
-
-              <View style={styles.stylesHeaderRow}>
-                <Text style={styles.insertLabel}>Стили</Text>
-                <View style={styles.stylesTabs}>
-                  <TouchableOpacity
-                    style={[styles.stylesTab, insertStyleMode === 'kv' && styles.stylesTabActive]}
-                    onPress={() => setInsertStyleMode('kv')}
-                  >
-                    <Text style={styles.stylesTabText}>KV</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.stylesTab, insertStyleMode === 'text' && styles.stylesTabActive]}
-                    onPress={() => setInsertStyleMode('text')}
-                  >
-                    <Text style={styles.stylesTabText}>Text</Text>
-                  </TouchableOpacity>
-                </View>
-
-          <View style={styles.reparentBox}>
-            <TouchableOpacity
-              style={styles.layerOpBtn}
-              onPress={() => {
-                setReparentMode((v) => !v);
-                setReparentTargetId(null);
-              }}
-            >
-              <Text style={styles.layerOpBtnText}>
-                {reparentMode ? 'Отмена переноса' : 'Перенести: выбрать родителя'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.layerSaveBtn,
-                (!selectedBlock?.id || !reparentTargetId) && styles.layerOpBtnDisabled,
-              ]}
-              disabled={!selectedBlock?.id || !reparentTargetId}
-              onPress={() => {
-                if (!selectedBlock?.id || !reparentTargetId) return;
-                onReparentBlock && onReparentBlock({ sourceId: selectedBlock.id, targetParentId: reparentTargetId });
-                setReparentMode(false);
-                setReparentTargetId(null);
-              }}
-            >
-              <Text style={styles.layerSaveBtnText}>Перенести в выбранного</Text>
-            </TouchableOpacity>
-          </View>
-              </View>
-
-              {insertStyleMode === 'kv' ? (
-                <div style={{ maxHeight: 120, overflow: 'auto' }}>
-                  {insertStyleRows.map((row, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                      <input
-                        style={htmlInputStyle}
-                        type="text"
-                        placeholder={fileType === 'html' ? 'prop-kebab' : 'propCamel'}
-                        value={row.key}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setInsertStyleRows((prev) => prev.map((r, i) => (i === idx ? { ...r, key: v } : r)));
-                        }}
-                      />
-                      <input
-                        style={htmlInputStyle}
-                        type="text"
-                        placeholder="value"
-                        value={row.value}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setInsertStyleRows((prev) => prev.map((r, i) => (i === idx ? { ...r, value: v } : r)));
-                        }}
-                      />
-                      <button
-                        style={{
-                          height: '32px',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(255,255,255,0.15)',
-                          background: 'rgba(255,255,255,0.08)',
-                          color: '#fff',
-                          padding: '0 10px',
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => setInsertStyleRows((prev) => prev.filter((_, i) => i !== idx))}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <textarea
-                  style={{
-                    width: '100%',
-                    minHeight: '110px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: 'rgba(0,0,0,0.25)',
-                    color: '#fff',
-                    padding: '10px',
-                    outline: 'none',
-                    fontFamily: 'monospace',
-                    fontSize: '12px',
-                  }}
-                  placeholder={'color: red;\nwidth: 120px;'}
-                  value={insertStyleText}
-                  onChange={(e) => setInsertStyleText(e.target.value)}
-                />
-              )}
-
-              <View style={styles.insertActionsRow}>
-                <TouchableOpacity
-                  style={styles.layerOpBtn}
-                  onPress={() => setInsertStyleRows((prev) => [...prev, { key: '', value: '' }])}
-                >
-                  <Text style={styles.layerOpBtnText}>+ стиль</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.layerSaveBtn}
-                  onPress={() => {
-                    console.log('[BlockEditorPanel] 🔵 Кнопка "Добавить" нажата');
-                    
-                    if (!selectedBlock?.id) {
-                      console.warn('[BlockEditorPanel] selectedBlock.id отсутствует');
-                      return;
-                    }
-                    
-                    // Защита от двойного клика (debounce 300ms)
-                    const now = Date.now();
-                    if (now - lastInsertTimeRef.current < 300) {
-                      console.warn('[BlockEditorPanel] ❌ ДУБЛИРОВАНИЕ КЛИКА предотвращено!', {
-                        timeDiff: now - lastInsertTimeRef.current
-                      });
-                      return;
-                    }
-                    lastInsertTimeRef.current = now;
-                    
-                    console.log('[BlockEditorPanel] ✅ Генерирую сниппет...');
-                    const snippet = buildInsertSnippet();
-                    console.log('[BlockEditorPanel] Сниппет сгенерирован:', snippet);
-                    console.log('[BlockEditorPanel] Вызываю onInsertBlock...', { 
-                      targetId: selectedBlock.id, 
-                      mode: insertMode 
-                    });
-                    onInsertBlock && onInsertBlock({ targetId: selectedBlock.id, mode: insertMode, snippet });
-                    setInsertMode(null);
-                  }}
-                >
-                  <Text style={styles.layerSaveBtnText}>Добавить</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.layerCancelBtn} onPress={() => setInsertMode(null)}>
-                  <Text style={styles.layerCancelBtnText}>Отмена</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Позиция/Размер</Text>
-          <Text style={styles.insertLabel}>Режим перемещения</Text>
-          <select
-            style={{ ...htmlInputStyle, height: '36px', marginBottom: '10px' }}
-            value={moveMode}
-            onChange={(e) => handleMoveModeChange(e.target.value)}
-          >
-            <option value="absolute">AbsoluteToParent</option>
-            <option value="relative">Relative</option>
-            <option value="grid8">GridSnap(8)</option>
-          </select>
-          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginBottom: '10px' }}>
-            {moveMode === 'absolute' && 'Позиционирование относительно родителя с точными координатами'}
-            {moveMode === 'relative' && 'Позиционирование относительно текущей позиции элемента'}
-            {moveMode === 'grid8' && 'Позиционирование с привязкой к сетке 8px для точного выравнивания'}
-          </Text>
-          <NumberField label="left" value={livePosition?.left !== null && livePosition?.left !== undefined ? livePosition.left : left} onChange={handleLeftChange} />
-          <NumberField label="top" value={livePosition?.top !== null && livePosition?.top !== undefined ? livePosition.top : top} onChange={handleTopChange} />
-          <NumberField label="width" value={livePosition?.width !== null && livePosition?.width !== undefined ? livePosition.width : width} onChange={handleWidthChange} />
-          <NumberField label="height" value={livePosition?.height !== null && livePosition?.height !== undefined ? livePosition.height : height} onChange={handleHeightChange} />
-          {livePosition && (livePosition.left !== null || livePosition.top !== null || livePosition.width !== null || livePosition.height !== null) && (
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginTop: '6px', fontStyle: 'italic' }}>
-              ● Обновляется в реальном времени
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Текст</Text>
-          <TextField label="text" value={textValue} onChange={setTextValue} placeholder="Текст блока" />
-          <View style={styles.stylesActionsRow}>
-            <TouchableOpacity
-              style={[styles.layerOpBtn, !canApply && styles.layerOpBtnDisabled]}
-              disabled={!canApply}
-              onPress={() => {
-                if (!canApply) return;
-                
-                // Защита от двойного клика (debounce 300ms)
-                const now = Date.now();
-                if (now - lastSetTextTimeRef.current < 300) {
-                  return;
-                }
-                lastSetTextTimeRef.current = now;
-                
-                if (onSetText) {
-                  onSetText({ blockId: selectedBlock.id, text: textValue });
-                }
-              }}
-            >
-              <Text style={styles.layerOpBtnText}>Stage текст</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.stylesHeaderRow}>
-            <Text style={styles.sectionTitle}>Стили</Text>
-            <View style={styles.stylesTabs}>
-              <TouchableOpacity
-                style={[styles.stylesTab, styleMode === 'kv' && styles.stylesTabActive]}
-                onPress={() => setStyleMode('kv')}
-              >
-                <Text style={styles.stylesTabText}>KV</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.stylesTab, styleMode === 'text' && styles.stylesTabActive]}
-                onPress={() => setStyleMode('text')}
-              >
-                <Text style={styles.stylesTabText}>Text</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {styleMode === 'kv' ? (
-            <div style={{ maxHeight: 180, overflow: 'auto' }}>
-              {styleRows.map((row, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                  <input
-                    style={htmlInputStyle}
-                    type="text"
-                    placeholder={fileType === 'html' ? 'prop-kebab' : 'propCamel'}
-                    value={row.key}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setStyleRows((prev) => prev.map((r, i) => (i === idx ? { ...r, key: v } : r)));
-                    }}
-                  />
-                  <input
-                    style={htmlInputStyle}
-                    type="text"
-                    placeholder="value"
-                    value={row.value}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setStyleRows((prev) => prev.map((r, i) => (i === idx ? { ...r, value: v } : r)));
-                    }}
-                  />
-                  <button
-                    style={{
-                      height: '32px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.08)',
-                      color: '#fff',
-                      padding: '0 10px',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => setStyleRows((prev) => prev.filter((_, i) => i !== idx))}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <textarea
-              style={{
-                width: '100%',
-                minHeight: '160px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.15)',
-                background: 'rgba(0,0,0,0.25)',
-                color: '#fff',
-                padding: '10px',
-                outline: 'none',
-                fontFamily: 'monospace',
-                fontSize: '12px',
-              }}
-              placeholder={'color: red;\nwidth: 120px;'}
-              value={styleText}
-              onChange={(e) => setStyleText(e.target.value)}
-            />
-          )}
-
-          <View style={styles.stylesActionsRow}>
-            <TouchableOpacity
-              style={[styles.layerOpBtn, !canApply && styles.layerOpBtnDisabled]}
-              disabled={!canApply}
-              onPress={() => setStyleRows((prev) => [...prev, { key: '', value: '' }])}
-            >
-              <Text style={styles.layerOpBtnText}>+ стиль</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.layerOpBtn, !canApply && styles.layerOpBtnDisabled]}
-              disabled={!canApply}
-              onPress={stageLocalStyles}
-            >
-              <Text style={styles.layerOpBtnText}>Stage (локально)</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.hint}>
-            HTML: kebab-case и px; React/RN: camelCase, числа можно без px.
-          </Text>
-
-          {styleSnapshot?.computedStyle && (
-            <div style={{ marginTop: '10px' }}>
-              <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginBottom: '6px' }}>
-                computed (для справки)
-              </div>
-              <pre
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  background: 'rgba(0,0,0,0.25)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '8px',
-                  padding: '10px',
-                  color: 'rgba(255,255,255,0.85)',
-                  fontSize: '11px',
-                  lineHeight: '14px',
-                  maxHeight: '120px',
-                  overflow: 'auto',
-                }}
-              >
-                {JSON.stringify(styleSnapshot.computedStyle, null, 2)}
-              </pre>
-            </div>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Цвета</Text>
-          <TextField label="bg" value={bg} onChange={setBg} placeholder="#ffffff" />
-          <TextField label="color" value={color} onChange={setColor} placeholder="#000000" />
-        </View>
-
-        <TouchableOpacity
-          style={[styles.applyBtn, !canApply && styles.applyBtnDisabled]}
-          onPress={handleApply}
-          disabled={!canApply}
-        >
-          <Text style={styles.applyBtnText}>Применить в файлы</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.hint}>
-          Подсказка: кликните по элементу в превью, чтобы выбрать блок.
-        </Text>
-        </ScrollView>
-      </View>
-
-      <View style={styles.preview}>
-        <WebView
-          key={webViewKey}
-          source={webSource}
-          style={styles.webview}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={false}
-          allowExternalScripts={true}
-          onMessage={onMessage}
-          outgoingMessage={outgoingMessage}
-        />
-      </View>
+    <View style={blockEditorPanelStyles.preview}>
+      <WebView
+        key={webViewKey}
+        source={webSource}
+        style={blockEditorPanelStyles.webview}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        startInLoadingState={false}
+        allowExternalScripts={true}
+        onMessage={onMessage}
+        outgoingMessage={outgoingMessage}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+export const blockEditorPanelStyles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
@@ -1293,5 +860,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-
