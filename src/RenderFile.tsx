@@ -168,8 +168,11 @@ function RenderFile({
   const [isProcessingHTML, setIsProcessingHTML] = useState<boolean>(false);
 
   const [splitLeftWidth, setSplitLeftWidth] = useState<number>(0.5); // 0.5 = 50% ширины
+  const [splitSidebarWidth, setSplitSidebarWidth] = useState<number>(320);
   const [isResizing, setIsResizing] = useState<boolean>(false);
+  const [resizeTarget, setResizeTarget] = useState<'main' | 'sidebar' | null>(null);
   const splitContainerRef = useRef<HTMLElement | null>(null);
+  const splitMainPanelsRef = useRef<HTMLElement | null>(null);
   const detectedComponentName = useMemo(() => {
     if (!fileContent || (fileType !== 'react' && fileType !== 'react-native')) {
       return null;
@@ -2176,17 +2179,22 @@ function RenderFile({
   }, [viewMode, undo, redo]);
 
   // Обработчики для изменения размера split панелей
-  const handleSplitResizeStart = useCallback((e: any) => {
+  const handleSplitResizeStart = useCallback((target: 'main' | 'sidebar') => (e: any) => {
+    setResizeTarget(target);
     setIsResizing(true);
+    if (typeof document !== 'undefined') {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+    }
     if (e.preventDefault) e.preventDefault();
     if (e.stopPropagation) e.stopPropagation();
   }, []);
 
   const handleSplitResize = useCallback((e: any) => {
-    if (!isResizing) return;
+    if (!isResizing || !resizeTarget) return;
 
     // Для React Native Web используем DOM API
-    let container = splitContainerRef.current as any;
+    let container = (resizeTarget === 'sidebar' ? splitContainerRef.current : splitMainPanelsRef.current) as any;
 
     // Пробуем получить DOM элемент разными способами
     if (container) {
@@ -2204,7 +2212,7 @@ function RenderFile({
     // Пробуем найти через document.querySelector если ref не работает
     if (!container || typeof container.getBoundingClientRect !== 'function') {
       // Используем глобальный поиск по классу или data-атрибуту
-      const splitContainers = document.querySelectorAll('[data-split-container]');
+      const splitContainers = document.querySelectorAll(resizeTarget === 'sidebar' ? '[data-split-container]' : '[data-split-main-panels]');
       if (splitContainers.length > 0) {
         container = splitContainers[0] as HTMLElement;
       }
@@ -2216,14 +2224,24 @@ function RenderFile({
 
     const rect = container.getBoundingClientRect();
     const x = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
+    if (resizeTarget === 'sidebar') {
+      const newSidebarWidth = Math.max(240, Math.min(520, x - rect.left));
+      setSplitSidebarWidth(newSidebarWidth);
+      return;
+    }
     const relativeX = x - rect.left;
     const newWidth = Math.max(0.2, Math.min(0.8, relativeX / rect.width));
 
     setSplitLeftWidth(newWidth);
-  }, [isResizing]);
+  }, [isResizing, resizeTarget]);
 
   const handleSplitResizeEnd = useCallback(() => {
     setIsResizing(false);
+    setResizeTarget(null);
+    if (typeof document !== 'undefined') {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
   }, []);
 
   // Эффект для обработки изменения размера
@@ -5363,6 +5381,35 @@ function RenderFile({
     }, 0);
   }, []);
 
+  const setSplitMainPanelsNode = useCallback((ref: any) => {
+    if (!ref) return;
+    if (ref._nativeNode) {
+      splitMainPanelsRef.current = ref._nativeNode;
+      return;
+    }
+    if (typeof ref.getBoundingClientRect === 'function') {
+      splitMainPanelsRef.current = ref;
+      return;
+    }
+    splitMainPanelsRef.current = ref;
+    setTimeout(() => {
+      const element = document.querySelector('[data-split-main-panels]');
+      if (element) {
+        splitMainPanelsRef.current = element as HTMLElement;
+      }
+    }, 0);
+  }, []);
+
+  const splitSidebarStyles = useMemo(() => ({
+    ...blockEditorSidebarProps.styles,
+    sidebar: {
+      ...blockEditorSidebarProps.styles.sidebar,
+      width: '100%',
+      minWidth: 0,
+      height: '100%',
+    },
+  }), [blockEditorSidebarProps.styles]);
+
   const renderBlockEditorPreview = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => (
     <BlockEditorPanel
       fileType={editorType}
@@ -5383,8 +5430,19 @@ function RenderFile({
     return (
       <View style={styles.splitModeRoot}>
         <View style={styles.splitContainer} data-split-container="true" ref={setSplitContainerNode}>
-          {showSplitSidebar && <BlockEditorSidebar {...blockEditorSidebarProps} />}
-          <View style={styles.splitMainPanels}>
+          {showSplitSidebar && (
+            <View style={[styles.splitSidebarPane, { width: splitSidebarWidth }]}>
+              <BlockEditorSidebar {...blockEditorSidebarProps} styles={splitSidebarStyles} />
+            </View>
+          )}
+          {showSplitSidebar && (showSplitPreview || showSplitCode) && (
+            <View
+              style={[styles.splitDivider, isResizing && resizeTarget === 'sidebar' && styles.splitDividerActive]}
+              onMouseDown={handleSplitResizeStart('sidebar')}
+              onTouchStart={handleSplitResizeStart('sidebar')}
+            />
+          )}
+          <View style={styles.splitMainPanels} data-split-main-panels="true" ref={setSplitMainPanelsNode}>
             {showSplitPreview && (
               <View style={[styles.splitLeft, { width: previewWidth, maxWidth: showSplitCode ? '80%' : '100%', minWidth: showSplitCode ? '20%' : 0 }]}>
                 <View style={styles.blockEditorPreviewContainer}>
@@ -5399,9 +5457,9 @@ function RenderFile({
             )}
             {showSplitPreview && showSplitCode && (
               <View
-                style={[styles.splitDivider, isResizing && styles.splitDividerActive]}
-                onMouseDown={handleSplitResizeStart}
-                onTouchStart={handleSplitResizeStart}
+                style={[styles.splitDivider, isResizing && resizeTarget === 'main' && styles.splitDividerActive]}
+                onMouseDown={handleSplitResizeStart('main')}
+                onTouchStart={handleSplitResizeStart('main')}
               />
             )}
             {showSplitCode && (
@@ -5431,6 +5489,18 @@ function RenderFile({
             )}
           </View>
         </View>
+        {isResizing && (
+          <View
+            style={[
+              styles.splitResizeOverlay,
+              resizeTarget === 'sidebar' ? styles.splitResizeOverlaySidebar : styles.splitResizeOverlayMain,
+            ]}
+            onMouseMove={handleSplitResize}
+            onMouseUp={handleSplitResizeEnd}
+            onTouchMove={handleSplitResize}
+            onTouchEnd={handleSplitResizeEnd}
+          />
+        )}
       </View>
     );
   }, [
@@ -5440,16 +5510,22 @@ function RenderFile({
     fileType,
     handleEditorChange,
     handleSplitResizeStart,
+    handleSplitResize,
+    handleSplitResizeEnd,
     hasStagedChanges,
     isModified,
     isResizing,
+    resizeTarget,
     renderBlockEditorPreview,
     saveFile,
     setSplitContainerNode,
+    setSplitMainPanelsNode,
     showSplitCode,
     showSplitPreview,
     showSplitSidebar,
     splitLeftWidth,
+    splitSidebarStyles,
+    splitSidebarWidth,
     unsavedContent,
   ]);
 
@@ -5889,6 +5965,7 @@ const styles = StyleSheet.create({
   splitModeRoot: {
     flex: 1,
     backgroundColor: '#1e1e1e',
+    position: 'relative',
   },
   splitContainer: {
     flex: 1,
@@ -5896,6 +5973,13 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#1e1e1e',
     overflow: 'hidden',
+  },
+  splitSidebarPane: {
+    minWidth: 240,
+    maxWidth: 520,
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
   },
   splitMainPanels: {
     flex: 1,
@@ -5923,6 +6007,20 @@ const styles = StyleSheet.create({
   },
   splitDividerActive: {
     backgroundColor: 'rgba(102, 126, 234, 0.5)',
+  },
+  splitResizeOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 2000,
+  },
+  splitResizeOverlayMain: {
+    cursor: 'col-resize',
+  },
+  splitResizeOverlaySidebar: {
+    cursor: 'col-resize',
   },
   splitEmptyState: {
     flex: 1,
