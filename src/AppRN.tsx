@@ -434,7 +434,9 @@ const styles = StyleSheet.create({
     width: 40,
   },
   sidebarContent: {
+    flex: 1,
     width: '100%',
+    minHeight: 0,
     minWidth: 260, // Минимальная ширина для комфортного отображения
     transition: 'opacity 0.2s ease',
   },

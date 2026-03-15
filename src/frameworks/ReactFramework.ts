@@ -20,6 +20,24 @@ import { resolvePath, resolvePathSync } from '../features/file-renderer/lib/path
 import { injectBlockEditorScript } from '../features/file-renderer/lib/block-editor-script';
 import { toReactStyleObjectText } from '../blockEditor/styleUtils';
 
+function parseRuntimeNamedImports(importSpec: string): Array<{ orig: string; alias: string }> {
+  return importSpec
+    .replace(/[{}]/g, '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => name.replace(/^type\s+/, '').replace(/^typeof\s+/, '').trim())
+    .filter(Boolean)
+    .map((name) => {
+      const parts = name.includes(' as ') ? name.split(/\s+as\s+/) : [name, name];
+      return {
+        orig: parts[0].trim(),
+        alias: parts[1].trim(),
+      };
+    })
+    .filter((entry) => entry.orig && entry.alias);
+}
+
 /**
  * Реализация Framework для React файлов
  * 
@@ -736,11 +754,10 @@ export class ReactFramework extends Framework {
           
           if (importSpec.startsWith('{')) {
             // Named imports: import { a, b as c } from ...
-            const names = importSpec.replace(/[{}]/g, '').split(',').map((n:string) => n.trim()).filter((n:string) => n);
-            return names.map((name:string) => {
-              const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
-              let orig = parts[0].trim();
-              let alias = parts[1].trim();
+            const names = parseRuntimeNamedImports(importSpec);
+            return names.map((entry) => {
+              let orig = entry.orig;
+              let alias = entry.alias;
               // Валидация имени переменной: убираем недопустимые символы
               alias = alias.replace(/[^a-zA-Z0-9_$]/g, '');
               if (!alias || !/^[a-zA-Z_$]/.test(alias)) {
@@ -1069,13 +1086,12 @@ export class ReactFramework extends Framework {
             importReplacements[importStatement.fullStatement] = `const ${alias} = window.__modules__['${importPath}'];`;
           } else if (importSpec.startsWith('{')) {
             // Named imports: import { a, b as c } from ...
-            const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
+            const names = parseRuntimeNamedImports(importSpec);
             // Получаем абсолютный путь для этого модуля
             const absolutePath = dependencyModules[importPath] || importPath;
-            const replacements = names.map(name => {
-              const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
-              let orig = parts[0].trim();
-              let alias = parts[1].trim();
+            const replacements = names.map((entry) => {
+              let orig = entry.orig;
+              let alias = entry.alias;
               // Валидация имени переменной: убираем недопустимые символы
               alias = alias.replace(/[^a-zA-Z0-9_$]/g, '');
               if (!alias || !/^[a-zA-Z_$]/.test(alias)) {
@@ -1165,11 +1181,10 @@ export class ReactFramework extends Framework {
         
         // Named imports: import { View, Text, StyleSheet } from 'react-native'
         if (importSpec.startsWith('{')) {
-          const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
-          const replacements = names.map(name => {
-            const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
-            const orig = parts[0].trim();
-            const alias = parts[1].trim();
+          const names = parseRuntimeNamedImports(importSpec);
+          const replacements = names.map((entry) => {
+            const orig = entry.orig;
+            const alias = entry.alias;
             return `const ${alias} = window.${orig} || window.ReactNativeWeb?.${orig};`;
           });
           importReplacements[imp.fullStatement] = replacements.join('\n');
@@ -1201,11 +1216,10 @@ export class ReactFramework extends Framework {
         importReplacements[imp.fullStatement] = `const ${alias} = window.__modules__ && window.__modules__['${absolutePath}'] || window.__modules__ && window.__modules__['${imp.path}'] || {};`;
       } else if (importSpec.startsWith('{')) {
         // Named imports: import { a, b as c } from ...
-        const names = importSpec.replace(/[{}]/g, '').split(',').map(n => n.trim()).filter(n => n);
-        const replacements = names.map(name => {
-          const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
-          let orig = parts[0].trim();
-          let alias = parts[1].trim();
+        const names = parseRuntimeNamedImports(importSpec);
+        const replacements = names.map((entry) => {
+          let orig = entry.orig;
+          let alias = entry.alias;
           // Валидация имени переменной: убираем недопустимые символы
           alias = alias.replace(/[^a-zA-Z0-9_$]/g, '');
           if (!alias || !/^[a-zA-Z_$]/.test(alias)) {
@@ -1505,6 +1519,16 @@ export class ReactFramework extends Framework {
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+      if (typeof Babel !== 'undefined' && Babel.registerPreset && Babel.availablePresets) {
+        Babel.registerPreset('mrpak-tsx', {
+          presets: [
+            [Babel.availablePresets['react'], { runtime: 'classic' }],
+            [Babel.availablePresets['typescript'], { allExtensions: true, isTSX: true }]
+          ]
+        });
+      }
+    </script>
     
     <!-- Ждем полной загрузки React перед инициализацией -->
     <script>
@@ -1646,7 +1670,7 @@ export class ReactFramework extends Framework {
         Компонент загружается из выбранного файла...
     </div>
     <div id="root"></div>
-    <script type="text/babel" data-type="module" data-presets="react,typescript">
+    <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
         // Делаем все React хуки доступными в Babel скрипте
         const React = window.React;
         

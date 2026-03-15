@@ -753,7 +753,7 @@ export default ${componentName};`;
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.treeRoot}>
       {rootPath && (
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -770,7 +770,11 @@ export default ${componentName};`;
           </TouchableOpacity>
         </View>
       )}
-      <ScrollView style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+      >
         {renderTree(tree)}
       </ScrollView>
       <CreateFileDialog
@@ -816,9 +820,17 @@ export default ${componentName};`;
 }
 
 const styles = StyleSheet.create({
+  treeRoot: {
+    flex: 1,
+    minHeight: 0,
+  },
   container: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: '#1e1e1e',
+  },
+  scrollContent: {
+    paddingBottom: 16,
   },
   item: {
     flexDirection: 'row',

@@ -14,6 +14,12 @@ body {
   overflow: hidden;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 #root {
   width: 100vw;
   height: 100vh;
@@ -23,6 +29,34 @@ body {
 #root {
   display: flex;
   flex: 1;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 118, 129, 0.9) rgba(24, 24, 24, 0.95);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(24, 24, 24, 0.95);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(110, 118, 129, 0.9);
+  border-radius: 999px;
+  border: 2px solid rgba(24, 24, 24, 0.95);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 149, 159, 0.95);
+}
+
+*::-webkit-scrollbar-corner {
+  background: rgba(24, 24, 24, 0.95);
 }
 
 /* Monaco Editor - визуальная индикация сохранения */

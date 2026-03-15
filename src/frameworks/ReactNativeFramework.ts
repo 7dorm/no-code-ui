@@ -207,6 +207,16 @@ export class ReactNativeFramework extends ReactFramework {
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+      if (typeof Babel !== 'undefined' && Babel.registerPreset && Babel.availablePresets) {
+        Babel.registerPreset('mrpak-tsx', {
+          presets: [
+            [Babel.availablePresets['react'], { runtime: 'classic' }],
+            [Babel.availablePresets['typescript'], { allExtensions: true, isTSX: true }]
+          ]
+        });
+      }
+    </script>
     
     <!-- Ждем полной загрузки React перед инициализацией -->
     <script>
@@ -840,7 +850,7 @@ export class ReactNativeFramework extends ReactFramework {
 </head>
 <body>
     <div id="root"></div>
-    <script type="text/babel" data-type="module" data-presets="react,typescript">
+    <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
         // Ждем загрузки React Native Web
         (async () => {
           // Ждем пока RNW загрузится
