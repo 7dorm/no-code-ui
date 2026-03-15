@@ -439,6 +439,56 @@ export function useBlockEditorSidebarController({
     return `<${insertTag}${styleAttr}${onClickAttr}>${insertText || 'Новый блок'}</${insertTag}>`;
   };
 
+  const handleDeleteSelected = () => {
+    if (!selectedBlock?.id) return;
+    const now = Date.now();
+    if (now - lastDeleteTimeRef.current < 300) return;
+    lastDeleteTimeRef.current = now;
+    onDeleteBlock && onDeleteBlock(selectedBlock.id);
+  };
+
+  const handleConfirmInsert = () => {
+    console.log('[BlockEditorPanel] 🔵 Кнопка "Добавить" нажата');
+    if (!selectedBlock?.id || !insertMode) {
+      console.warn('[BlockEditorPanel] selectedBlock.id или insertMode отсутствует');
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastInsertTimeRef.current < 300) {
+      console.warn('[BlockEditorPanel] ❌ ДУБЛИРОВАНИЕ КЛИКА предотвращено!', {
+        timeDiff: now - lastInsertTimeRef.current
+      });
+      return;
+    }
+
+    lastInsertTimeRef.current = now;
+    const snippet = buildInsertSnippet();
+    console.log('[BlockEditorPanel] Сниппет сгенерирован:', snippet);
+    onInsertBlock && onInsertBlock({ targetId: selectedBlock.id, mode: insertMode, snippet });
+    setInsertMode(null);
+  };
+
+  const handleStageText = () => {
+    if (!canApply || !selectedBlock?.id) return;
+    const now = Date.now();
+    if (now - lastSetTextTimeRef.current < 300) return;
+    lastSetTextTimeRef.current = now;
+    onSetText && onSetText({ blockId: selectedBlock.id, text: textValue });
+  };
+
+  const handleApplyReparent = () => {
+    if (!selectedBlock?.id || !reparentTargetId) return;
+    onReparentBlock && onReparentBlock({ sourceId: selectedBlock.id, targetParentId: reparentTargetId });
+    setReparentMode(false);
+    setReparentTargetId(null);
+  };
+
+  const handleToggleReparentMode = () => {
+    setReparentMode((value) => !value);
+    setReparentTargetId(null);
+  };
+
   // ВАЖНО: стабилизируем source объект, иначе WebView пересоздаёт iframe на каждый ререндер
   // (например, при клике по блоку и обновлении selectedBlock).
   const shortId = (id: any) => {
@@ -534,9 +584,27 @@ export function useBlockEditorSidebarController({
     selectedBlock,
     layersTree,
     renderTreeNode,
+    fileType,
     setInsertMode,
-    onDeleteBlock,
-    lastDeleteTimeRef,
+    insertMode,
+    insertTag,
+    setInsertTag,
+    insertText,
+    setInsertText,
+    insertStyleMode,
+    setInsertStyleMode,
+    insertStyleRows,
+    setInsertStyleRows,
+    insertStyleText,
+    setInsertStyleText,
+    handleDeleteSelected,
+    handleConfirmInsert,
+    reparentMode,
+    setReparentMode,
+    reparentTargetId,
+    setReparentTargetId,
+    handleToggleReparentMode,
+    handleApplyReparent,
     livePosition,
     left,
     top,
@@ -549,9 +617,18 @@ export function useBlockEditorSidebarController({
     NumberField,
     textValue,
     setTextValue,
-    onSetText,
-    lastSetTextTimeRef,
+    handleStageText,
     TextField,
+    moveMode,
+    handleMoveModeChange,
+    styleMode,
+    setStyleMode,
+    styleRows,
+    setStyleRows,
+    styleText,
+    setStyleText,
+    stageLocalStyles,
+    styleSnapshot,
     bg,
     setBg,
     color,
