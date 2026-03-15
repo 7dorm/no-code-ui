@@ -65,6 +65,18 @@ body,
   animation: save-flash 0.3s ease-out;
 }
 
+.monaco-block-selection {
+  background-color: rgba(56, 189, 248, 0.16) !important;
+  border-left: 2px solid rgba(56, 189, 248, 0.95);
+}
+
+.monaco-block-selection-glyph {
+  background: rgba(56, 189, 248, 0.95);
+  width: 3px !important;
+  margin-left: 2px;
+  border-radius: 999px;
+}
+
 @keyframes save-flash {
   0% {
     background-color: rgba(76, 175, 80, 0.4);

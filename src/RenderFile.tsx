@@ -143,6 +143,8 @@ function RenderFile({
   const [isModified, setIsModified] = useState<boolean>(false); // Флаг изменений
   const [showSaveIndicator, setShowSaveIndicator] = useState<boolean>(false); // Индикатор сохранения
   const monacoEditorRef = useRef<any>(null);
+  const suppressCodeSelectionSyncRef = useRef<boolean>(false);
+  const monacoSelectionDecorationsRef = useRef<string[]>([]);
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Таймер для автосохранения
   const undoHistoryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Таймер для debounce истории undo/redo
   const pendingHistoryOperationRef = useRef<HistoryOperation | null>(null); // Отложенная операция для истории
@@ -647,6 +649,136 @@ function RenderFile({
       }
     }
   }, []);
+
+  const clearMonacoBlockSelection = useCallback(() => {
+    const editor = monacoEditorRef?.current;
+    if (!editor) return;
+
+    try {
+      if (typeof editor.deltaDecorations === 'function') {
+        monacoSelectionDecorationsRef.current = editor.deltaDecorations(
+          monacoSelectionDecorationsRef.current,
+          []
+        );
+      }
+    } catch (e) {
+      console.warn('[clearMonacoBlockSelection] Ошибка очистки decorations:', e);
+    }
+  }, []);
+
+  const revealSelectedBlockInCode = useCallback((blockId: string | null | undefined) => {
+    clearMonacoBlockSelection();
+    if (!blockId || !monacoEditorRef?.current) return;
+
+    try {
+      const editor = monacoEditorRef.current;
+      const model = typeof editor.getModel === 'function' ? editor.getModel() : null;
+      if (!model || typeof model.getPositionAt !== 'function') return;
+
+      const entry = (blockMapForFile && blockMapForFile[blockId]) || (blockMap && blockMap[blockId]);
+      if (!entry || typeof entry.start !== 'number') return;
+
+      const offset = Math.max(0, Math.min(entry.start, model.getValueLength()));
+      const position = model.getPositionAt(offset);
+      if (!position) return;
+
+      suppressCodeSelectionSyncRef.current = true;
+      if (typeof editor.deltaDecorations === 'function') {
+        monacoSelectionDecorationsRef.current = editor.deltaDecorations(
+          monacoSelectionDecorationsRef.current,
+          [
+            {
+              range: {
+                startLineNumber: position.lineNumber,
+                startColumn: 1,
+                endLineNumber: position.lineNumber,
+                endColumn: model.getLineMaxColumn(position.lineNumber),
+              },
+              options: {
+                isWholeLine: true,
+                className: 'monaco-block-selection',
+                linesDecorationsClassName: 'monaco-block-selection-glyph',
+              },
+            },
+          ]
+        );
+      }
+      editor.setPosition(position);
+      if (typeof editor.revealPositionInCenter === 'function') {
+        editor.revealPositionInCenter(position);
+      } else if (typeof editor.revealLineInCenter === 'function') {
+        editor.revealLineInCenter(position.lineNumber);
+      }
+
+      if (typeof editor.setSelection === 'function') {
+        editor.setSelection({
+          startLineNumber: position.lineNumber,
+          startColumn: 1,
+          endLineNumber: position.lineNumber,
+          endColumn: model.getLineMaxColumn(position.lineNumber),
+        });
+      }
+
+      try {
+        editor.focus();
+      } catch (e) {}
+      requestAnimationFrame(() => {
+        suppressCodeSelectionSyncRef.current = false;
+      });
+    } catch (e) {
+      console.warn('[revealSelectedBlockInCode] Ошибка навигации к блоку в Monaco:', e);
+      suppressCodeSelectionSyncRef.current = false;
+    }
+  }, [blockMapForFile, blockMap, clearMonacoBlockSelection]);
+
+  const handleMonacoCtrlClick = useCallback((event: any) => {
+    if (suppressCodeSelectionSyncRef.current) return;
+
+    try {
+      const editor = monacoEditorRef?.current;
+      const model = editor && typeof editor.getModel === 'function' ? editor.getModel() : null;
+      const position = event?.position;
+      if (!model || !position) return;
+
+      const offset = model.getOffsetAt(position);
+      const entries = Object.entries(blockMapForFile || {});
+      if (entries.length === 0) return;
+
+      let bestMatch: { id: string; entry: any } | null = null;
+      for (const [id, entry] of entries) {
+        if (!entry || typeof entry.start !== 'number' || typeof entry.end !== 'number') continue;
+        if (offset >= entry.start && offset <= entry.end) {
+          if (!bestMatch || (entry.start >= bestMatch.entry.start && entry.end <= bestMatch.entry.end)) {
+            bestMatch = { id, entry };
+          }
+        }
+      }
+
+      if (!bestMatch) return;
+      if (selectedBlock?.id === bestMatch.id) return;
+
+      setSelectedBlock((prev) => {
+        if (prev?.id === bestMatch!.id) return prev;
+        return { id: bestMatch!.id, meta: prev?.meta };
+      });
+      sendIframeCommand({ type: MRPAK_CMD.SELECT, id: bestMatch.id });
+    } catch (e) {
+      console.warn('[handleMonacoCtrlClick] Ошибка синхронизации Ctrl+Click с блоком:', e);
+    }
+  }, [blockMapForFile, selectedBlock?.id, sendIframeCommand]);
+
+  useEffect(() => {
+    if (!selectedBlock?.id) {
+      clearMonacoBlockSelection();
+      return;
+    }
+
+    const rafId = requestAnimationFrame(() => {
+      revealSelectedBlockInCode(selectedBlock.id);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [selectedBlock?.id, revealSelectedBlockInCode, clearMonacoBlockSelection]);
 
   const applyBlockPatch = useCallback(
     async (blockId: any, patch: any, isIntermediate = false) => {
@@ -5231,6 +5363,7 @@ function RenderFile({
                     onChange={handleEditorChange}
                     onSave={saveFile}
                     editorRef={monacoEditorRef}
+                    onCodeCtrlClick={handleMonacoCtrlClick}
                   />
                   {isModified && (
                     <View style={styles.saveIndicator} pointerEvents="none">
@@ -5554,6 +5687,7 @@ function RenderFile({
           onChange={handleEditorChange}
           onSave={saveFile}
           editorRef={monacoEditorRef}
+          onCodeCtrlClick={handleMonacoCtrlClick}
         />
         {isModified && (
           <View style={styles.saveIndicator}>

@@ -51,6 +51,18 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
       </style>
       <script>
         (function() {
+          const INSTANCE_TOKEN = 'mrpak-editor:' + Date.now() + ':' + Math.random().toString(16).slice(2, 8);
+          window.__MRPAK_BLOCK_EDITOR_ACTIVE_TOKEN__ = INSTANCE_TOKEN;
+          const isActiveInstance = () => window.__MRPAK_BLOCK_EDITOR_ACTIVE_TOKEN__ === INSTANCE_TOKEN;
+          try {
+            Array.from(document.querySelectorAll('.mrpak-selected')).forEach((el) => {
+              try { el.classList.remove('mrpak-selected'); } catch (e) {}
+            });
+            Array.from(document.querySelectorAll('.mrpak-box-overlay, .mrpak-hint')).forEach((el) => {
+              try { el.remove(); } catch (e) {}
+            });
+          } catch (e) {}
+
           const EDIT_MODE = ${isEditMode ? 'true' : 'false'};
           const ATTR_NEW = 'data-no-code-ui-id';
           const ATTR_OLD = 'data-mrpak-id';
@@ -164,6 +176,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           };
 
           const updateBoxOverlay = () => {
+            if (!isActiveInstance()) return;
             try {
               ensureOverlay();
               if (!selected) {
@@ -184,14 +197,14 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const pl = toNum(cs.paddingLeft);
               
               // Показываем родительскую рамку
-              const parent = getOffsetParent(selected);
-              if (parent && parent !== document.body) {
-                const parentRect = parent.getBoundingClientRect();
-                const parentCs = window.getComputedStyle(parent);
-                const parentPt = toNum(parentCs.paddingTop);
-                const parentPr = toNum(parentCs.paddingRight);
-                const parentPb = toNum(parentCs.paddingBottom);
-                const parentPl = toNum(parentCs.paddingLeft);
+              const parentInfo = getParentContentRect(selected);
+              const parent = parentInfo.parent;
+              if (parent && parent !== document.body && parent !== document.documentElement) {
+                const parentRect = parentInfo.rect;
+                const parentPt = parentInfo.padding.top;
+                const parentPr = parentInfo.padding.right;
+                const parentPb = parentInfo.padding.bottom;
+                const parentPl = parentInfo.padding.left;
                 
                 setRect(overlay.parent, {
                   left: parentRect.left + parentPl,
@@ -254,18 +267,63 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             return el.offsetParent || document.body;
           };
 
+          const getLogicalParentBlock = (el) => {
+            if (!el) return null;
+            let parent = el.parentElement;
+            while (parent && parent !== document.body && parent !== document.documentElement) {
+              if (parent.hasAttribute && (parent.hasAttribute(ATTR_NEW) || parent.hasAttribute(ATTR_OLD))) {
+                return parent;
+              }
+              parent = parent.parentElement;
+            }
+            return null;
+          };
+
+          const getConstraintParent = (el) => {
+            return getLogicalParentBlock(el) || getOffsetParent(el) || document.body;
+          };
+
+          const getParentContentRect = (el) => {
+            const parent = getConstraintParent(el);
+            if (!parent || parent === document.body || parent === document.documentElement) {
+              return {
+                parent,
+                rect: {
+                  left: 0,
+                  top: 0,
+                  width: window.innerWidth,
+                  height: window.innerHeight,
+                },
+                padding: { left: 0, top: 0, right: 0, bottom: 0 },
+              };
+            }
+
+            const rect = parent.getBoundingClientRect();
+            const cs = window.getComputedStyle(parent);
+            const padding = {
+              left: toNum(cs.paddingLeft),
+              top: toNum(cs.paddingTop),
+              right: toNum(cs.paddingRight),
+              bottom: toNum(cs.paddingBottom),
+            };
+
+            return { parent, rect, padding };
+          };
+
           const pxToNum = (s) => {
             const m = String(s || '').match(/(-?\\d+(?:\\.\\d+)?)px/);
             return m ? Number(m[1]) : 0;
           };
 
           function post(type, payload) {
+            if (!isActiveInstance()) return;
             try {
               window.parent && window.parent.postMessage({ type, ...payload }, '*');
             } catch (e) {}
           }
 
           function buildTree() {
+            if (!isActiveInstance()) return;
             const nodes = {};
             const rootIds = [];
             const all = Array.from(document.querySelectorAll(SEL_ALL));
@@ -339,8 +397,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           window.__MRPAK_BUILD_TREE__ = buildTree;
 
           function clearSelected() {
+            if (!isActiveInstance()) return;
             try {
-              (selectedGroup || []).forEach((el) => {
+              const allSelected = Array.from(document.querySelectorAll('.mrpak-selected'));
+              allSelected.forEach((el) => {
                 try { el.classList.remove('mrpak-selected'); } catch(e) {}
               });
             } catch(e) {}
@@ -350,6 +410,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           }
 
           function selectEl(el) {
+            if (!isActiveInstance()) return;
             if (!el) return;
             clearSelected();
             const id = ensureId(el);
@@ -403,6 +464,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           // Hover для drop target при перетаскивании (режим reparent)
           document.addEventListener('mousemove', (ev) => {
+            if (!isActiveInstance()) return;
             if (!dragging || !dragging.sourceId || dragging.mode !== 'reparent') return;
             const el = ev.target && ev.target.closest ? ev.target.closest(SEL_ALL) : null;
             const sid = dragging.sourceId;
@@ -421,6 +483,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           // Блокируем submit форм только в режиме редактора
           if (EDIT_MODE) {
             document.addEventListener('submit', (ev) => {
+              if (!isActiveInstance()) return;
               try {
                 ev.preventDefault();
                 ev.stopPropagation();
@@ -431,6 +494,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           // Блокируем все события на интерактивных элементах только в режиме редактора
           const blockInteractiveEvents = (ev) => {
+            if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
             const t = ev.target;
             if (!t) return;
@@ -463,6 +527,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             document.addEventListener('focus', blockInteractiveEvents, true);
             document.addEventListener('blur', blockInteractiveEvents, true);
             document.addEventListener('keydown', (ev) => {
+              if (!isActiveInstance()) return;
               const t = ev.target;
               if (t && (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,[role=button],[role=link],[contenteditable]')))) {
                 try {
@@ -488,6 +553,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           
           // Обработка клика для выбора блоков (только в режиме редактора)
           document.addEventListener('click', (ev) => {
+            if (!isActiveInstance()) return;
             if (!EDIT_MODE) return; // В preview режиме не обрабатываем клики для выбора
             
             const t = ev.target;
@@ -524,6 +590,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           // Этот обработчик также блокирует интерактивные элементы (только в режиме редактора)
           let drag = null;
           document.addEventListener('mousedown', (ev) => {
+            if (!isActiveInstance()) return;
             if (!EDIT_MODE) return; // В preview режиме не обрабатываем
             
             const t = ev.target;
@@ -600,42 +667,28 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           }, true);
 
           document.addEventListener('mousemove', (ev) => {
+            if (!isActiveInstance()) return;
             if (!drag || !selected) return;
             const dx = ev.clientX - drag.sx;
             const dy = ev.clientY - drag.sy;
-            const id = ensureId(selected);
             
             if (drag.mode === 'move') {
-              // Получаем родительские ограничения для real-time проверки
-              const parent = getOffsetParent(selected);
-              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-              const ps = parent ? window.getComputedStyle(parent) : null;
-              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
-              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
-              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
-              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
-              
-              // Рассчитываем ограничения
-              const startLeft = drag.rect.left - parentRect.left - padLeft;
-              const startTop = drag.rect.top - parentRect.top - padTop;
-              let constrainedDx = dx;
-              let constrainedDy = dy;
-              
-              if (moveMode === 'absolute') {
-                const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
-                const maxTop = parentRect.height - padBottom - snap(drag.rect.height);
-                const minLeft = padLeft;
-                const minTop = padTop;
-                
-                const potentialLeft = snap(startLeft + dx);
-                const potentialTop = snap(startTop + dy);
-                
-                if (potentialLeft < minLeft) constrainedDx = minLeft - startLeft;
-                else if (potentialLeft > maxLeft) constrainedDx = maxLeft - startLeft;
-                
-                if (potentialTop < minTop) constrainedDy = minTop - startTop;
-                else if (potentialTop > maxTop) constrainedDy = maxTop - startTop;
-              }
+              const parentInfo = getParentContentRect(selected);
+              const parentRect = parentInfo.rect;
+              const padLeft = parentInfo.padding.left;
+              const padTop = parentInfo.padding.top;
+              const padRight = parentInfo.padding.right;
+              const padBottom = parentInfo.padding.bottom;
+              const contentLeft = parentRect.left + padLeft;
+              const contentTop = parentRect.top + padTop;
+              const contentRight = parentRect.left + parentRect.width - padRight;
+              const contentBottom = parentRect.top + parentRect.height - padBottom;
+              const minDx = contentLeft - drag.rect.left;
+              const maxDx = contentRight - drag.rect.right;
+              const minDy = contentTop - drag.rect.top;
+              const maxDy = contentBottom - drag.rect.bottom;
+              const constrainedDx = Math.min(Math.max(dx, minDx), maxDx);
+              const constrainedDy = Math.min(Math.max(dy, minDy), maxDy);
               
               selected.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
               updateBoxOverlay();
@@ -666,48 +719,34 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           // Touch события для мобильных устройств
           document.addEventListener('touchmove', (ev) => {
+            if (!isActiveInstance()) return;
             if (!drag || !selected) return;
             const touch = ev.touches[0];
             if (!touch) return;
             const dx = touch.clientX - drag.sx;
             const dy = touch.clientY - drag.sy;
-            const id = ensureId(selected);
             
             if (drag.mode === 'move') {
-              // Получаем родительские ограничения для real-time проверки
-              const parent = getOffsetParent(selected);
-              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-              const ps = parent ? window.getComputedStyle(parent) : null;
-              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
-              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
-              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
-              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
-              
-              // Рассчитываем ограничения
-              const startLeft = drag.rect.left - parentRect.left - padLeft;
-              const startTop = drag.rect.top - parentRect.top - padTop;
-              let constrainedDx = dx;
-              let constrainedDy = dy;
-              
-              if (moveMode === 'absolute') {
-                const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
-                const maxTop = parentRect.height - padBottom - snap(drag.rect.height);
-                const minLeft = padLeft;
-                const minTop = padTop;
-                
-                const potentialLeft = snap(startLeft + dx);
-                const potentialTop = snap(startTop + dy);
-                
-                if (potentialLeft < minLeft) constrainedDx = minLeft - startLeft;
-                else if (potentialLeft > maxLeft) constrainedDx = maxLeft - startLeft;
-                
-                if (potentialTop < minTop) constrainedDy = minTop - startTop;
-                else if (potentialTop > maxTop) constrainedDy = maxTop - startTop;
-              }
-              
+              const parentInfo = getParentContentRect(selected);
+              const parentRect = parentInfo.rect;
+              const padLeft = parentInfo.padding.left;
+              const padTop = parentInfo.padding.top;
+              const padRight = parentInfo.padding.right;
+              const padBottom = parentInfo.padding.bottom;
+              const contentLeft = parentRect.left + padLeft;
+              const contentTop = parentRect.top + padTop;
+              const contentRight = parentRect.left + parentRect.width - padRight;
+              const contentBottom = parentRect.top + parentRect.height - padBottom;
+              const minDx = contentLeft - drag.rect.left;
+              const maxDx = contentRight - drag.rect.right;
+              const minDy = contentTop - drag.rect.top;
+              const maxDy = contentBottom - drag.rect.bottom;
+              const constrainedDx = Math.min(Math.max(dx, minDx), maxDx);
+              const constrainedDy = Math.min(Math.max(dy, minDy), maxDy);
+
               selected.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
               updateBoxOverlay();
-              
+
               // Сохраняем финальные координаты в drag объект
               if (moveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
@@ -720,6 +759,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 drag.finalTop = top;
                 drag.finalPosition = 'relative';
               } else {
+                const startLeft = drag.rect.left - parentRect.left - padLeft;
+                const startTop = drag.rect.top - parentRect.top - padTop;
                 const left = snap(startLeft + constrainedDx);
                 const top = snap(startTop + constrainedDy);
                 
@@ -757,6 +798,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           }, { passive: false });
 
           document.addEventListener('touchend', (ev) => {
+            if (!isActiveInstance()) return;
             // reparent drag (Ctrl/Cmd + drag) - не поддерживается для touch
             if (dragging && dragging.mode === 'reparent') {
               dragging = null;
@@ -821,6 +863,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           }, { passive: false });
 
           document.addEventListener('mouseup', (ev) => {
+            if (!isActiveInstance()) return;
             // reparent drag (Ctrl/Cmd + drag)
             if (dragging && dragging.mode === 'reparent') {
               if (dropTarget && dragging.sourceId && dropTarget !== dragging.sourceId) {
@@ -837,16 +880,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const dy = ev.clientY - drag.sy;
             const id = ensureId(selected);
 
-            // координаты родителя и padding для ограничения
-            const parent = getOffsetParent(selected);
-            const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-            const ps = parent ? window.getComputedStyle(parent) : null;
-            const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
-            const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
-            const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
-            const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
-            const scrollLeft = parent ? (parent.scrollLeft || 0) : 0;
-            const scrollTop = parent ? (parent.scrollTop || 0) : 0;
+            const parentInfo = getParentContentRect(selected);
+            const parentRect = parentInfo.rect;
+            const padLeft = parentInfo.padding.left;
+            const padTop = parentInfo.padding.top;
+            const padRight = parentInfo.padding.right;
+            const padBottom = parentInfo.padding.bottom;
+            const contentLeft = parentRect.left + padLeft;
+            const contentTop = parentRect.top + padTop;
+            const contentRight = parentRect.left + parentRect.width - padRight;
+            const contentBottom = parentRect.top + parentRect.height - padBottom;
+            const minDx = contentLeft - drag.rect.left;
+            const maxDx = contentRight - drag.rect.right;
+            const minDy = contentTop - drag.rect.top;
+            const maxDy = contentBottom - drag.rect.bottom;
+            const constrainedDx = Math.min(Math.max(dx, minDx), maxDx);
+            const constrainedDy = Math.min(Math.max(dy, minDy), maxDy);
 
             if (drag.mode === 'move') {
               selected.style.transform = '';
@@ -857,8 +906,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 const cs = window.getComputedStyle(selected);
                 const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
                 const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
-                const left = snap(baseLeft + dx);
-                const top = snap(baseTop + dy);
+                const left = snap(baseLeft + constrainedDx);
+                const top = snap(baseTop + constrainedDy);
                 selected.style.position = 'relative';
                 selected.style.left = left + 'px';
                 selected.style.top = top + 'px';
@@ -873,8 +922,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 const startLeft = drag.rect.left - parentRect.left - padLeft;
                 const startTop = drag.rect.top - parentRect.top - padTop;
                 
-                let left = snap(startLeft + dx);
-                let top = snap(startTop + dy);
+                let left = snap(startLeft + constrainedDx);
+                let top = snap(startTop + constrainedDy);
 
                 // Ограничиваем позицию padding-box родителя
                 const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
@@ -938,6 +987,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           // Команды из UI (локальные изменения)
           window.addEventListener('message', (event) => {
+            if (!isActiveInstance()) return;
             const data = event && event.data;
             if (!data || typeof data !== 'object') return;
             try {
@@ -1100,6 +1150,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             } catch(e) {}
           }, false);
 
+          if (!isActiveInstance()) return;
           post(MSG_READY, { meta: { mode: 'edit' } });
           buildTree();
           updateBoxOverlay();

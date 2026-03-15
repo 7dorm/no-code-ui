@@ -5,7 +5,7 @@ import Editor from '@monaco-editor/react';
 /**
  * Обертка для Monaco Editor, совместимая с React Native Web
  */
-export function MonacoEditorWrapper({ value, language, onChange, filePath, onSave, editorRef }) {
+export function MonacoEditorWrapper({ value, language, onChange, filePath, onSave, editorRef, onCodeCtrlClick }) {
   const handleChange = (newValue) => {
     if (onChange && typeof onChange === 'function') {
       onChange(newValue || '');
@@ -27,6 +27,22 @@ export function MonacoEditorWrapper({ value, language, onChange, filePath, onSav
             if (editorRef) {
               editorRef.current = editor;
               console.log('💾 [Monaco] editorRef установлен');
+            }
+
+            if (onCodeCtrlClick && typeof onCodeCtrlClick === 'function') {
+              editor.onMouseDown((event) => {
+                try {
+                  const browserEvent = event?.event?.browserEvent || event?.event;
+                  const isPrimaryButton = browserEvent?.button === 0 || browserEvent?.buttons === 1;
+                  const hasModifier = !!(browserEvent?.ctrlKey || browserEvent?.metaKey);
+                  const position = event?.target?.position;
+                  if (isPrimaryButton && hasModifier && position) {
+                    onCodeCtrlClick({ position, source: 'mouse' });
+                  }
+                } catch (e) {
+                  console.warn('💾 [Monaco] Ошибка обработки Ctrl+Click:', e);
+                }
+              });
             }
             
             editor.updateOptions({ readOnly: false });
@@ -131,4 +147,3 @@ const styles = StyleSheet.create({
     minHeight: 600,
   },
 });
-
