@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import WebView from './WebView';
 import {
@@ -156,7 +156,7 @@ export function useBlockEditorSidebarController({
   const [textValue, setTextValue] = useState('');
   const [reparentMode, setReparentMode] = useState(false);
   const [reparentTargetId, setReparentTargetId] = useState(null);
-  const [moveMode, setMoveMode] = useState('absolute'); // absolute | relative | grid8
+  const [moveMode, setMoveMode] = useState('relative'); // absolute | relative | grid8
   const [moveUnit, setMoveUnit] = useState<'px' | '%'>('px');
   const [isMoveModeInitialized, setIsMoveModeInitialized] = useState(false);
 
@@ -230,7 +230,7 @@ export function useBlockEditorSidebarController({
       if (heightVal !== null) setHeight(heightVal);
     }
     // Читаем moveMode из data-атрибута элемента или из computedStyle.position
-    let elementMoveMode: 'absolute' | 'relative' | 'grid8' = 'absolute'; // значение по умолчанию
+    let elementMoveMode: 'absolute' | 'relative' | 'grid8' = 'relative'; // значение по умолчанию
     if (selectedBlock?.id) {
       // В React-режиме нужно искать в DOM через data-no-code-ui-id
       const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
@@ -298,7 +298,7 @@ export function useBlockEditorSidebarController({
     onSendCommand({ type: 'MRPAK_CMD_SET_MOVE_MODE', mode: moveMode, unit: moveUnit, grid: 8 });
   }, [moveMode, moveUnit, onSendCommand]);
 
-  // Отдельный useEffect для сохранения moveMode в data-атрибут и создания патча
+  // Отдельный useEffect только для локальных data-атрибутов iframe.
   useEffect(() => {
     if (!selectedBlock?.id || !isMoveModeInitialized) return;
     
@@ -307,14 +307,6 @@ export function useBlockEditorSidebarController({
     if (element) {
       element.setAttribute('data-move-mode', moveMode);
       element.setAttribute('data-move-unit', moveMode === 'grid8' ? 'px' : moveUnit);
-      
-      // Создаем патч для обновления position в стиле элемента
-      console.log('[moveMode change] Processing moveMode:', { moveMode, moveUnit, selectedBlockId: selectedBlock?.id, isInitialized: isMoveModeInitialized });
-      const patch: any = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
-      console.log('[moveMode change] Created patch:', { patch, patchKeys: Object.keys(patch), patchValues: Object.values(patch) });
-      console.log('[moveMode change] About to call onApplyPatch:', { blockId: selectedBlock.id, onApplyPatch: typeof onApplyPatch });
-      onApplyPatch(selectedBlock.id, patch);
-      console.log('[moveMode change] onApplyPatch called successfully');
     }
   }, [moveMode, moveUnit, selectedBlock?.id, isMoveModeInitialized]);
 
@@ -689,7 +681,7 @@ export function useBlockEditorSidebarController({
   };
 }
 
-export default function BlockEditorPanel({
+function BlockEditorPanelComponent({
   fileType,
   html,
   onMessage,
@@ -717,6 +709,17 @@ export default function BlockEditorPanel({
     </View>
   );
 }
+
+const BlockEditorPanel = memo(
+  BlockEditorPanelComponent,
+  (prevProps, nextProps) =>
+    prevProps.fileType === nextProps.fileType &&
+    prevProps.html === nextProps.html &&
+    prevProps.onMessage === nextProps.onMessage &&
+    prevProps.outgoingMessage === nextProps.outgoingMessage
+);
+
+export default BlockEditorPanel;
 
 export const blockEditorPanelStyles = StyleSheet.create({
   container: {

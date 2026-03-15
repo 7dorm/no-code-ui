@@ -293,8 +293,42 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             return null;
           };
 
+          const hasUsableRect = (el) => {
+            if (!el || !el.getBoundingClientRect) return false;
+            try {
+              const rect = el.getBoundingClientRect();
+              return rect.width > 0.5 && rect.height > 0.5;
+            } catch (e) {
+              return false;
+            }
+          };
+
+          const getVisualParent = (el) => {
+            if (!el) return null;
+            let parent = el.parentElement;
+            while (parent && parent !== document.body && parent !== document.documentElement) {
+              const cs = window.getComputedStyle(parent);
+              if (cs.display !== 'contents' && hasUsableRect(parent)) {
+                return parent;
+              }
+              parent = parent.parentElement;
+            }
+            return null;
+          };
+
           const getConstraintParent = (el) => {
-            return getLogicalParentBlock(el) || getOffsetParent(el) || document.body;
+            const logicalParent = getLogicalParentBlock(el);
+            if (logicalParent && hasUsableRect(logicalParent)) return logicalParent;
+
+            const visualParent = getVisualParent(el);
+            if (visualParent) return visualParent;
+
+            const offsetParent = getOffsetParent(el);
+            if (offsetParent && offsetParent !== document.body && offsetParent !== document.documentElement && hasUsableRect(offsetParent)) {
+              return offsetParent;
+            }
+
+            return offsetParent || document.body;
           };
 
           const getParentContentRect = (el) => {
@@ -709,14 +743,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               selected.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
               updateBoxOverlay();
             } else {
-              // Изменение размера с ограничениями
-              const parent = getOffsetParent(selected);
-              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-              const ps = parent ? window.getComputedStyle(parent) : null;
-              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
-              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
-              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
-              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
+              const parentInfo = getParentContentRect(selected);
+              const parentRect = parentInfo.rect;
+              const padLeft = parentInfo.padding.left;
+              const padTop = parentInfo.padding.top;
+              const padRight = parentInfo.padding.right;
+              const padBottom = parentInfo.padding.bottom;
               
               const w = snap(Math.max(1, drag.rect.width + dx));
               const h = snap(Math.max(1, drag.rect.height + dy));
@@ -785,14 +817,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 drag.finalPosition = 'absolute';
               }
             } else {
-              // Изменение размера с ограничениями
-              const parent = getOffsetParent(selected);
-              const parentRect = parent && parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-              const ps = parent ? window.getComputedStyle(parent) : null;
-              const padLeft = ps ? parseFloat(ps.getPropertyValue('padding-left')) || 0 : 0;
-              const padTop = ps ? parseFloat(ps.getPropertyValue('padding-top')) || 0 : 0;
-              const padRight = ps ? parseFloat(ps.getPropertyValue('padding-right')) || 0 : 0;
-              const padBottom = ps ? parseFloat(ps.getPropertyValue('padding-bottom')) || 0 : 0;
+              const parentInfo = getParentContentRect(selected);
+              const parentRect = parentInfo.rect;
+              const padLeft = parentInfo.padding.left;
+              const padTop = parentInfo.padding.top;
+              const padRight = parentInfo.padding.right;
+              const padBottom = parentInfo.padding.bottom;
               
               const w = snap(Math.max(1, drag.rect.width + dx));
               const h = snap(Math.max(1, drag.rect.height + dy));
@@ -912,8 +942,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
             if (drag.mode === 'move') {
               selected.style.transform = '';
-              
-              //updateBoxOverlay();
+              updateBoxOverlay();
 
               if (moveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);

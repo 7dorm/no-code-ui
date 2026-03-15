@@ -18,6 +18,7 @@ import { findProjectRoot, resolvePath, resolvePathSync } from './features/file-r
 import { extractImports, detectComponents } from './features/file-renderer/lib/react-processor';
 import { createFramework, isFrameworkSupported } from './frameworks/FrameworkFactory';
 import { BlockEditorSidebar } from './shared/ui/BlockEditorSidebar';
+import { parseStyleText } from './blockEditor/styleUtils';
 
 type StylePatch = Record<string, any>;
 
@@ -252,6 +253,36 @@ function RenderFile({
   const sendIframeCommand = useCallback((cmd: any) => {
     setIframeCommand({ ...cmd, ts: Date.now() });
   }, []);
+
+  const derivePreviousStylePatch = useCallback((blockId: string, patch: StylePatch) => {
+    const inlineStyle = String(styleSnapshots?.[blockId]?.inlineStyle || '');
+    if (!inlineStyle || !patch || typeof patch !== 'object') return null;
+
+    const parsed = parseStyleText(inlineStyle);
+    const toKebab = (key: string) =>
+      String(key || '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+        .replace(/_/g, '-')
+        .toLowerCase();
+    const toCamel = (key: string) =>
+      String(key || '').replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
+
+    const previousValue: StylePatch = {};
+
+    Object.keys(patch).forEach((key) => {
+      const kebabKey = toKebab(key);
+      const camelKey = toCamel(key);
+      if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+        previousValue[key] = parsed[key];
+      } else if (Object.prototype.hasOwnProperty.call(parsed, kebabKey)) {
+        previousValue[key] = parsed[kebabKey];
+      } else if (Object.prototype.hasOwnProperty.call(parsed, camelKey)) {
+        previousValue[key] = parsed[camelKey];
+      }
+    });
+
+    return Object.keys(previousValue).length > 0 ? previousValue : null;
+  }, [styleSnapshots]);
 
   // Функция для добавления операции в историю undo
   const addToHistory = useCallback((operation: HistoryOperation | SetTextHistoryOperation | ReparentHistoryOperation) => {
@@ -977,7 +1008,7 @@ function RenderFile({
           // НЕ вызываем setFileContent и setRenderVersion для промежуточных изменений
 
           // Добавляем в историю для undo (с debounce для промежуточных изменений)
-        const previousValue = stagedPatchesRef.current[blockId] || null;
+        const previousValue = derivePreviousStylePatch(blockId, patch);
           addToHistoryDebounced({
             type: 'patch',
             blockId,
@@ -1003,7 +1034,7 @@ function RenderFile({
         ]);
 
         // Добавляем в историю для undo (с debounce для промежуточных изменений)
-        const previousValue = stagedPatchesRef.current[blockId] || null;
+        const previousValue = derivePreviousStylePatch(blockId, patch);
         addToHistoryDebounced({
           type: 'patch',
           blockId,
@@ -1021,7 +1052,7 @@ function RenderFile({
         setError(`Ошибка применения изменений: ${errorMessage}`);
       }
     },
-    [fileContent, fileType, filePath, blockMapForFile, externalStylesMap, resolvePath, readFile, writeFile, addToHistory, projectRoot]
+    [fileContent, fileType, filePath, blockMapForFile, externalStylesMap, resolvePath, readFile, writeFile, addToHistory, projectRoot, derivePreviousStylePatch]
   );
 
   const commitStagedPatches = useCallback(async () => {
@@ -3377,7 +3408,47 @@ function RenderFile({
 
     // Создаем код для модулей зависимостей
     let modulesCode = '';
+    let collectedCss = '';
     let importReplacements = {};
+
+    const isCssModulePath = (modulePath: string) => /\.css($|\?)/i.test(modulePath || '');
+    const createCssImportReplacement = (importSpec: string) => {
+      if (!importSpec) {
+        return '';
+      }
+
+      const trimmed = importSpec.trim();
+      if (!trimmed) {
+        return '';
+      }
+
+      if (trimmed.startsWith('{')) {
+        const names = trimmed
+          .replace(/[{}]/g, '')
+          .split(',')
+          .map((name: string) => name.trim())
+          .filter(Boolean);
+
+        return names
+          .map((name: string) => {
+            const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
+            let alias = (parts[1] || parts[0] || '').trim().replace(/[^a-zA-Z0-9_$]/g, '');
+            if (!alias || !/^[a-zA-Z_$]/.test(alias)) {
+              alias = 'cssImport';
+            }
+            return `const ${alias} = {};`;
+          })
+          .join('\n');
+      }
+
+      if (trimmed.startsWith('* as ')) {
+        const alias = trimmed.replace('* as ', '').trim().replace(/[^a-zA-Z0-9_$]/g, '');
+        return alias ? `const ${alias} = {};` : '';
+      }
+
+      const alias = trimmed.replace(/[^a-zA-Z0-9_$]/g, '');
+      return alias ? `const ${alias} = {};` : '';
+    };
 
     // Собираем уникальные абсолютные пути из pathMap
     const uniqueAbsolutePaths = new Set(Object.values(pathMap));
@@ -3483,6 +3554,11 @@ function RenderFile({
       }
 
       // Используем абсолютный путь как основной ключ для обработки
+      if (isCssModulePath(absolutePath)) {
+        collectedCss += `\n/* ${absolutePath} */\n${content}\n`;
+        continue;
+      }
+
       const importPath = absolutePath;
       // Обрабатываем зависимость
       // Сначала извлекаем все экспорты
@@ -3547,6 +3623,7 @@ function RenderFile({
         .replace(/import\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '')
         // Удаляем import { ... } from 'react-native'
         .replace(/import\s*\{[^}]*\}\s*from\s+['"]react-native['"];?\s*/gi, '')
+        .replace(/import\s+['"][^'"]+['"];?\s*/g, '')
         // Заменяем все остальные импорты на код доступа к модулям
         .replace(/import\s+(.*?)\s+from\s+['"](.*?)['"];?\s*/g, (match: string, importSpec: string, depImportPath: string) => {
 
@@ -3563,6 +3640,10 @@ function RenderFile({
 
           // Для локальных импортов заменяем на код доступа к модулям
           // Используем фактический путь файла зависимости для разрешения относительных путей
+          if (isCssModulePath(depImportPath)) {
+            return createCssImportReplacement(importSpec);
+          }
+
           const finalDepPath = findModulePath(depImportPath, currentDepActualPath, pathMap, dependencyModules);
 
           // Разрешаем путь синхронно для генерации всех возможных вариантов ключей
@@ -4021,6 +4102,10 @@ function RenderFile({
         const match = importStatement.fullStatement.match(/import\s+(.*?)\s+from/);
         if (match) {
           const importSpec = match[1].trim();
+          if (isCssModulePath(importPath)) {
+            importReplacements[importStatement.fullStatement] = createCssImportReplacement(importSpec);
+            continue;
+          }
           // Проверяем import * as name from ...
           const starAsMatch = importStatement.fullStatement.match(/import\s+\*\s+as\s+(\w+)/);
           if (starAsMatch) {
@@ -4283,6 +4368,7 @@ function RenderFile({
 
     // Удаляем оставшиеся локальные импорты (которые не были заменены)
     processedCode = processedCode.replace(/import\s+.*?from\s+['"].*?['"];?\s*/g, '');
+    processedCode = processedCode.replace(/import\s+['"][^'"]+['"];?\s*/g, '');
 
     console.log('RenderFile: Processed code length:', processedCode.length);
     console.log('RenderFile: Modules code length:', modulesCode.length);
@@ -4346,6 +4432,7 @@ function RenderFile({
     return {
       code: processedCode,
       modulesCode: wrappedModulesCode,
+      stylesCode: collectedCss,
       dependencyPaths: dependencyPaths, // Возвращаем пути зависимых файлов
       defaultExportInfo: defaultExportInfo // Сохраняем информацию о default export
     };
@@ -4374,6 +4461,7 @@ function RenderFile({
     const processed = await processReactCode(instOriginal.code, basePath);
     const processedCodeBeforeInst = processed.code; // уже содержит data-no-code-ui-id (или legacy data-mrpak-id)
     const modulesCode = processed.modulesCode || '';
+    const stylesCode = processed.stylesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
     const defaultExportInfo = processed.defaultExportInfo || null;
 
@@ -4463,6 +4551,7 @@ function RenderFile({
             margin-bottom: 20px;
             font-size: 14px;
         }
+        ${stylesCode}
     </style>
 </head>
 <body>
@@ -5278,50 +5367,12 @@ function RenderFile({
     <BlockEditorPanel
       fileType={editorType}
       html={html}
-      selectedBlock={selectedBlock}
       onMessage={handleEditorMessage}
-      onApplyPatch={applyAndCommitPatch}
-      onStagePatch={applyBlockPatch}
-      layersTree={layersTree}
-      layerNames={layerNames}
-      onRenameLayer={handleRenameLayer}
       outgoingMessage={iframeCommand}
-      onSendCommand={sendIframeCommand}
-      onInsertBlock={stageInsertBlock}
-      onDeleteBlock={stageDeleteBlock}
-      styleSnapshot={selectedBlock?.id ? styleSnapshots[selectedBlock.id] : null}
-      textSnapshot={selectedBlock?.id ? textSnapshots[selectedBlock.id] : ''}
-      onReparentBlock={stageReparentBlock}
-      onSetText={stageSetText}
-      framework={framework}
-      onUndo={undo}
-      onRedo={redo}
-      canUndo={undoStack.length > 0}
-      canRedo={redoStack.length > 0}
-      livePosition={livePosition}
     />
   ), [
-    applyAndCommitPatch,
-    applyBlockPatch,
-    framework,
     handleEditorMessage,
-    handleRenameLayer,
     iframeCommand,
-    layerNames,
-    layersTree,
-    livePosition,
-    selectedBlock,
-    sendIframeCommand,
-    stageDeleteBlock,
-    stageInsertBlock,
-    stageReparentBlock,
-    stageSetText,
-    styleSnapshots,
-    textSnapshots,
-    undo,
-    redo,
-    undoStack.length,
-    redoStack.length,
   ]);
 
   const renderBlockEditorSplitMode = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => {

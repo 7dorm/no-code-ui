@@ -38,7 +38,12 @@ function WebView({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const onMessageRef = useRef(onMessage);
   const [loading, setLoading] = useState(startInLoadingState);
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -169,16 +174,14 @@ function WebView({
         if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) {
           return;
         }
-        if (onMessage) {
-          onMessage({ nativeEvent: { data: event.data } });
+        if (onMessageRef.current) {
+          onMessageRef.current({ nativeEvent: { data: event.data } });
         }
       } catch (e) {
         // Ничего не делаем
       }
     };
-    if (onMessage) {
-      window.addEventListener('message', handleMessage);
-    }
+    window.addEventListener('message', handleMessage);
 
     // Добавляем iframe в DOM сначала (пустой)
     container.appendChild(iframe);
@@ -250,11 +253,9 @@ function WebView({
         iframeRef.current.removeEventListener('load', handleLoad);
         iframeRef.current.removeEventListener('error', handleError);
       }
-      if (onMessage) {
-        window.removeEventListener('message', handleMessage);
-      }
+      window.removeEventListener('message', handleMessage);
     };
-  }, [source, javaScriptEnabled, startInLoadingState, allowExternalScripts, onMessage]);
+  }, [source, javaScriptEnabled, startInLoadingState, allowExternalScripts]);
 
   // Отправка сообщений В iframe (без пересоздания iframe)
   useEffect(() => {
