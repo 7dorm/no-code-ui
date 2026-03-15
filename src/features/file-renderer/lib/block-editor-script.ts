@@ -82,6 +82,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const safe = String(id || '').replace(/\"/g,'');
             return '[data-no-code-ui-id=\"' + safe + '\"],[data-mrpak-id=\"' + safe + '\"]';
           };
+          const getElementsById = (id) => {
+            try {
+              return Array.from(document.querySelectorAll(byIdSelector(id)));
+            } catch (e) {
+              return [];
+            }
+          };
           const MSG_SELECT = '${MRPAK_MSG.SELECT}';
           const MSG_APPLY = '${MRPAK_MSG.APPLY}';
           const MSG_TREE = '${MRPAK_MSG.TREE}';
@@ -101,6 +108,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_START_DRAG = '${MRPAK_CMD.START_DRAG}';
           const CMD_END_DRAG = '${MRPAK_CMD.END_DRAG}';
           let selected = null;
+          let selectedGroup = [];
           let lastSelectedId = null;
           let moveMode = 'absolute'; // absolute | relative | grid8
           let gridStep = 8;
@@ -332,21 +340,25 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           function clearSelected() {
             try {
-              if (selected) selected.classList.remove('mrpak-selected');
+              (selectedGroup || []).forEach((el) => {
+                try { el.classList.remove('mrpak-selected'); } catch(e) {}
+              });
             } catch(e) {}
             selected = null;
+            selectedGroup = [];
             updateBoxOverlay();
           }
 
           function selectEl(el) {
             if (!el) return;
             clearSelected();
-            selected = el;
-            try { selected.classList.add('mrpak-selected'); } catch(e) {}
-            const id = ensureId(selected);
+            const id = ensureId(el);
+            selectedGroup = id ? getElementsById(id) : [];
+            selected = selectedGroup[0] || el;
+            try { selectedGroup.forEach((node) => node.classList.add('mrpak-selected')); } catch(e) {}
             lastSelectedId = id;
             const rect = selected.getBoundingClientRect();
-            post(MSG_SELECT, { id, meta: { tagName: selected.tagName, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } } });
+            post(MSG_SELECT, { id, meta: { tagName: selected.tagName, instances: selectedGroup.length, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } } });
             updateBoxOverlay();
             buildTree();
             // отправляем снапшот inline style, чтобы UI мог показать базовые стили
@@ -930,7 +942,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (!data || typeof data !== 'object') return;
             try {
               if (data.type === CMD_SELECT && data.id) {
-                const el = document.querySelector(byIdSelector(String(data.id)));
+                const el = getElementsById(String(data.id))[0];
                 if (el) selectEl(el);
                 return;
               }
@@ -940,33 +952,34 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   patch: data.patch,
                   hasPatch: !!data.patch
                 });
-                const el = document.querySelector(byIdSelector(String(data.id)));
+                const elements = getElementsById(String(data.id));
+                const el = elements[0];
                 if (!el) {
                   console.warn('[iframe CMD_SET_STYLE] Элемент не найден:', data.id);
                   return;
                 }
                 const patch = data.patch || {};
                 console.log('[iframe CMD_SET_STYLE] Применяю патч:', patch);
-                for (const k in patch) {
-                  const v = patch[k];
-                  if (k.includes('-')) {
-                    if (v === null || v === undefined || v === '') {
-                      // Удаляем свойство, если значение пустое
-                      el.style.removeProperty(k);
-                    } else {
-                      el.style.setProperty(k, String(v));
-                    }
-                  } else {
-                    // DOM style: camelCase
-                    try { 
+                elements.forEach((node) => {
+                  for (const k in patch) {
+                    const v = patch[k];
+                    if (k.includes('-')) {
                       if (v === null || v === undefined || v === '') {
-                        el.style[k] = '';
+                        node.style.removeProperty(k);
                       } else {
-                        el.style[k] = String(v);
+                        node.style.setProperty(k, String(v));
                       }
-                    } catch(e) {}
+                    } else {
+                      try {
+                        if (v === null || v === undefined || v === '') {
+                          node.style[k] = '';
+                        } else {
+                          node.style[k] = String(v);
+                        }
+                      } catch(e) {}
+                    }
                   }
-                }
+                });
                 console.log('[iframe CMD_SET_STYLE] Стили применены, текущий style:', el.getAttribute('style'));
                 
                 // Перестроим дерево после изменения стилей
@@ -994,7 +1007,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 return;
               }
               if (data.type === CMD_REQ_STYLE && data.id) {
-                const el = document.querySelector(byIdSelector(String(data.id)));
+                const el = getElementsById(String(data.id))[0];
                 if (!el) return;
                 const cs = window.getComputedStyle(el);
                 post(MSG_STYLE_SNAPSHOT, {
@@ -1015,23 +1028,26 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 return;
               }
               if (data.type === CMD_SET_TEXT && data.id) {
-                const el = document.querySelector(byIdSelector(String(data.id)));
+                const elements = getElementsById(String(data.id));
+                const el = elements[0];
                 if (!el) return;
-                el.innerText = data.text ?? '';
+                elements.forEach((node) => {
+                  node.innerText = data.text ?? '';
+                });
                 post(MSG_TEXT_SNAPSHOT, { id: data.id, text: el.innerText || '' });
                 return;
               }
               if (data.type === CMD_REQ_TEXT && data.id) {
-                const el = document.querySelector(byIdSelector(String(data.id)));
+                const el = getElementsById(String(data.id))[0];
                 if (!el) return;
                 post(MSG_TEXT_SNAPSHOT, { id: data.id, text: el.innerText || '' });
                 return;
               }
               if (data.type === CMD_DELETE && data.id) {
-                const el = document.querySelector(byIdSelector(String(data.id)));
-                if (el) {
-                  if (selected === el) clearSelected();
-                  el.remove();
+                const elements = getElementsById(String(data.id));
+                if (elements.length) {
+                  if (elements.some((node) => selectedGroup.includes(node))) clearSelected();
+                  elements.forEach((node) => node.remove());
                   buildTree();
                 }
                 return;
@@ -1107,4 +1123,3 @@ export function injectBlockEditorScript(html: string, type: string, mode: string
   }
   return source + script;
 }
-
