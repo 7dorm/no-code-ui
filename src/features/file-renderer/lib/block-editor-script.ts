@@ -123,6 +123,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           let selectedGroup = [];
           let lastSelectedId = null;
           let moveMode = 'absolute'; // absolute | relative | grid8
+          let moveUnit = 'px'; // px | %
           let gridStep = 8;
           let dragging = null; // {sourceId}
           let dropTarget = null;
@@ -241,6 +242,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (moveMode !== 'grid8') return v;
             const step = gridStep || 8;
             return Math.round(v / step) * step;
+          };
+
+          const pxToPercent = (value, total) => {
+            if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return 0;
+            return (value / total) * 100;
+          };
+
+          const formatMoveValue = (value, axisSize) => {
+            if (moveMode === 'grid8' || moveUnit !== '%') {
+              return '${type}' === 'html' ? (value + 'px') : value;
+            }
+            const pct = pxToPercent(value, axisSize);
+            return pct + '%';
           };
 
           const getOffsetParent = (el) => {
@@ -496,6 +510,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const blockInteractiveEvents = (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
+            if (drag || dragging) return;
             const t = ev.target;
             if (!t) return;
             // Проверяем, является ли элемент интерактивным
@@ -528,6 +543,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             document.addEventListener('blur', blockInteractiveEvents, true);
             document.addEventListener('keydown', (ev) => {
               if (!isActiveInstance()) return;
+              if (drag || dragging) return;
               const t = ev.target;
               if (t && (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,[role=button],[role=link],[contenteditable]')))) {
                 try {
@@ -809,35 +825,30 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
             if (!drag || !selected) return;
             const id = ensureId(selected);
+            const parentInfo = getParentContentRect(selected);
+            const contentWidth = Math.max(1, parentInfo.rect.width - parentInfo.padding.left - parentInfo.padding.right);
+            const contentHeight = Math.max(1, parentInfo.rect.height - parentInfo.padding.top - parentInfo.padding.bottom);
 
             if (drag.mode === 'move') {
               selected.style.transform = '';
 
               // Используем сохраненные финальные значения
               if (drag.finalLeft !== undefined && drag.finalTop !== undefined) {
+                const finalLeftValue = formatMoveValue(drag.finalLeft, contentWidth);
+                const finalTopValue = formatMoveValue(drag.finalTop, contentHeight);
                 if (drag.finalPosition === 'relative') {
                   selected.style.position = 'relative';
-                  selected.style.left = drag.finalLeft + 'px';
-                  selected.style.top = drag.finalTop + 'px';
-
-                  if ('${type}' === 'html') {
-                    post(MSG_APPLY, { id, patch: { position: 'relative', left: drag.finalLeft + 'px', top: drag.finalTop + 'px' }, isIntermediate: false });
-                  } else {
-                    post(MSG_APPLY, { id, patch: { position: 'relative', left: drag.finalLeft, top: drag.finalTop }, isIntermediate: false });
-                  }
+                  selected.style.left = String(finalLeftValue);
+                  selected.style.top = String(finalTopValue);
+                  post(MSG_APPLY, { id, patch: { position: 'relative', left: finalLeftValue, top: finalTopValue }, isIntermediate: false });
                 } else {
                   selected.style.position = 'absolute';
-                  selected.style.left = drag.finalLeft + 'px';
-                  selected.style.top = drag.finalTop + 'px';
+                  selected.style.left = String(finalLeftValue);
+                  selected.style.top = String(finalTopValue);
 
                   const patch = { position: 'absolute' };
-                  if ('${type}' === 'html') {
-                    patch.left = drag.finalLeft + 'px';
-                    patch.top = drag.finalTop + 'px';
-                  } else {
-                    patch.left = drag.finalLeft;
-                    patch.top = drag.finalTop;
-                  }
+                  patch.left = finalLeftValue;
+                  patch.top = finalTopValue;
                   
                   post(MSG_APPLY, { id, patch, isIntermediate: false });
                 }
@@ -886,6 +897,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const padTop = parentInfo.padding.top;
             const padRight = parentInfo.padding.right;
             const padBottom = parentInfo.padding.bottom;
+            const contentWidth = Math.max(1, parentRect.width - padLeft - padRight);
+            const contentHeight = Math.max(1, parentRect.height - padTop - padBottom);
             const contentLeft = parentRect.left + padLeft;
             const contentTop = parentRect.top + padTop;
             const contentRight = parentRect.left + parentRect.width - padRight;
@@ -908,15 +921,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
                 const left = snap(baseLeft + constrainedDx);
                 const top = snap(baseTop + constrainedDy);
+                const leftValue = formatMoveValue(left, contentWidth);
+                const topValue = formatMoveValue(top, contentHeight);
                 selected.style.position = 'relative';
-                selected.style.left = left + 'px';
-                selected.style.top = top + 'px';
-
-                if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left + 'px', top: top + 'px' }, isIntermediate: false });
-                } else {
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: left, top: top }, isIntermediate: false });
-                }
+                selected.style.left = String(leftValue);
+                selected.style.top = String(topValue);
+                post(MSG_APPLY, { id, patch: { position: 'relative', left: leftValue, top: topValue }, isIntermediate: false });
               } else {
                 // absolute с ограничением по padding-box
                 const startLeft = drag.rect.left - parentRect.left - padLeft;
@@ -934,17 +944,14 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 top = Math.min(Math.max(top, minTop), maxTop);
 
                 selected.style.position = 'absolute';
-                selected.style.left = left + 'px';
-                selected.style.top = top + 'px';
+                const leftValue = formatMoveValue(left, contentWidth);
+                const topValue = formatMoveValue(top, contentHeight);
+                selected.style.left = String(leftValue);
+                selected.style.top = String(topValue);
 
                 const patch= { position: 'absolute' };
-                if ('${type}' === 'html') {
-                  patch.left = left + 'px';
-                  patch.top = top + 'px';
-                } else {
-                  patch.left = left;
-                  patch.top = top;
-                }
+                patch.left = leftValue;
+                patch.top = topValue;
                 
                 post(MSG_APPLY, { id, patch, isIntermediate: false });
               }
@@ -1144,6 +1151,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               }
               if (data.type === CMD_SET_MOVE_MODE) {
                 if (data.mode) moveMode = String(data.mode);
+                if (data.unit === '%' || data.unit === 'px') moveUnit = String(data.unit);
+                if (moveMode === 'grid8') moveUnit = 'px';
                 if (typeof data.grid === 'number') gridStep = data.grid;
                 return;
               }

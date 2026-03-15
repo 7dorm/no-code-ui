@@ -64,6 +64,8 @@ export function BlockEditorSidebar(props) {
     TextField,
     moveMode,
     handleMoveModeChange,
+    moveUnit,
+    handleMoveUnitChange,
     styleMode,
     setStyleMode,
     styleRows,
@@ -360,6 +362,16 @@ export function BlockEditorSidebar(props) {
                 <option value="absolute">AbsoluteToParent</option>
                 <option value="relative">Relative</option>
                 <option value="grid8">GridSnap(8)</option>
+              </select>
+              <Text style={styles.insertLabel}>Р•РґРёРЅРёС†С‹</Text>
+              <select
+                style={{ ...htmlInputStyle, height: '36px', marginBottom: '10px' }}
+                value={moveMode === 'grid8' ? 'px' : (moveUnit || 'px')}
+                onChange={(e) => handleMoveUnitChange?.(e.target.value as 'px' | '%')}
+                disabled={moveMode === 'grid8'}
+              >
+                <option value="px">Pixels</option>
+                <option value="%">Percent</option>
               </select>
               <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginBottom: '10px' }}>
                 {moveMode === 'absolute' && 'Позиционирование относительно родителя с точными координатами'}

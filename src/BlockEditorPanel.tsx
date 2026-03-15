@@ -93,10 +93,8 @@ export function useBlockEditorSidebarController({
     console.log('[handleLeftChange] Called with:', { value, selectedBlockId: selectedBlock?.id, typeofValue: typeof value });
     setLeft(value);
     if (selectedBlock?.id && value !== null && value !== undefined && !isNaN(value)) {
-      const patch: any = { left: fileType === 'html' ? `${value}px` : value };
-      if (moveMode !== 'relative') {
-        patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
-      }
+      const patch: any = { left: formatMoveValue(value) };
+      patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
       console.log('[handleLeftChange] Sending patch:', { blockId: selectedBlock.id, patch });
       onApplyPatch(selectedBlock.id, patch);
     } else {
@@ -107,10 +105,8 @@ export function useBlockEditorSidebarController({
   const handleTopChange = (value: number | null) => {
     setTop(value);
     if (selectedBlock?.id && value !== null) {
-      const patch: any = { top: fileType === 'html' ? `${value}px` : value };
-      if (moveMode !== 'relative') {
-        patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
-      }
+      const patch: any = { top: formatMoveValue(value) };
+      patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
       onApplyPatch(selectedBlock.id, patch);
     }
   };
@@ -137,6 +133,9 @@ export function useBlockEditorSidebarController({
   const handleMoveModeChange = (newMoveMode: string) => {
     console.log('[handleMoveModeChange] Called with:', { newMoveMode, oldMoveMode: moveMode, selectedBlockId: selectedBlock?.id });
     setMoveMode(newMoveMode);
+    if (newMoveMode === 'grid8') {
+      setMoveUnit('px');
+    }
     
     if (selectedBlock?.id) {
       const patch: any = { position: newMoveMode === 'grid8' ? 'absolute' : newMoveMode };
@@ -158,7 +157,27 @@ export function useBlockEditorSidebarController({
   const [reparentMode, setReparentMode] = useState(false);
   const [reparentTargetId, setReparentTargetId] = useState(null);
   const [moveMode, setMoveMode] = useState('absolute'); // absolute | relative | grid8
+  const [moveUnit, setMoveUnit] = useState<'px' | '%'>('px');
   const [isMoveModeInitialized, setIsMoveModeInitialized] = useState(false);
+
+  const formatMoveValue = (value: number) => {
+    if (moveUnit === '%') return `${value}%`;
+    return fileType === 'html' ? `${value}px` : value;
+  };
+
+  const handleMoveUnitChange = (newMoveUnit: 'px' | '%') => {
+    if (moveMode === 'grid8' && newMoveUnit === '%') return;
+    setMoveUnit(newMoveUnit);
+    if (!selectedBlock?.id) return;
+    const patch: any = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
+    if (left !== null && Number.isFinite(left)) {
+      patch.left = newMoveUnit === '%' ? `${left}%` : (fileType === 'html' ? `${left}px` : left);
+    }
+    if (top !== null && Number.isFinite(top)) {
+      patch.top = newMoveUnit === '%' ? `${top}%` : (fileType === 'html' ? `${top}px` : top);
+    }
+    onApplyPatch(selectedBlock.id, patch);
+  };
 
   useEffect(() => {
     // При выборе блока сбрасываем форму (MVP: не пытаемся читать текущие стили)
@@ -191,7 +210,7 @@ export function useBlockEditorSidebarController({
     setBaselineMap(norm);
     // Инициализируем числовые поля позиции/размера из computedStyle, если оно есть
     const cs = styleSnapshot?.computedStyle as any | null;
-    const parsePx = (v: any): number | null => {
+    const parseNumeric = (v: any): number | null => {
       if (v == null) return null;
       if (typeof v === 'number') return Number.isFinite(v) ? v : null;
       if (typeof v === 'string') {
@@ -200,13 +219,13 @@ export function useBlockEditorSidebarController({
       }
       return null;
     };
+    let leftValFromComputed = null;
+    let topValFromComputed = null;
     if (cs) {
-      const leftVal = parsePx(cs.left);
-      const topVal = parsePx(cs.top);
-      const widthVal = parsePx(cs.width);
-      const heightVal = parsePx(cs.height);
-      if (leftVal !== null) setLeft(leftVal);
-      if (topVal !== null) setTop(topVal);
+      leftValFromComputed = parseNumeric(cs.left);
+      topValFromComputed = parseNumeric(cs.top);
+      const widthVal = parseNumeric(cs.width);
+      const heightVal = parseNumeric(cs.height);
       if (widthVal !== null) setWidth(widthVal);
       if (heightVal !== null) setHeight(heightVal);
     }
@@ -221,7 +240,37 @@ export function useBlockEditorSidebarController({
         if (savedMoveMode && ['absolute', 'relative', 'grid8'].includes(savedMoveMode as any)) {
           elementMoveMode = savedMoveMode as 'absolute' | 'relative' | 'grid8';
         }
+        const savedMoveUnit = element.getAttribute('data-move-unit');
+        if (savedMoveUnit === 'px' || savedMoveUnit === '%') {
+          setMoveUnit(savedMoveUnit);
+        } else {
+          const inlineLeft = element.style?.left || '';
+          const inlineTop = element.style?.top || '';
+          setMoveUnit(
+            String(inlineLeft).includes('%') || String(inlineTop).includes('%') ? '%' : 'px'
+          );
+        }
+
+        const inlineLeftNumeric = parseNumeric(element.style?.left);
+        const inlineTopNumeric = parseNumeric(element.style?.top);
+        if (String(element.style?.left || '').includes('%') && inlineLeftNumeric !== null) {
+          setLeft(inlineLeftNumeric);
+        } else if (leftValFromComputed !== null) {
+          setLeft(leftValFromComputed);
+        }
+        if (String(element.style?.top || '').includes('%') && inlineTopNumeric !== null) {
+          setTop(inlineTopNumeric);
+        } else if (topValFromComputed !== null) {
+          setTop(topValFromComputed);
+        }
+      } else {
+        if (leftValFromComputed !== null) setLeft(leftValFromComputed);
+        if (topValFromComputed !== null) setTop(topValFromComputed);
       }
+    }
+    if (!selectedBlock?.id) {
+      if (leftValFromComputed !== null) setLeft(leftValFromComputed);
+      if (topValFromComputed !== null) setTop(topValFromComputed);
     }
     // Если data-атрибут не задан, пробуем взять position из computedStyle
     const computedPosition = cs?.position;
@@ -233,6 +282,9 @@ export function useBlockEditorSidebarController({
       }
     }
     setMoveMode(elementMoveMode);
+    if (elementMoveMode === 'grid8') {
+      setMoveUnit('px');
+    }
     setIsMoveModeInitialized(true);
     // Текст: приоритет у textSnapshot (приходит отдельным сообщением), fallback на styleSnapshot.textContent
     const initialText =
@@ -243,8 +295,8 @@ export function useBlockEditorSidebarController({
   }, [selectedBlock?.id, textSnapshot]);
   useEffect(() => {
     if (!onSendCommand) return;
-    onSendCommand({ type: 'MRPAK_CMD_SET_MOVE_MODE', mode: moveMode, grid: 8 });
-  }, [moveMode, onSendCommand]);
+    onSendCommand({ type: 'MRPAK_CMD_SET_MOVE_MODE', mode: moveMode, unit: moveUnit, grid: 8 });
+  }, [moveMode, moveUnit, onSendCommand]);
 
   // Отдельный useEffect для сохранения moveMode в data-атрибут и создания патча
   useEffect(() => {
@@ -254,20 +306,17 @@ export function useBlockEditorSidebarController({
                     document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
     if (element) {
       element.setAttribute('data-move-mode', moveMode);
+      element.setAttribute('data-move-unit', moveMode === 'grid8' ? 'px' : moveUnit);
       
       // Создаем патч для обновления position в стиле элемента
-      console.log('[moveMode change] Processing moveMode:', { moveMode, selectedBlockId: selectedBlock?.id, isInitialized: isMoveModeInitialized });
-      if (moveMode !== 'relative') {
-        const patch: any = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
-        console.log('[moveMode change] Created patch:', { patch, patchKeys: Object.keys(patch), patchValues: Object.values(patch) });
-        console.log('[moveMode change] About to call onApplyPatch:', { blockId: selectedBlock.id, onApplyPatch: typeof onApplyPatch });
-        onApplyPatch(selectedBlock.id, patch);
-        console.log('[moveMode change] onApplyPatch called successfully');
-      } else {
-        console.log('[moveMode change] Skipping patch for relative mode');
-      }
+      console.log('[moveMode change] Processing moveMode:', { moveMode, moveUnit, selectedBlockId: selectedBlock?.id, isInitialized: isMoveModeInitialized });
+      const patch: any = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
+      console.log('[moveMode change] Created patch:', { patch, patchKeys: Object.keys(patch), patchValues: Object.values(patch) });
+      console.log('[moveMode change] About to call onApplyPatch:', { blockId: selectedBlock.id, onApplyPatch: typeof onApplyPatch });
+      onApplyPatch(selectedBlock.id, patch);
+      console.log('[moveMode change] onApplyPatch called successfully');
     }
-  }, [moveMode, selectedBlock?.id, isMoveModeInitialized]);
+  }, [moveMode, moveUnit, selectedBlock?.id, isMoveModeInitialized]);
 
   const canApply = !!selectedBlock?.id;
 
@@ -276,6 +325,10 @@ export function useBlockEditorSidebarController({
 
     const setPx = (key: any, val: any) => {
       if (val == null || !Number.isFinite(val)) return;
+      if (key === 'left' || key === 'top') {
+        p[key] = formatMoveValue(val);
+        return;
+      }
       if (fileType === 'html') p[key] = `${val}px`;
       else p[key] = val; // React/RN: число = px
     };
@@ -295,16 +348,12 @@ export function useBlockEditorSidebarController({
       else p.color = color;
     }
 
-    // Если пользователь задал left/top — делаем absolute (чтобы движение было видно)
-    if ((left != null || top != null) && (fileType === 'react' || fileType === 'react-native')) {
-      p.position = 'absolute';
-    }
-    if ((left != null || top != null) && fileType === 'html') {
-      p.position = 'absolute';
+    if (left != null || top != null) {
+      p.position = moveMode === 'grid8' ? 'absolute' : moveMode;
     }
 
     return p;
-  }, [fileType, left, top, width, height, bg, color]);
+  }, [fileType, left, top, width, height, bg, color, moveMode, moveUnit]);
 
   const handleApply = () => {
     if (!canApply) return;
@@ -621,6 +670,8 @@ export function useBlockEditorSidebarController({
     TextField,
     moveMode,
     handleMoveModeChange,
+    moveUnit,
+    handleMoveUnitChange,
     styleMode,
     setStyleMode,
     styleRows,
