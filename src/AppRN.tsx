@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import RenderFile from './RenderFile';
-import FileTree from './FileTree';
+import FileTree, { type FileSelection } from './FileTree';
 import { openDirectoryDialog, setRootDirectory, isFileSystemAPIAvailable } from './shared/api/filesystem-api';
 import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
 import { createProject } from './features/file-operations/lib/file-operations';
@@ -12,7 +12,7 @@ function AppRN() {
   const [showSplitPreview, setShowSplitPreview] = useState(true);
   const [showSplitCode, setShowSplitCode] = useState(true);
   const [projectPath, setProjectPath] = useState<string | null>(null);
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<FileSelection | null>(null);
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -83,7 +83,7 @@ function AppRN() {
         console.log('Устанавливаем корневую директорию:', result.directoryHandle.name);
         setRootDirectory(result.directoryHandle);
         setProjectPath(result.directoryHandle.name);
-        setSelectedFilePath(null); // Сбрасываем выбранный файл при смене проекта
+        setSelectedFile(null); // Сбрасываем выбранный файл при смене проекта
         setError(null); // Очищаем ошибки при успешном открытии
       } else if (result.canceled) {
         // Пользователь отменил выбор - это нормально, не показываем ошибку
@@ -98,8 +98,22 @@ function AppRN() {
     }
   };
 
-  const handleSelectFile = (filePath: string) => {
-    setSelectedFilePath(filePath);
+  const handleSelectFile = (selection: FileSelection | string | null) => {
+    if (!selection) {
+      setSelectedFile(null);
+      return;
+    }
+
+    if (typeof selection === 'string') {
+      setSelectedFile({ filePath: selection, selectionKey: selection });
+      setViewMode('preview');
+      return;
+    }
+
+    setSelectedFile({
+      ...selection,
+      selectionKey: selection.selectionKey || selection.filePath,
+    });
     setViewMode('preview');
   };
 
@@ -124,7 +138,7 @@ function AppRN() {
           if (createResult.success) {
             // Устанавливаем путь к созданному проекту
             setProjectPath(projectName);
-            setSelectedFilePath(null);
+            setSelectedFile(null);
             setCreateProjectDialogVisible(false);
           } else {
             setError(`Ошибка создания проекта: ${createResult.error}`);
@@ -148,7 +162,7 @@ function AppRN() {
           </Text>
         </View>
         <View style={styles.headerRight}>
-          {selectedFilePath && (
+          {selectedFile?.filePath && (
             <View style={styles.topToolbar}>
               <TouchableOpacity
                 style={[styles.modeButton, viewMode === 'preview' && styles.modeButtonActive]}
@@ -254,7 +268,7 @@ function AppRN() {
               key={`file-tree-${projectPath || 'none'}-${fileTreeVersion}`}
               rootPath={projectPath!}
               onSelectFile={handleSelectFile}
-              selectedPath={selectedFilePath!}
+              selectedPath={selectedFile?.selectionKey || ''}
             />
           </View>
         </View>
@@ -264,9 +278,10 @@ function AppRN() {
 
         {/* Правая панель: рендеринг файла */}
         <View style={styles.content}>
-          {selectedFilePath ? (
+          {selectedFile?.filePath ? (
             <RenderFile
-              filePath={selectedFilePath}
+              filePath={selectedFile.filePath}
+              selectedComponentName={selectedFile.componentName || null}
               projectPath={projectPath}
               viewMode={viewMode}
               onViewModeChange={setViewMode}

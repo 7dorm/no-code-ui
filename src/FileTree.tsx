@@ -5,7 +5,14 @@ import { RenameDialog } from './shared/ui/dialogs/rename-dialog';
 import { CreateFileDialog } from './shared/ui/dialogs/create-file-dialog';
 import { CreateFolderDialog } from './shared/ui/dialogs/create-folder-dialog';
 import { loadDirectory, renameItem, deleteItem, deleteDir, createFile, createFolder } from './features/file-operations/lib/file-operations';
-import { readDirectory, deleteFile, deleteDirectory } from './shared/api/filesystem-api';
+import { readDirectory, deleteFile, deleteDirectory, readFile } from './shared/api/filesystem-api';
+import { detectComponents } from './features/file-renderer/lib/react-processor';
+
+export type FileSelection = {
+  filePath: string;
+  componentName?: string | null;
+  selectionKey?: string;
+};
 
 interface FileTreeItem {
   path: string;
@@ -13,6 +20,74 @@ interface FileTreeItem {
   isDirectory: boolean;
   isFile: boolean;
   children?: FileTreeItem[];
+  componentName?: string | null;
+  parentFilePath?: string;
+  kind?: 'directory' | 'file' | 'component';
+}
+
+function isComponentSelectableFile(item: FileTreeItem) {
+  return item.isFile && /\.(jsx|tsx)$/i.test(item.name);
+}
+
+function buildComponentSelectionKey(filePath: string, componentName: string) {
+  return `${filePath}#component:${componentName}`;
+}
+
+async function annotateRenderableComponents(items: FileTreeItem[]): Promise<FileTreeItem[]> {
+  const nextItems = await Promise.all(
+    items.map(async (item) => {
+      if (!isComponentSelectableFile(item)) {
+        return {
+          ...item,
+          kind: item.isDirectory ? 'directory' : 'file',
+        };
+      }
+
+      try {
+        const result = await readFile(item.path);
+        if (!result.success || !result.content) {
+          return {
+            ...item,
+            kind: 'file',
+          };
+        }
+
+        const components = detectComponents(result.content).filter((component) => Boolean(component?.name));
+        if (components.length === 1) {
+          return {
+            ...item,
+            kind: 'file',
+            componentName: components[0].name,
+          };
+        }
+
+        if (components.length > 1) {
+          return {
+            ...item,
+            kind: 'file',
+            children: components.map((component) => ({
+              path: buildComponentSelectionKey(item.path, component.name),
+              name: component.name,
+              isDirectory: false,
+              isFile: false,
+              kind: 'component',
+              componentName: component.name,
+              parentFilePath: item.path,
+            })),
+          };
+        }
+      } catch (error) {
+        console.warn('[FileTree] Failed to inspect components for file:', item.path, error);
+      }
+
+      return {
+        ...item,
+        kind: 'file',
+      };
+    })
+  );
+
+  return nextItems;
 }
  
 // Update the ContextMenu component with proper types
@@ -168,7 +243,7 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }: ContextMenu
 function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPaths, onToggleExpand, onCreateFile, onCreateFolder, onDelete, onRename }: {
   item: FileTreeItem;
   level?: number;
-  onSelectFile?: (path: string | null) => void;
+  onSelectFile?: (selection: FileSelection | null) => void;
   selectedPath?: string;
   expandedPaths: Set<string>;
   onToggleExpand: (path: string) => void;
@@ -179,15 +254,33 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
 }) {
   const isExpanded = expandedPaths.has(item.path);
   const isSelected = selectedPath === item.path;
-  const hasChildren = item.isDirectory;
+  const hasChildren = item.isDirectory || Boolean(item.children?.length);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const itemRef = useRef(null);
   const containerRef = useRef(null);
 
   const handlePress = () => {
+    if (item.kind === 'component' && item.parentFilePath) {
+      onSelectFile?.({
+        filePath: item.parentFilePath,
+        componentName: item.componentName || null,
+        selectionKey: item.path,
+      });
+      return;
+    }
+
+    if (item.isFile && item.children?.length) {
+      onToggleExpand(item.path);
+      return;
+    }
+
     if (item.isFile) {
-      onSelectFile?.(item.path);
+      onSelectFile?.({
+        filePath: item.path,
+        componentName: item.componentName || null,
+        selectionKey: item.path,
+      });
     } else {
       onToggleExpand(item.path);
     }
@@ -231,6 +324,9 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
   }, []);
 
   const getIcon = () => {
+    if (item.kind === 'component') {
+      return '◧';
+    }
     if (item.isDirectory) {
       return isExpanded ? '📂' : '📁';
     }
@@ -307,34 +403,38 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
               </TouchableOpacity>
             </>
           )}
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={(e: any) => {
-              e.stopPropagation();
-              onDelete && onDelete(item.path);
-            }}
-          >
-            <Text style={styles.deleteButtonText}>🗑️</Text>
-          </TouchableOpacity>
+          {item.kind !== 'component' && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={(e: any) => {
+                e.stopPropagation();
+                onDelete && onDelete(item.path);
+              }}
+            >
+              <Text style={styles.deleteButtonText}>🗑️</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </div>
-      <ContextMenu
-        visible={showContextMenu}
-        x={contextMenuPos.x}
-        y={contextMenuPos.y}
-        onClose={() => setShowContextMenu(false)}
-        onDelete={() => {
-          onDelete && onDelete(item.path);
-        }}
-        onRename={() => {
-          onRename && onRename(item.path);
-        }}
-      />
+      {item.kind !== 'component' && (
+        <ContextMenu
+          visible={showContextMenu}
+          x={contextMenuPos.x}
+          y={contextMenuPos.y}
+          onClose={() => setShowContextMenu(false)}
+          onDelete={() => {
+            onDelete && onDelete(item.path);
+          }}
+          onRename={() => {
+            onRename && onRename(item.path);
+          }}
+        />
+      )}
     </View>
   );
 }
 
-function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string; onSelectFile: (path: string | null) => void; selectedPath: string }) {
+function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string; onSelectFile: (selection: FileSelection | null) => void; selectedPath: string }) {
   const [tree, setTree] = useState<FileTreeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -364,6 +464,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string;
       const result = await readDirectory(dirPath);
 
       if (result.success) {
+        const annotatedItems = await annotateRenderableComponents(result.items as FileTreeItem[]);
         setLoadedPaths(prev => new Set([...prev, dirPath]));
 
         // Обновляем дерево
@@ -380,9 +481,9 @@ function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string;
         };
 
         if (isRoot) {
-          setTree(result.items as FileTreeItem[]);
+          setTree(annotatedItems);
         } else {
-          setTree(prev => updateTree(prev, dirPath, result.items as FileTreeItem[]));
+          setTree(prev => updateTree(prev, dirPath, annotatedItems));
         }
       } else {
         if (isRoot) {
@@ -489,8 +590,8 @@ function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string;
 
         if (result.success) {
           // Если переименован выбранный файл, обновляем выбор
-          if (selectedPath === itemToRename.path && onSelectFile) {
-            onSelectFile(newPath);
+          if ((selectedPath === itemToRename.path || selectedPath.startsWith(`${itemToRename.path}#component:`)) && onSelectFile) {
+            onSelectFile({ filePath: newPath, selectionKey: newPath });
           }
 
           // Сбрасываем кэш для родительской директории
@@ -537,7 +638,7 @@ function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string;
 
       if (result.success) {
         // Если удален выбранный файл, сбрасываем выбор
-        if (selectedPath === itemToDelete.path && onSelectFile) {
+        if ((selectedPath === itemToDelete.path || selectedPath.startsWith(`${itemToDelete.path}#component:`)) && onSelectFile) {
           onSelectFile(null);
         }
 
@@ -654,7 +755,7 @@ export default ${componentName};`;
         await loadDirectory(parentDir, parentDir === '');
         // Автоматически выбираем созданный файл
         if (onSelectFile) {
-          onSelectFile(filePath);
+          onSelectFile({ filePath, selectionKey: filePath });
         }
       } else {
         setError(`Ошибка создания файла: ${result.error}`);
@@ -711,7 +812,7 @@ export default ${componentName};`;
             onDelete={handleDelete}
             onRename={handleRename}
           />
-          {item.isDirectory && isExpanded && children.length > 0 && (
+          {(item.isDirectory || children.length > 0) && isExpanded && children.length > 0 && (
             <View>
               {renderTree(children, level + 1)}
             </View>

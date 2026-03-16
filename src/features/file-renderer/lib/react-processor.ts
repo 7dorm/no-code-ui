@@ -646,7 +646,7 @@ export function detectComponents(code: string): DetectedComponent[] {
   try {
     const ast = parseModule(code);
 
-    ast.program.body.forEach((statement) => {
+    const inspectTopLevelStatement = (statement: t.Statement | t.Declaration) => {
       if (t.isFunctionDeclaration(statement) && isPascalCase(statement.id?.name) && hasRenderableReturn(statement)) {
         addComponent(statement.id?.name, 'function-component');
         return;
@@ -664,6 +664,26 @@ export function detectComponents(code: string): DetectedComponent[] {
           }
         });
       }
+    };
+
+    ast.program.body.forEach((statement) => {
+      if (t.isExportDefaultDeclaration(statement)) {
+        const declaration = statement.declaration;
+        if (
+          (t.isFunctionDeclaration(declaration) && isPascalCase(declaration.id?.name) && hasRenderableReturn(declaration)) ||
+          (t.isClassDeclaration(declaration) && isPascalCase(declaration.id?.name) && isClassComponent(declaration))
+        ) {
+          inspectTopLevelStatement(declaration);
+        }
+        return;
+      }
+
+      if (t.isExportNamedDeclaration(statement) && statement.declaration) {
+        inspectTopLevelStatement(statement.declaration);
+        return;
+      }
+
+      inspectTopLevelStatement(statement);
     });
 
     return components;

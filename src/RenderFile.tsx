@@ -239,6 +239,7 @@ function MrpakImportedBoundary({
 
 function RenderFile({
   filePath,
+  selectedComponentName,
   projectPath,
   viewMode,
   onViewModeChange,
@@ -249,6 +250,7 @@ function RenderFile({
   onOpenFile,
 }: {
   filePath: string;
+  selectedComponentName?: string | null;
   projectPath: string | null;
   viewMode: 'preview' | 'split' | 'changes';
   onViewModeChange: (mode: 'preview' | 'split' | 'changes') => void;
@@ -296,6 +298,10 @@ function RenderFile({
   const splitContainerRef = useRef<HTMLElement | null>(null);
   const splitMainPanelsRef = useRef<HTMLElement | null>(null);
   const detectedComponentName = useMemo(() => {
+    if (selectedComponentName) {
+      return selectedComponentName;
+    }
+
     if (!fileContent || (fileType !== 'react' && fileType !== 'react-native')) {
       return null;
     }
@@ -306,7 +312,7 @@ function RenderFile({
     } catch {
       return null;
     }
-  }, [fileContent, fileType]);
+  }, [fileContent, fileType, selectedComponentName]);
 
   // Состояние редактора блоков
   const [blockMap, setBlockMap] = useState<BlockMap>({});
@@ -1009,6 +1015,8 @@ function RenderFile({
               if (patch.position !== undefined) positionPatch.position = patch.position;
               if (patch.left !== undefined) positionPatch.left = patch.left;
               if (patch.top !== undefined) positionPatch.top = patch.top;
+              if (patch.marginLeft !== undefined) positionPatch.marginLeft = patch.marginLeft;
+              if (patch.marginTop !== undefined) positionPatch.marginTop = patch.marginTop;
               if (patch.right !== undefined) positionPatch.right = patch.right;
               if (patch.bottom !== undefined) positionPatch.bottom = patch.bottom;
               
@@ -1480,12 +1488,14 @@ function RenderFile({
           setLivePosition((prev) => {
             const newPos = { ...prev };
             // Извлекаем числовые значения из patch
-            if (patch.left !== undefined) {
-              const leftVal = typeof patch.left === 'string' ? parseFloat(patch.left.replace('px', '')) : patch.left;
+            const patchLeft = patch.marginLeft !== undefined ? patch.marginLeft : patch.left;
+            const patchTop = patch.marginTop !== undefined ? patch.marginTop : patch.top;
+            if (patchLeft !== undefined) {
+              const leftVal = typeof patchLeft === 'string' ? parseFloat(patchLeft.replace('px', '')) : patchLeft;
               if (!isNaN(leftVal)) newPos.left = leftVal;
             }
-            if (patch.top !== undefined) {
-              const topVal = typeof patch.top === 'string' ? parseFloat(patch.top.replace('px', '')) : patch.top;
+            if (patchTop !== undefined) {
+              const topVal = typeof patchTop === 'string' ? parseFloat(patchTop.replace('px', '')) : patchTop;
               if (!isNaN(topVal)) newPos.top = topVal;
             }
             if (patch.width !== undefined) {
@@ -2893,7 +2903,11 @@ function RenderFile({
         try {
           console.log('RenderFile: Rendering React file, content length:', fileContent.length);
           const framework = createFramework('react', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot: projectRoot || undefined });
+          const result = await framework.generateHTML(fileContent, filePath, {
+            viewMode,
+            projectRoot: projectRoot || undefined,
+            selectedComponentName,
+          });
           console.log('RenderFile: Generated React HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
           setReactHTML(result.html);
@@ -2916,7 +2930,7 @@ function RenderFile({
       setIsProcessingReact(false);
       setDependencyPaths([]);
     }
-  }, [fileType, fileContent, filePath, viewMode]);
+  }, [fileType, fileContent, filePath, viewMode, projectRoot, selectedComponentName]);
 
   // Обработка React Native файлов с зависимостями
   useEffect(() => {
@@ -2926,7 +2940,11 @@ function RenderFile({
         try {
           console.log('RenderFile: Rendering React Native file, content length:', fileContent.length);
           const framework = createFramework('react-native', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot: projectRoot || undefined });
+          const result = await framework.generateHTML(fileContent, filePath, {
+            viewMode,
+            projectRoot: projectRoot || undefined,
+            selectedComponentName,
+          });
           console.log('RenderFile: Generated React Native HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
           setReactNativeHTML(result.html);
@@ -2949,7 +2967,7 @@ function RenderFile({
       setIsProcessingReactNative(false);
       setDependencyPaths([]);
     }
-  }, [fileType, fileContent, filePath, viewMode]);
+  }, [fileType, fileContent, filePath, viewMode, projectRoot, selectedComponentName]);
 
   // Отслеживание изменений зависимых файлов
   useEffect(() => {

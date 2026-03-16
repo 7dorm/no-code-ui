@@ -53,10 +53,18 @@ export function BlockEditorSidebar(props) {
     top,
     width,
     height,
+    leftMode,
+    topMode,
+    widthMode,
+    heightMode,
     handleLeftChange,
     handleTopChange,
     handleWidthChange,
     handleHeightChange,
+    handleLeftModeChange,
+    handleTopModeChange,
+    handleWidthModeChange,
+    handleHeightModeChange,
     NumberField,
     textValue,
     setTextValue,
@@ -68,6 +76,7 @@ export function BlockEditorSidebar(props) {
     handleMoveModeChange,
     moveUnit,
     handleMoveUnitChange,
+    handlePositionPreset,
     onSendCommand,
     styleMode,
     setStyleMode,
@@ -113,6 +122,29 @@ export function BlockEditorSidebar(props) {
 
   const [sidebarTab, setSidebarTab] = React.useState<'inspector' | 'library'>('inspector');
   const [libraryDragTag, setLibraryDragTag] = React.useState<string | null>(null);
+  const supportsCssSpecialValues = fileType !== 'react-native';
+  const positionModeOptions =
+    supportsCssSpecialValues && moveMode !== 'relative'
+      ? [
+          { value: 'value', label: 'Value' },
+          { value: 'auto', label: 'Auto' },
+        ]
+      : null;
+  const widthModeOptions = supportsCssSpecialValues
+    ? [
+        { value: 'value', label: 'Value' },
+        { value: 'auto', label: 'Auto' },
+        { value: 'min-content', label: 'Min' },
+        { value: 'max-content', label: 'Max' },
+        { value: 'fit-content', label: 'Fit' },
+      ]
+    : null;
+  const heightModeOptions = supportsCssSpecialValues
+    ? [
+        { value: 'value', label: 'Value' },
+        { value: 'auto', label: 'Auto' },
+      ]
+    : null;
   const blockLibraryItems =
     fileType === 'react-native'
       ? ['View', 'Text', 'TouchableOpacity', 'Image', 'ScrollView']
@@ -446,10 +478,84 @@ export function BlockEditorSidebar(props) {
             </>
           )}
 
-          <NumberField label="left" value={livePosition?.left ?? left} onChange={handleLeftChange} />
-          <NumberField label="top" value={livePosition?.top ?? top} onChange={handleTopChange} />
-          <NumberField label="width" value={livePosition?.width ?? width} onChange={handleWidthChange} />
-          <NumberField label="height" value={livePosition?.height ?? height} onChange={handleHeightChange} />
+          <Text style={styles.insertLabel}>Позиционные пресеты</Text>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: '6px',
+              marginBottom: '12px',
+            }}
+          >
+            {[
+              { h: 'left', v: 'top', label: '↖' },
+              { h: 'center', v: 'top', label: '↑' },
+              { h: 'right', v: 'top', label: '↗' },
+              { h: 'left', v: 'center', label: '←' },
+              { h: 'center', v: 'center', label: '•' },
+              { h: 'right', v: 'center', label: '→' },
+              { h: 'left', v: 'bottom', label: '↙' },
+              { h: 'center', v: 'bottom', label: '↓' },
+              { h: 'right', v: 'bottom', label: '↘' },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                style={{
+                  height: '34px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  cursor: selectedBlock?.id ? 'pointer' : 'not-allowed',
+                  opacity: selectedBlock?.id ? 1 : 0.45,
+                  fontSize: '15px',
+                  fontWeight: 700,
+                }}
+                disabled={!selectedBlock?.id}
+                onClick={() =>
+                  handlePositionPreset?.(
+                    preset.h as 'left' | 'center' | 'right',
+                    preset.v as 'top' | 'center' | 'bottom'
+                  )
+                }
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          <NumberField
+            label="left"
+            value={leftMode === 'value' ? (livePosition?.left ?? left) : null}
+            onChange={handleLeftChange}
+            mode={leftMode}
+            modeOptions={positionModeOptions}
+            onModeChange={handleLeftModeChange}
+          />
+          <NumberField
+            label="top"
+            value={topMode === 'value' ? (livePosition?.top ?? top) : null}
+            onChange={handleTopChange}
+            mode={topMode}
+            modeOptions={positionModeOptions}
+            onModeChange={handleTopModeChange}
+          />
+          <NumberField
+            label="width"
+            value={widthMode === 'value' ? (livePosition?.width ?? width) : null}
+            onChange={handleWidthChange}
+            mode={widthMode}
+            modeOptions={widthModeOptions}
+            onModeChange={handleWidthModeChange}
+          />
+          <NumberField
+            label="height"
+            value={heightMode === 'value' ? (livePosition?.height ?? height) : null}
+            onChange={handleHeightChange}
+            mode={heightMode}
+            modeOptions={heightModeOptions}
+            onModeChange={handleHeightModeChange}
+          />
 
           {livePosition && (
             livePosition.left !== null ||

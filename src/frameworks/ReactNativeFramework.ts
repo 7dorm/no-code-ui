@@ -21,6 +21,10 @@ export class ReactNativeFramework extends ReactFramework {
    */
   async generateHTML(code: string, filePath: string, options: any = {}) {
     const viewMode = options.viewMode || 'preview';
+    const requestedComponentName =
+      typeof options.selectedComponentName === 'string' && options.selectedComponentName.trim()
+        ? options.selectedComponentName.trim()
+        : null;
     
     // ВАЖНО: сначала инструментируем ИСХОДНЫЙ код, чтобы data-no-code-ui-id были стабильны
     // Используем AST парсинг для JS/TS файлов с fallback
@@ -85,10 +89,22 @@ export class ReactNativeFramework extends ReactFramework {
     // Находим компонент для рендеринга по приоритету
     let componentToRender = null;
     let componentName = null;
+    const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
+
+    if (requestedComponentName && !jsKeywords.includes(requestedComponentName)) {
+      const requestedComponent = detectedComponents.find((component) => component.name === requestedComponentName);
+      if (requestedComponent) {
+        componentToRender = requestedComponent.name;
+        componentName = requestedComponent.name;
+        console.log('ReactNativeFramework: Selected requested component:', requestedComponentName);
+      }
+    }
     
     for (const comp of detectedComponents) {
+      if (componentToRender) {
+        break;
+      }
       const name = comp.name;
-      const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
       if (jsKeywords.includes(name)) {
         console.log(`ReactNativeFramework: Skipping JS keyword: ${name}`);
         continue;
@@ -103,7 +119,6 @@ export class ReactNativeFramework extends ReactFramework {
     // Если не нашли компонент, пробуем найти по имени из defaultExportInfo
     if (!componentToRender && defaultExportInfo) {
       const name = defaultExportInfo.name;
-      const jsKeywords = ['function', 'class', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'];
       if (!jsKeywords.includes(name)) {
         componentToRender = name;
         componentName = name;

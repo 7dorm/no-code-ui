@@ -93,14 +93,23 @@ export function useBlockEditorSidebarController({
   const [top, setTop] = useState<number | null>(null);
   const [width, setWidth] = useState<number | null>(null);
   const [height, setHeight] = useState<number | null>(null);
+  const [leftMode, setLeftMode] = useState<'value' | 'auto'>('value');
+  const [topMode, setTopMode] = useState<'value' | 'auto'>('value');
+  const [widthMode, setWidthMode] = useState<'value' | 'auto' | 'min-content' | 'max-content' | 'fit-content'>('value');
+  const [heightMode, setHeightMode] = useState<'value' | 'auto'>('value');
 
   // Обработчики для отправки патчей позиционирования
   const handleLeftChange = (value: number | null) => {
     console.log('[handleLeftChange] Called with:', { value, selectedBlockId: selectedBlock?.id, typeofValue: typeof value });
     setLeft(value);
+    setLeftMode('value');
     if (selectedBlock?.id && value !== null && value !== undefined && !isNaN(value)) {
-      const patch: any = { left: formatMoveValue(value) };
+      const moveKeys = getMovePatchKeys(moveMode);
+      const patch: any = { [moveKeys.x]: formatMoveValue(value) };
       patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
+      if (moveMode === 'relative') {
+        patch.left = '';
+      }
       console.log('[handleLeftChange] Sending patch:', { blockId: selectedBlock.id, patch });
       onApplyPatch(selectedBlock.id, patch);
     } else {
@@ -110,29 +119,68 @@ export function useBlockEditorSidebarController({
 
   const handleTopChange = (value: number | null) => {
     setTop(value);
+    setTopMode('value');
     if (selectedBlock?.id && value !== null) {
-      const patch: any = { top: formatMoveValue(value) };
+      const moveKeys = getMovePatchKeys(moveMode);
+      const patch: any = { [moveKeys.y]: formatMoveValue(value) };
       patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
+      if (moveMode === 'relative') {
+        patch.top = '';
+      }
       onApplyPatch(selectedBlock.id, patch);
     }
   };
 
   const handleWidthChange = (value: number | null) => {
     setWidth(value);
+    setWidthMode('value');
     if (selectedBlock?.id && value !== null) {
       onApplyPatch(selectedBlock.id, { 
-        width: fileType === 'html' ? `${value}px` : value 
+        width: toDimensionValue(value),
       });
     }
   };
 
   const handleHeightChange = (value: number | null) => {
     setHeight(value);
+    setHeightMode('value');
     if (selectedBlock?.id && value !== null) {
       onApplyPatch(selectedBlock.id, { 
-        height: fileType === 'html' ? `${value}px` : value 
+        height: toDimensionValue(value),
       });
     }
+  };
+
+  const handleLeftModeChange = (mode: 'value' | 'auto') => {
+    setLeftMode(mode);
+    if (mode === 'value') return;
+    setLeft(null);
+    const patch = getSpecialModePatch('left', mode);
+    if (patch) onApplyPatch(selectedBlock.id, patch);
+  };
+
+  const handleTopModeChange = (mode: 'value' | 'auto') => {
+    setTopMode(mode);
+    if (mode === 'value') return;
+    setTop(null);
+    const patch = getSpecialModePatch('top', mode);
+    if (patch) onApplyPatch(selectedBlock.id, patch);
+  };
+
+  const handleWidthModeChange = (mode: 'value' | 'auto' | 'min-content' | 'max-content' | 'fit-content') => {
+    setWidthMode(mode);
+    if (mode === 'value') return;
+    setWidth(null);
+    const patch = getSpecialModePatch('width', mode);
+    if (patch) onApplyPatch(selectedBlock.id, patch);
+  };
+
+  const handleHeightModeChange = (mode: 'value' | 'auto') => {
+    setHeightMode(mode);
+    if (mode === 'value') return;
+    setHeight(null);
+    const patch = getSpecialModePatch('height', mode);
+    if (patch) onApplyPatch(selectedBlock.id, patch);
   };
 
   // Обработчик для изменения moveMode
@@ -141,6 +189,10 @@ export function useBlockEditorSidebarController({
     setMoveMode(newMoveMode);
     if (newMoveMode === 'grid8') {
       setMoveUnit('px');
+    }
+    if (newMoveMode === 'relative') {
+      setLeftMode('value');
+      setTopMode('value');
     }
     
     if (selectedBlock?.id) {
@@ -166,23 +218,62 @@ export function useBlockEditorSidebarController({
   const [moveUnit, setMoveUnit] = useState<'px' | '%'>('px');
   const [isMoveModeInitialized, setIsMoveModeInitialized] = useState(false);
 
+  const getMovePatchKeys = (mode: string) => {
+    if (mode === 'relative') {
+      return { x: 'marginLeft', y: 'marginTop' } as const;
+    }
+    return { x: 'left', y: 'top' } as const;
+  };
+
   const formatMoveValue = (value: number) => {
     if (moveUnit === '%') return `${value}%`;
     return fileType === 'html' ? `${value}px` : value;
+  };
+  const supportsCssSpecialValues = fileType !== 'react-native';
+  const canUseAutoOffsets = supportsCssSpecialValues && moveMode !== 'relative';
+  const toDimensionValue = (value: number) => (fileType === 'html' ? `${value}px` : value);
+
+  const getSpecialModePatch = (field: 'left' | 'top' | 'width' | 'height', mode: string) => {
+    if (!selectedBlock?.id) return null;
+    const patch: any = {};
+    if (field === 'left' || field === 'top') {
+      if (!canUseAutoOffsets) return null;
+      patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
+      patch[field] = mode === 'auto' ? 'auto' : '';
+      return patch;
+    }
+    if (!supportsCssSpecialValues) return null;
+    patch[field] = mode === 'value' ? '' : mode;
+    return patch;
   };
 
   const handleMoveUnitChange = (newMoveUnit: 'px' | '%') => {
     if (moveMode === 'grid8' && newMoveUnit === '%') return;
     setMoveUnit(newMoveUnit);
     if (!selectedBlock?.id) return;
+    const moveKeys = getMovePatchKeys(moveMode);
     const patch: any = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
     if (left !== null && Number.isFinite(left)) {
-      patch.left = newMoveUnit === '%' ? `${left}%` : (fileType === 'html' ? `${left}px` : left);
+      patch[moveKeys.x] = newMoveUnit === '%' ? `${left}%` : (fileType === 'html' ? `${left}px` : left);
     }
     if (top !== null && Number.isFinite(top)) {
-      patch.top = newMoveUnit === '%' ? `${top}%` : (fileType === 'html' ? `${top}px` : top);
+      patch[moveKeys.y] = newMoveUnit === '%' ? `${top}%` : (fileType === 'html' ? `${top}px` : top);
+    }
+    if (moveMode === 'relative') {
+      patch.left = '';
+      patch.top = '';
     }
     onApplyPatch(selectedBlock.id, patch);
+  };
+
+  const handlePositionPreset = (horizontal: 'left' | 'center' | 'right', vertical: 'top' | 'center' | 'bottom') => {
+    if (!selectedBlock?.id || !onSendCommand) return;
+    onSendCommand({
+      type: 'MRPAK_CMD_ALIGN',
+      id: selectedBlock.id,
+      horizontal,
+      vertical,
+    });
   };
 
   useEffect(() => {
@@ -191,6 +282,10 @@ export function useBlockEditorSidebarController({
     setTop(null);
     setWidth(null);
     setHeight(null);
+    setLeftMode('value');
+    setTopMode('value');
+    setWidthMode('value');
+    setHeightMode('value');
     setBg('');
     setColor('');
     setStyleRows([{ key: '', value: '' }]);
@@ -203,6 +298,12 @@ export function useBlockEditorSidebarController({
     }
     // Строим baseline map в нормализованном виде
     const raw = parseStyleText(inline);
+    const getRawStyleValue = (...keys: string[]) => {
+      for (const key of keys) {
+        if (raw[key] !== undefined) return String(raw[key]).trim();
+      }
+      return '';
+    };
     const norm: Record<string, string | number | boolean> = {};
     for (const [k, v] of Object.entries(raw)) {
       const nk = normalizeStyleKey({ fileType, key: k });
@@ -227,9 +328,13 @@ export function useBlockEditorSidebarController({
     };
     let leftValFromComputed = null;
     let topValFromComputed = null;
+    let marginLeftValFromComputed = null;
+    let marginTopValFromComputed = null;
     if (cs) {
       leftValFromComputed = parseNumeric(cs.left);
       topValFromComputed = parseNumeric(cs.top);
+      marginLeftValFromComputed = parseNumeric(cs.marginLeft);
+      marginTopValFromComputed = parseNumeric(cs.marginTop);
       const widthVal = parseNumeric(cs.width);
       const heightVal = parseNumeric(cs.height);
       if (widthVal !== null) setWidth(widthVal);
@@ -250,24 +355,28 @@ export function useBlockEditorSidebarController({
         if (savedMoveUnit === 'px' || savedMoveUnit === '%') {
           setMoveUnit(savedMoveUnit);
         } else {
-          const inlineLeft = element.style?.left || '';
-          const inlineTop = element.style?.top || '';
+          const moveKeys = getMovePatchKeys(elementMoveMode);
+          const inlineLeft = (element.style as any)?.[moveKeys.x] || '';
+          const inlineTop = (element.style as any)?.[moveKeys.y] || '';
           setMoveUnit(
             String(inlineLeft).includes('%') || String(inlineTop).includes('%') ? '%' : 'px'
           );
         }
 
-        const inlineLeftNumeric = parseNumeric(element.style?.left);
-        const inlineTopNumeric = parseNumeric(element.style?.top);
-        if (String(element.style?.left || '').includes('%') && inlineLeftNumeric !== null) {
+        const moveKeys = getMovePatchKeys(elementMoveMode);
+        const inlineLeftNumeric = parseNumeric((element.style as any)?.[moveKeys.x]);
+        const inlineTopNumeric = parseNumeric((element.style as any)?.[moveKeys.y]);
+        const computedX = elementMoveMode === 'relative' ? marginLeftValFromComputed : leftValFromComputed;
+        const computedY = elementMoveMode === 'relative' ? marginTopValFromComputed : topValFromComputed;
+        if (String((element.style as any)?.[moveKeys.x] || '').includes('%') && inlineLeftNumeric !== null) {
           setLeft(inlineLeftNumeric);
-        } else if (leftValFromComputed !== null) {
-          setLeft(leftValFromComputed);
+        } else if (computedX !== null) {
+          setLeft(computedX);
         }
-        if (String(element.style?.top || '').includes('%') && inlineTopNumeric !== null) {
+        if (String((element.style as any)?.[moveKeys.y] || '').includes('%') && inlineTopNumeric !== null) {
           setTop(inlineTopNumeric);
-        } else if (topValFromComputed !== null) {
-          setTop(topValFromComputed);
+        } else if (computedY !== null) {
+          setTop(computedY);
         }
       } else {
         if (leftValFromComputed !== null) setLeft(leftValFromComputed);
@@ -292,13 +401,29 @@ export function useBlockEditorSidebarController({
       setMoveUnit('px');
     }
     setIsMoveModeInitialized(true);
+    const currentXRaw = elementMoveMode === 'relative'
+      ? getRawStyleValue('margin-left', 'marginLeft')
+      : getRawStyleValue('left');
+    const currentYRaw = elementMoveMode === 'relative'
+      ? getRawStyleValue('margin-top', 'marginTop')
+      : getRawStyleValue('top');
+    const widthRaw = getRawStyleValue('width');
+    const heightRaw = getRawStyleValue('height');
+    setLeftMode(currentXRaw === 'auto' && canUseAutoOffsets ? 'auto' : 'value');
+    setTopMode(currentYRaw === 'auto' && canUseAutoOffsets ? 'auto' : 'value');
+    setWidthMode(
+      widthRaw === 'auto' || widthRaw === 'min-content' || widthRaw === 'max-content' || widthRaw === 'fit-content'
+        ? (widthRaw as any)
+        : 'value'
+    );
+    setHeightMode(heightRaw === 'auto' ? 'auto' : 'value');
     // Текст: приоритет у textSnapshot (приходит отдельным сообщением), fallback на styleSnapshot.textContent
     const initialText =
       (typeof textSnapshot === 'string' ? textSnapshot : styleSnapshot?.textContent) || '';
     setTextValue(initialText);
     setReparentMode(false);
     setReparentTargetId(null);
-  }, [selectedBlock?.id, textSnapshot]);
+  }, [selectedBlock?.id, textSnapshot, canUseAutoOffsets]);
   useEffect(() => {
     if (!onSendCommand) return;
     onSendCommand({ type: 'MRPAK_CMD_SET_MOVE_MODE', mode: moveMode, unit: moveUnit, grid: 8 });
@@ -331,10 +456,15 @@ export function useBlockEditorSidebarController({
       else p[key] = val; // React/RN: число = px
     };
 
-    setPx('left', left);
-    setPx('top', top);
-    setPx('width', width);
-    setPx('height', height);
+    const moveKeys = getMovePatchKeys(moveMode);
+    if (leftMode === 'value') setPx(moveKeys.x, left);
+    else if (canUseAutoOffsets) p[moveKeys.x] = 'auto';
+    if (topMode === 'value') setPx(moveKeys.y, top);
+    else if (canUseAutoOffsets) p[moveKeys.y] = 'auto';
+    if (widthMode === 'value') setPx('width', width);
+    else if (supportsCssSpecialValues) p.width = widthMode;
+    if (heightMode === 'value') setPx('height', height);
+    else if (supportsCssSpecialValues) p.height = heightMode;
 
     if (bg) {
       // В HTML ожидаем lower/kebab, но background-color тоже ок как backgroundColor? -> используем background-color
@@ -346,16 +476,36 @@ export function useBlockEditorSidebarController({
       else p.color = color;
     }
 
-    if (left != null || top != null) {
+    if (leftMode !== 'value' || topMode !== 'value' || left != null || top != null) {
       p.position = moveMode === 'grid8' ? 'absolute' : moveMode;
+      if (moveMode === 'relative') {
+        p.left = '';
+        p.top = '';
+      }
     }
 
     return p;
-  }, [fileType, left, top, width, height, bg, color, moveMode, moveUnit]);
+  }, [fileType, left, top, width, height, bg, color, moveMode, moveUnit, leftMode, topMode, widthMode, heightMode, canUseAutoOffsets, supportsCssSpecialValues]);
 
   const handleApply = () => {
     if (!canApply) return;
-    onApplyPatch(selectedBlock.id, { ...patch, ...diffAgainstBaseline(buildCurrentStylePatch()) });
+    const fullPatch = { ...patch, ...diffAgainstBaseline(buildCurrentStylePatch()) };
+    if (Object.keys(fullPatch).length === 0) return;
+
+    if (onStagePatch) {
+      onStagePatch(selectedBlock.id, fullPatch);
+    }
+
+    if (onSendCommand) {
+      onSendCommand({
+        type: 'MRPAK_CMD_SET_STYLE',
+        id: selectedBlock.id,
+        patch: fullPatch,
+        fileType,
+      });
+    }
+
+    onApplyPatch(selectedBlock.id, fullPatch);
   };
 
   const buildCurrentStylePatch = () => {
@@ -669,10 +819,18 @@ export function useBlockEditorSidebarController({
     top,
     width,
     height,
+    leftMode,
+    topMode,
+    widthMode,
+    heightMode,
     handleLeftChange,
     handleTopChange,
     handleWidthChange,
     handleHeightChange,
+    handleLeftModeChange,
+    handleTopModeChange,
+    handleWidthModeChange,
+    handleHeightModeChange,
     NumberField,
     textValue,
     setTextValue,
@@ -682,6 +840,7 @@ export function useBlockEditorSidebarController({
     handleMoveModeChange,
     moveUnit,
     handleMoveUnitChange,
+    handlePositionPreset,
     onSendCommand,
     styleMode,
     setStyleMode,

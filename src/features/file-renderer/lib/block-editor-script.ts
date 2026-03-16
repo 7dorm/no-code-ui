@@ -110,6 +110,20 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               return [];
             }
           };
+          const getSelectedGroupNodes = () => {
+            if (Array.isArray(selectedGroup) && selectedGroup.length > 0) {
+              return selectedGroup.filter(Boolean);
+            }
+            return selected ? [selected] : [];
+          };
+          const applyToSelectedGroup = (cb) => {
+            const nodes = getSelectedGroupNodes();
+            nodes.forEach((node, index) => {
+              try {
+                cb(node, index);
+              } catch (e) {}
+            });
+          };
           const getIdFileBasename = (id) => {
             const m = String(id || '').match(/^mrpak:([^:]+):/);
             return m ? m[1] : '';
@@ -153,6 +167,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_REQ_STYLE = '${MRPAK_CMD.REQUEST_STYLE_SNAPSHOT}';
           const CMD_REPARENT = '${MRPAK_CMD.REPARENT}';
           const CMD_SET_MOVE_MODE = '${MRPAK_CMD.SET_MOVE_MODE}';
+          const CMD_ALIGN = '${MRPAK_CMD.ALIGN}';
           const CMD_SET_TEXT = '${MRPAK_CMD.SET_TEXT}';
           const CMD_REQ_TEXT = '${MRPAK_CMD.REQUEST_TEXT_SNAPSHOT}';
           const CMD_START_DRAG = '${MRPAK_CMD.START_DRAG}';
@@ -355,6 +370,55 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           };
 
+          const updateRelativeParentPreview = (el, dx, dy) => {
+            try {
+              ensureOverlay();
+              if (!el || !overlay.parent || !overlay.margin) return;
+              const rect = getElementVisualRect(el);
+              if (!rect) return;
+              const cs = window.getComputedStyle(el);
+              const mt = toNum(cs.marginTop);
+              const mr = toNum(cs.marginRight);
+              const mb = toNum(cs.marginBottom);
+              const ml = toNum(cs.marginLeft);
+              const futureMl = ml + dx;
+              const futureMt = mt + dy;
+              const parentInfo = getParentContentRect(el);
+              const parent = parentInfo.parent;
+              if (!parent || parent === document.body || parent === document.documentElement) return;
+
+              const parentRect = parentInfo.rect;
+              const parentLeft = parentRect.left + parentInfo.padding.left;
+              const parentTop = parentRect.top + parentInfo.padding.top;
+              const parentRight = parentRect.right - parentInfo.padding.right;
+              const parentBottom = parentRect.bottom - parentInfo.padding.bottom;
+
+              const movedLeft = rect.left - futureMl;
+              const movedTop = rect.top - futureMt;
+              const movedRight = rect.right + mr;
+              const movedBottom = rect.bottom + mb;
+
+              setRect(overlay.margin, {
+                left: movedLeft,
+                top: movedTop,
+                width: Math.max(0, rect.width + futureMl + mr),
+                height: Math.max(0, rect.height + futureMt + mb),
+              });
+
+              const unionLeft = Math.min(parentLeft, movedLeft);
+              const unionTop = Math.min(parentTop, movedTop);
+              const unionRight = Math.max(parentRight, movedRight);
+              const unionBottom = Math.max(parentBottom, movedBottom);
+
+              setRect(overlay.parent, {
+                left: unionLeft,
+                top: unionTop,
+                width: Math.max(0, unionRight - unionLeft),
+                height: Math.max(0, unionBottom - unionTop),
+              });
+            } catch (e) {}
+          };
+
           const snap = (v) => {
             if (moveMode !== 'grid8') return v;
             const step = gridStep || 8;
@@ -366,12 +430,129 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             return (value / total) * 100;
           };
 
-          const formatMoveValue = (value, axisSize) => {
-            if (moveMode === 'grid8' || moveUnit !== '%') {
+          const getMoveAxisReferenceSize = (mode, axis, width, height) => {
+            if (mode === 'relative') {
+              // CSS % margins are resolved against the containing block width.
+              return Math.max(1, width);
+            }
+            return axis === 'x' ? Math.max(1, width) : Math.max(1, height);
+          };
+
+          const formatMoveValue = (value, axisSize, modeForValue) => {
+            if (modeForValue === 'grid8' || moveUnit !== '%') {
               return '${type}' === 'html' ? (value + 'px') : value;
             }
             const pct = pxToPercent(value, axisSize);
             return pct + '%';
+          };
+          const getMovePatchKeys = (mode) => {
+            if (mode === 'relative') {
+              return { x: 'marginLeft', y: 'marginTop' };
+            }
+            return { x: 'left', y: 'top' };
+          };
+          const getElementMoveMode = (el) => {
+            if (!el || !el.getAttribute) {
+              return moveMode;
+            }
+            const saved = el.getAttribute('data-move-mode');
+            if (saved === 'relative' || saved === 'absolute' || saved === 'grid8') {
+              return saved;
+            }
+            try {
+              const position = window.getComputedStyle(el).position;
+              if (position === 'relative') return 'relative';
+              if (position === 'absolute' || position === 'fixed') return 'absolute';
+            } catch (e) {}
+            return moveMode;
+          };
+          const applyAlignmentPreset = (el, horizontal, vertical) => {
+            if (!el) return;
+            const id = ensureId(el);
+            const rect = getElementVisualRect(el);
+            const parentInfo = getParentContentRect(el);
+            if (!rect || !parentInfo || !parentInfo.rect) return;
+
+            const activeMoveMode = getElementMoveMode(el);
+            const parentRect = parentInfo.rect;
+            const contentLeft = parentRect.left + parentInfo.padding.left;
+            const contentTop = parentRect.top + parentInfo.padding.top;
+            const contentWidth = Math.max(1, parentRect.width - parentInfo.padding.left - parentInfo.padding.right);
+            const contentHeight = Math.max(1, parentRect.height - parentInfo.padding.top - parentInfo.padding.bottom);
+            const desiredLeft =
+              horizontal === 'left'
+                ? contentLeft
+                : horizontal === 'center'
+                ? contentLeft + (contentWidth - rect.width) / 2
+                : contentLeft + contentWidth - rect.width;
+            const desiredTop =
+              vertical === 'top'
+                ? contentTop
+                : vertical === 'center'
+                ? contentTop + (contentHeight - rect.height) / 2
+                : contentTop + contentHeight - rect.height;
+
+            if (activeMoveMode === 'relative') {
+              const cs = window.getComputedStyle(el);
+              const baseLeft = pxToNum(cs.marginLeft);
+              const baseTop = pxToNum(cs.marginTop);
+              const nextLeft = snap(baseLeft + (desiredLeft - rect.left));
+              const nextTop = snap(baseTop + (desiredTop - rect.top));
+              const leftValue = formatMoveValue(
+                nextLeft,
+                getMoveAxisReferenceSize(activeMoveMode, 'x', contentWidth, contentHeight),
+                activeMoveMode
+              );
+              const topValue = formatMoveValue(
+                nextTop,
+                getMoveAxisReferenceSize(activeMoveMode, 'y', contentWidth, contentHeight),
+                activeMoveMode
+              );
+              const moveKeys = getMovePatchKeys('relative');
+              el.style.position = 'relative';
+              el.style.left = '';
+              el.style.top = '';
+              el.style[moveKeys.x] = String(leftValue);
+              el.style[moveKeys.y] = String(topValue);
+              post(MSG_APPLY, {
+                id,
+                patch: {
+                  position: 'relative',
+                  left: '',
+                  top: '',
+                  [moveKeys.x]: leftValue,
+                  [moveKeys.y]: topValue,
+                },
+                isIntermediate: false,
+              });
+            } else {
+              const nextLeft = snap(desiredLeft - contentLeft);
+              const nextTop = snap(desiredTop - contentTop);
+              const leftValue = formatMoveValue(
+                nextLeft,
+                getMoveAxisReferenceSize('absolute', 'x', contentWidth, contentHeight),
+                'absolute'
+              );
+              const topValue = formatMoveValue(
+                nextTop,
+                getMoveAxisReferenceSize('absolute', 'y', contentWidth, contentHeight),
+                'absolute'
+              );
+              el.style.position = 'absolute';
+              el.style.left = String(leftValue);
+              el.style.top = String(topValue);
+              post(MSG_APPLY, {
+                id,
+                patch: {
+                  position: 'absolute',
+                  left: leftValue,
+                  top: topValue,
+                },
+                isIntermediate: false,
+              });
+            }
+
+            updateBoxOverlay();
           };
 
           const getOffsetParent = (el) => {
@@ -1068,6 +1249,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                       sx: ev.clientX,
                       sy: ev.clientY,
                       rect: startRect,
+                      moveMode: getElementMoveMode(targetEl),
                     };
                     return;
                   }
@@ -1099,11 +1281,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const id = ensureId(selected);
             dragging = { sourceId: id, mode: ev.altKey ? 'resize' : 'move' };
             const startRect = selected.getBoundingClientRect();
+            const elementMoveMode = getElementMoveMode(selected);
             drag = {
               mode: ev.altKey ? 'resize' : 'move',
               sx: ev.clientX,
               sy: ev.clientY,
               rect: startRect,
+              moveMode: elementMoveMode,
             };
           }, true);
 
@@ -1114,6 +1298,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const dy = ev.clientY - drag.sy;
             
             if (drag.mode === 'move') {
+              const activeMoveMode = drag.moveMode || getElementMoveMode(selected);
               const parentInfo = getParentContentRect(selected);
               const parentRect = parentInfo.rect;
               const padLeft = parentInfo.padding.left;
@@ -1128,11 +1313,16 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const maxDx = contentRight - drag.rect.right;
               const minDy = contentTop - drag.rect.top;
               const maxDy = contentBottom - drag.rect.bottom;
-              const constrainedDx = Math.min(Math.max(dx, minDx), maxDx);
-              const constrainedDy = Math.min(Math.max(dy, minDy), maxDy);
+              const constrainedDx = activeMoveMode === 'relative' ? dx : Math.min(Math.max(dx, minDx), maxDx);
+              const constrainedDy = activeMoveMode === 'relative' ? dy : Math.min(Math.max(dy, minDy), maxDy);
               
-              selected.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
+              applyToSelectedGroup((node) => {
+                node.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
+              });
               updateBoxOverlay();
+              if (activeMoveMode === 'relative') {
+                updateRelativeParentPreview(selected, constrainedDx, constrainedDy);
+              }
             } else {
               const parentInfo = getParentContentRect(selected);
               const parentRect = parentInfo.rect;
@@ -1150,8 +1340,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const cw = Math.min(w, maxW);
               const ch = Math.min(h, maxH);
               
-              selected.style.width = cw + 'px';
-              selected.style.height = ch + 'px';
+              applyToSelectedGroup((node) => {
+                node.style.width = cw + 'px';
+                node.style.height = ch + 'px';
+              });
               updateBoxOverlay();
             }
           }, true);
@@ -1166,6 +1358,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const dy = touch.clientY - drag.sy;
             
             if (drag.mode === 'move') {
+              const activeMoveMode = drag.moveMode || getElementMoveMode(selected);
               const parentInfo = getParentContentRect(selected);
               const parentRect = parentInfo.rect;
               const padLeft = parentInfo.padding.left;
@@ -1180,17 +1373,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const maxDx = contentRight - drag.rect.right;
               const minDy = contentTop - drag.rect.top;
               const maxDy = contentBottom - drag.rect.bottom;
-              const constrainedDx = Math.min(Math.max(dx, minDx), maxDx);
-              const constrainedDy = Math.min(Math.max(dy, minDy), maxDy);
+              const constrainedDx = activeMoveMode === 'relative' ? dx : Math.min(Math.max(dx, minDx), maxDx);
+              const constrainedDy = activeMoveMode === 'relative' ? dy : Math.min(Math.max(dy, minDy), maxDy);
 
-              selected.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
+              applyToSelectedGroup((node) => {
+                node.style.transform = 'translate(' + constrainedDx + 'px,' + constrainedDy + 'px)';
+              });
               updateBoxOverlay();
+              if (activeMoveMode === 'relative') {
+                updateRelativeParentPreview(selected, constrainedDx, constrainedDy);
+              }
 
               // Сохраняем финальные координаты в drag объект
-              if (moveMode === 'relative') {
+              if (activeMoveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
-                const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
-                const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
+                const baseLeft = pxToNum(cs.marginLeft);
+                const baseTop = pxToNum(cs.marginTop);
                 const left = snap(baseLeft + constrainedDx);
                 const top = snap(baseTop + constrainedDy);
                 
@@ -1224,8 +1422,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const cw = Math.min(w, maxW);
               const ch = Math.min(h, maxH);
               
-              selected.style.width = cw + 'px';
-              selected.style.height = ch + 'px';
+              applyToSelectedGroup((node) => {
+                node.style.width = cw + 'px';
+                node.style.height = ch + 'px';
+              });
               updateBoxOverlay();
               
               // Сохраняем финальные размеры в drag объект
@@ -1251,21 +1451,49 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const contentHeight = Math.max(1, parentInfo.rect.height - parentInfo.padding.top - parentInfo.padding.bottom);
 
             if (drag.mode === 'move') {
-              selected.style.transform = '';
+              const activeMoveMode = drag.moveMode || getElementMoveMode(selected);
+              applyToSelectedGroup((node) => {
+                node.style.transform = '';
+              });
 
               // Используем сохраненные финальные значения
               if (drag.finalLeft !== undefined && drag.finalTop !== undefined) {
-                const finalLeftValue = formatMoveValue(drag.finalLeft, contentWidth);
-                const finalTopValue = formatMoveValue(drag.finalTop, contentHeight);
-                if (drag.finalPosition === 'relative') {
-                  selected.style.position = 'relative';
-                  selected.style.left = String(finalLeftValue);
-                  selected.style.top = String(finalTopValue);
-                  post(MSG_APPLY, { id, patch: { position: 'relative', left: finalLeftValue, top: finalTopValue }, isIntermediate: false });
+                const finalLeftValue = formatMoveValue(
+                  drag.finalLeft,
+                  getMoveAxisReferenceSize(activeMoveMode, 'x', contentWidth, contentHeight),
+                  activeMoveMode
+                );
+                const finalTopValue = formatMoveValue(
+                  drag.finalTop,
+                  getMoveAxisReferenceSize(activeMoveMode, 'y', contentWidth, contentHeight),
+                  activeMoveMode
+                );
+                if (drag.finalPosition === 'relative' || activeMoveMode === 'relative') {
+                  const moveKeys = getMovePatchKeys('relative');
+                  applyToSelectedGroup((node) => {
+                    node.style.position = 'relative';
+                    node.style.left = '';
+                    node.style.top = '';
+                    node.style[moveKeys.x] = String(finalLeftValue);
+                    node.style[moveKeys.y] = String(finalTopValue);
+                  });
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      position: 'relative',
+                      left: '',
+                      top: '',
+                      [moveKeys.x]: finalLeftValue,
+                      [moveKeys.y]: finalTopValue,
+                    },
+                    isIntermediate: false
+                  });
                 } else {
-                  selected.style.position = 'absolute';
-                  selected.style.left = String(finalLeftValue);
-                  selected.style.top = String(finalTopValue);
+                  applyToSelectedGroup((node) => {
+                    node.style.position = 'absolute';
+                    node.style.left = String(finalLeftValue);
+                    node.style.top = String(finalTopValue);
+                  });
 
                   const patch = { position: 'absolute' };
                   patch.left = finalLeftValue;
@@ -1277,8 +1505,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             } else {
               // Используем сохраненные финальные размеры
               if (drag.finalWidth !== undefined && drag.finalHeight !== undefined) {
-                selected.style.width = drag.finalWidth + 'px';
-                selected.style.height = drag.finalHeight + 'px';
+                applyToSelectedGroup((node) => {
+                  node.style.width = drag.finalWidth + 'px';
+                  node.style.height = drag.finalHeight + 'px';
+                });
                 updateBoxOverlay();
                 
                 if ('${type}' === 'html') {
@@ -1328,25 +1558,51 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const maxDx = contentRight - drag.rect.right;
             const minDy = contentTop - drag.rect.top;
             const maxDy = contentBottom - drag.rect.bottom;
-            const constrainedDx = Math.min(Math.max(dx, minDx), maxDx);
-            const constrainedDy = Math.min(Math.max(dy, minDy), maxDy);
+            const activeMoveMode = drag.moveMode || getElementMoveMode(selected);
+            const constrainedDx = activeMoveMode === 'relative' ? dx : Math.min(Math.max(dx, minDx), maxDx);
+            const constrainedDy = activeMoveMode === 'relative' ? dy : Math.min(Math.max(dy, minDy), maxDy);
 
             if (drag.mode === 'move') {
-              selected.style.transform = '';
+              applyToSelectedGroup((node) => {
+                node.style.transform = '';
+              });
               updateBoxOverlay();
 
-              if (moveMode === 'relative') {
+              if (activeMoveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
-                const baseLeft = cs.left === 'auto' ? 0 : pxToNum(cs.left);
-                const baseTop = cs.top === 'auto' ? 0 : pxToNum(cs.top);
+                const baseLeft = pxToNum(cs.marginLeft);
+                const baseTop = pxToNum(cs.marginTop);
                 const left = snap(baseLeft + constrainedDx);
                 const top = snap(baseTop + constrainedDy);
-                const leftValue = formatMoveValue(left, contentWidth);
-                const topValue = formatMoveValue(top, contentHeight);
-                selected.style.position = 'relative';
-                selected.style.left = String(leftValue);
-                selected.style.top = String(topValue);
-                post(MSG_APPLY, { id, patch: { position: 'relative', left: leftValue, top: topValue }, isIntermediate: false });
+                const leftValue = formatMoveValue(
+                  left,
+                  getMoveAxisReferenceSize(activeMoveMode, 'x', contentWidth, contentHeight),
+                  activeMoveMode
+                );
+                const topValue = formatMoveValue(
+                  top,
+                  getMoveAxisReferenceSize(activeMoveMode, 'y', contentWidth, contentHeight),
+                  activeMoveMode
+                );
+                const moveKeys = getMovePatchKeys('relative');
+                applyToSelectedGroup((node) => {
+                  node.style.position = 'relative';
+                  node.style.left = '';
+                  node.style.top = '';
+                  node.style[moveKeys.x] = String(leftValue);
+                  node.style[moveKeys.y] = String(topValue);
+                });
+                post(MSG_APPLY, {
+                  id,
+                  patch: {
+                    position: 'relative',
+                    left: '',
+                    top: '',
+                    [moveKeys.x]: leftValue,
+                    [moveKeys.y]: topValue,
+                  },
+                  isIntermediate: false
+                });
               } else {
                 // absolute с ограничением по padding-box
                 const startLeft = drag.rect.left - parentRect.left - padLeft;
@@ -1363,11 +1619,21 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 left = Math.min(Math.max(left, minLeft), maxLeft);
                 top = Math.min(Math.max(top, minTop), maxTop);
 
-                selected.style.position = 'absolute';
-                const leftValue = formatMoveValue(left, contentWidth);
-                const topValue = formatMoveValue(top, contentHeight);
-                selected.style.left = String(leftValue);
-                selected.style.top = String(topValue);
+                const leftValue = formatMoveValue(
+                  left,
+                  getMoveAxisReferenceSize('absolute', 'x', contentWidth, contentHeight),
+                  'absolute'
+                );
+                const topValue = formatMoveValue(
+                  top,
+                  getMoveAxisReferenceSize('absolute', 'y', contentWidth, contentHeight),
+                  'absolute'
+                );
+                applyToSelectedGroup((node) => {
+                  node.style.position = 'absolute';
+                  node.style.left = String(leftValue);
+                  node.style.top = String(topValue);
+                });
 
                 const patch= { position: 'absolute' };
                 patch.left = leftValue;
@@ -1384,8 +1650,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const cw = Math.min(w, maxW);
               const ch = Math.min(h, maxH);
 
-              selected.style.width = cw + 'px';
-              selected.style.height = ch + 'px';
+              applyToSelectedGroup((node) => {
+                node.style.width = cw + 'px';
+                node.style.height = ch + 'px';
+              });
               updateBoxOverlay();
               if ('${type}' === 'html') {
                 post(MSG_APPLY, { id, patch: { width: cw + 'px', height: ch + 'px' }, isIntermediate: false });
@@ -1574,6 +1842,16 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 if (data.unit === '%' || data.unit === 'px') moveUnit = String(data.unit);
                 if (moveMode === 'grid8') moveUnit = 'px';
                 if (typeof data.grid === 'number') gridStep = data.grid;
+                return;
+              }
+              if (data.type === CMD_ALIGN && data.id) {
+                const el = getElementsById(String(data.id))[0];
+                if (!el) return;
+                applyAlignmentPreset(
+                  el,
+                  String(data.horizontal || 'center'),
+                  String(data.vertical || 'center')
+                );
                 return;
               }
               if (data.type === CMD_START_DRAG) {

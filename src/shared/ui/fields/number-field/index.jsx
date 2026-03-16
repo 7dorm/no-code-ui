@@ -16,16 +16,42 @@ const htmlInputStyle = {
 /**
  * Поле ввода для числовых значений
  */
-export function NumberField({ label, value, onChange }) {
+export function NumberField({ label, value, onChange, mode = 'value', modeOptions = null, onModeChange }) {
+  const hasModes = Array.isArray(modeOptions) && modeOptions.length > 0 && typeof onModeChange === 'function';
+  const isValueMode = mode === 'value';
   return (
     <View style={styles.fieldRow}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <input
-        style={htmlInputStyle}
+        style={{
+          ...htmlInputStyle,
+          flex: 1,
+          opacity: isValueMode ? 1 : 0.7,
+        }}
         type="number"
         value={Number.isFinite(value) ? value : ''}
+        disabled={!isValueMode}
         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
       />
+      {hasModes ? (
+        <select
+          style={{
+            ...htmlInputStyle,
+            width: '110px',
+            marginLeft: '8px',
+            paddingLeft: '8px',
+            paddingRight: '8px',
+          }}
+          value={mode}
+          onChange={(e) => onModeChange(e.target.value)}
+        >
+          {modeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : null}
     </View>
   );
 }
@@ -44,4 +70,3 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 });
-
