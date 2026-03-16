@@ -13,6 +13,7 @@ function AppRN() {
   const [showSplitCode, setShowSplitCode] = useState(true);
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [fileTreeVersion, setFileTreeVersion] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const leftPanelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -250,6 +251,7 @@ function AppRN() {
               <Text style={styles.sidebarTitle}>Файлы проекта</Text>
             </View>
             <FileTree
+              key={`file-tree-${projectPath || 'none'}-${fileTreeVersion}`}
               rootPath={projectPath!}
               onSelectFile={handleSelectFile}
               selectedPath={selectedFilePath!}
@@ -271,6 +273,8 @@ function AppRN() {
               showSplitSidebar={showSplitSidebar}
               showSplitPreview={showSplitPreview}
               showSplitCode={showSplitCode}
+              onProjectFilesChanged={() => setFileTreeVersion((v) => v + 1)}
+              onOpenFile={handleSelectFile}
             />
           ) : (
             <View style={styles.placeholder}>

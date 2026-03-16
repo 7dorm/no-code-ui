@@ -180,8 +180,14 @@ function patchOpeningTagStyle(openTagText: any, patch: any) {
   // Сохраняем все существующие атрибуты (onClick, onPress и т.д.)
   const insertAt = openTagText.lastIndexOf('>');
   if (insertAt < 0) return { ok: false, error: 'Opening tag malformed' };
-  const beforeClose = openTagText.slice(0, insertAt); // Сохраняет все атрибуты до '>'
-  const close = openTagText.slice(insertAt);
+  let attrsEnd = insertAt;
+  let scan = insertAt - 1;
+  while (scan >= 0 && /\s/.test(openTagText[scan])) scan--;
+  if (scan >= 0 && openTagText[scan] === '/') {
+    attrsEnd = scan;
+  }
+  const beforeClose = openTagText.slice(0, attrsEnd);
+  const close = openTagText.slice(attrsEnd);
   const objInner = upsertIntoObjectText('', patch);
   // Вставляем style перед '>', сохраняя все другие атрибуты
   return { ok: true, text: `${beforeClose} style={{${objInner}}}${close}` };
@@ -349,6 +355,5 @@ export function replaceStyleReferenceInJsx({ code, target, oldStyleRef, newStyle
   const newCode = source.slice(0, start) + replaced.text + source.slice(end);
   return { ok: true, code: newCode, changed: true };
 }
-
 
 

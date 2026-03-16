@@ -28,6 +28,11 @@ type DefaultExportInfo = {
   type: string;
 };
 
+type LocalComponentImport = {
+  localName: string;
+  sourcePath: string;
+};
+
 const DEFAULT_EXPORT_COMPONENT_NAME = 'MrpakDefaultExportComponent';
 const JS_KEYWORDS = new Set([
   'function',
@@ -488,6 +493,134 @@ export function normalizeReactModuleCode(code: string): {
         : null,
       namedExports: [],
     };
+  }
+}
+
+function getMrpakIdAttributeValue(openingElement: t.JSXOpeningElement) {
+  for (const attr of openingElement.attributes) {
+    if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) continue;
+    if (attr.name.name !== 'data-no-code-ui-id') continue;
+    if (t.isStringLiteral(attr.value)) {
+      return t.stringLiteral(attr.value.value);
+    }
+    if (t.isJSXExpressionContainer(attr.value) && t.isExpression(attr.value.expression)) {
+      return t.cloneNode(attr.value.expression, true);
+    }
+  }
+  return null;
+}
+
+function collectLocalComponentImports(ast: t.File) {
+  const imports = new Map<string, LocalComponentImport>();
+
+  ast.program.body.forEach((statement) => {
+    if (!t.isImportDeclaration(statement) || typeof statement.source.value !== 'string') {
+      return;
+    }
+
+    const importPath = statement.source.value;
+    const isTypeOnly =
+      statement.importKind === 'type' ||
+      statement.specifiers.every((specifier) => t.isImportSpecifier(specifier) && specifier.importKind === 'type');
+
+    if (
+      isTypeOnly ||
+      importPath.startsWith('react') ||
+      importPath.startsWith('react-dom') ||
+      importPath.startsWith('react-native') ||
+      importPath.startsWith('node_modules') ||
+      importPath.startsWith('http://') ||
+      importPath.startsWith('https://')
+    ) {
+      return;
+    }
+
+    statement.specifiers.forEach((specifier) => {
+      const localName = t.isIdentifier(specifier.local) ? specifier.local.name : null;
+      if (!isPascalCase(localName)) return;
+      imports.set(localName!, {
+        localName: localName!,
+        sourcePath: importPath,
+      });
+    });
+  });
+
+  return imports;
+}
+
+export function wrapImportedComponentUsages(code: string): {
+  code: string;
+  wrappedCount: number;
+} {
+  try {
+    const ast = parseModule(code);
+    const componentImports = collectLocalComponentImports(ast);
+    if (componentImports.size === 0) {
+      return { code, wrappedCount: 0 };
+    }
+
+    let wrappedCount = 0;
+
+    traverse(ast, {
+      JSXElement(path) {
+        const openingElement = path.node.openingElement;
+        if (!t.isJSXIdentifier(openingElement.name)) return;
+
+        const componentName = openingElement.name.name;
+        if (componentName === 'MrpakImportedBoundary') return;
+        const importMeta = componentImports.get(componentName);
+        if (!importMeta) return;
+
+        const mrpakIdExpr = getMrpakIdAttributeValue(openingElement);
+        if (!mrpakIdExpr) return;
+
+        const forwardedAttributes = openingElement.attributes.filter((attr) => {
+          return !(
+            t.isJSXAttribute(attr) &&
+            t.isJSXIdentifier(attr.name) &&
+            attr.name.name === 'data-no-code-ui-id'
+          );
+        }).map((attr) => t.cloneNode(attr, true));
+
+        const boundaryElement = t.jsxElement(
+          t.jsxOpeningElement(
+            t.jsxIdentifier('MrpakImportedBoundary'),
+            [
+              t.jsxAttribute(
+                t.jsxIdentifier('__mrpakComponent'),
+                t.jsxExpressionContainer(t.identifier(componentName))
+              ),
+              t.jsxAttribute(t.jsxIdentifier('__mrpakName'), t.stringLiteral(componentName)),
+              t.jsxAttribute(t.jsxIdentifier('__mrpakSource'), t.stringLiteral(importMeta.sourcePath)),
+              t.jsxAttribute(
+                t.jsxIdentifier('__mrpakId'),
+                t.jsxExpressionContainer(mrpakIdExpr)
+              ),
+              ...forwardedAttributes,
+            ],
+            false
+          ),
+          t.jsxClosingElement(t.jsxIdentifier('MrpakImportedBoundary')),
+          path.node.children.map((child) => t.cloneNode(child, true)),
+          false
+        );
+
+        path.replaceWith(boundaryElement);
+        wrappedCount += 1;
+      },
+    });
+
+    return {
+      code: generate(ast, {
+        retainLines: true,
+        compact: false,
+        comments: true,
+      }).code,
+      wrappedCount,
+    };
+  } catch (error) {
+    console.warn('[wrapImportedComponentUsages] AST transform failed, skipping:', error);
+    return { code, wrappedCount: 0 };
   }
 }
 

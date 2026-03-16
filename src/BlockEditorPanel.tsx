@@ -57,6 +57,9 @@ export type BlockEditorPanelProps = {
   canUndo: boolean;
   canRedo: boolean;
   livePosition: { left: number | null; top: number | null; width: number | null; height: number | null } | null;
+  selectedBlockIds?: string[];
+  onExtractSelection?: () => void;
+  onOpenFile?: (path: string) => void;
 };
 
 type BlockEditorSidebarControllerProps = Omit<BlockEditorPanelProps, 'html' | 'onMessage' | 'outgoingMessage'>;
@@ -82,6 +85,9 @@ export function useBlockEditorSidebarController({
   canUndo,
   canRedo,
   livePosition,
+  selectedBlockIds = [],
+  onExtractSelection,
+  onOpenFile,
 }: BlockEditorSidebarControllerProps) {
   const [left, setLeft] = useState<number | null>(null);
   const [top, setTop] = useState<number | null>(null);
@@ -545,6 +551,10 @@ export function useBlockEditorSidebarController({
     const customName = (layerNames && layerNames[id]) ? String(layerNames[id]).trim() : '';
     const title = customName || `${(node.tagName || '').toLowerCase()} · ${shortId(id)}`;
 
+    const displayTitle = node?.isIsolatedComponent
+      ? (customName || `${node?.componentName || node?.tagName || node?.sourceBasename || 'component'}`)
+      : title;
+
     return (
       <View key={id} style={{ marginLeft: depth * 10, marginBottom: 6 }}>
         <TouchableOpacity
@@ -553,7 +563,12 @@ export function useBlockEditorSidebarController({
             isSelected && blockEditorPanelStyles.layerRowSelected,
             isDrop && blockEditorPanelStyles.layerRowDropTarget,
           ]}
-          onPress={() => {
+          onPress={(event: any) => {
+            const nativeEvent = event?.nativeEvent || event;
+            if ((nativeEvent?.ctrlKey || nativeEvent?.metaKey) && node?.sourceFilePath && onOpenFile) {
+              onOpenFile(node.sourceFilePath);
+              return;
+            }
             if (reparentMode) {
               setReparentTargetId(id);
             } else if (onSendCommand) {
@@ -561,7 +576,7 @@ export function useBlockEditorSidebarController({
             }
           }}
         >
-          <Text style={blockEditorPanelStyles.layerRowText} numberOfLines={1}>{title}</Text>
+          <Text style={blockEditorPanelStyles.layerRowText} numberOfLines={1}>{displayTitle}</Text>
           {reparentMode && (
             <Text style={blockEditorPanelStyles.reparentMark}>
               {reparentTargetId === id ? '✓' : ''}
@@ -607,7 +622,7 @@ export function useBlockEditorSidebarController({
           </View>
         )}
 
-        {Array.isArray(node.childIds) && node.childIds.length > 0 && (
+        {!node?.isIsolatedComponent && Array.isArray(node.childIds) && node.childIds.length > 0 && (
           <View style={{ marginTop: 6 }}>
             {node.childIds.map((cid: any) => renderTreeNode(cid, depth + 1))}
           </View>
@@ -620,6 +635,9 @@ export function useBlockEditorSidebarController({
     styles: blockEditorPanelStyles,
     canUndo,
     canRedo,
+    selectedBlockIds,
+    onExtractSelection,
+    onOpenFile,
     onUndo,
     onRedo,
     selectedBlock,

@@ -5,12 +5,15 @@ import { MRPAK_MSG, MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
  * @param {string} type - тип файла ('html', 'react', 'react-native')
  * @param {string} mode - режим работы ('preview' | 'edit')
  */
-export function generateBlockEditorScript(type: string, mode: string = 'preview') {
+export function generateBlockEditorScript(type: string, mode: string = 'preview', rootFileBasename: string = '') {
   const isEditMode = mode === 'edit';
   
   return `
       <style>
         [data-no-code-ui-id].mrpak-selected, [data-mrpak-id].mrpak-selected { outline: 2px solid #667eea !important; outline-offset: 2px; }
+        [data-no-code-ui-id].mrpak-multi-selected, [data-mrpak-id].mrpak-multi-selected { outline: 2px solid #22c55e !important; outline-offset: 2px; }
+        [data-mrpak-component-boundary="1"].mrpak-selected > * { outline: 2px solid #667eea !important; outline-offset: 2px; }
+        [data-mrpak-component-boundary="1"].mrpak-multi-selected > * { outline: 2px solid #22c55e !important; outline-offset: 2px; }
         .mrpak-box-overlay { position: fixed; z-index: 9998; pointer-events: none; box-sizing: border-box; }
         .mrpak-box-overlay.mrpak-margin { border: 1px dashed rgba(245, 158, 11, 0.95); background: rgba(245, 158, 11, 0.06); }
         .mrpak-box-overlay.mrpak-padding { border: 1px dashed rgba(34, 197, 94, 0.95); background: rgba(34, 197, 94, 0.05); }
@@ -57,8 +60,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           window.__MRPAK_BLOCK_EDITOR_ACTIVE_TOKEN__ = INSTANCE_TOKEN;
           const isActiveInstance = () => window.__MRPAK_BLOCK_EDITOR_ACTIVE_TOKEN__ === INSTANCE_TOKEN;
           try {
-            Array.from(document.querySelectorAll('.mrpak-selected')).forEach((el) => {
-              try { el.classList.remove('mrpak-selected'); } catch (e) {}
+            Array.from(document.querySelectorAll('.mrpak-selected, .mrpak-multi-selected')).forEach((el) => {
+              try {
+                el.classList.remove('mrpak-selected');
+                el.classList.remove('mrpak-multi-selected');
+              } catch (e) {}
             });
             Array.from(document.querySelectorAll('.mrpak-box-overlay, .mrpak-hint')).forEach((el) => {
               try { el.remove(); } catch (e) {}
@@ -69,6 +75,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const ATTR_NEW = 'data-no-code-ui-id';
           const ATTR_OLD = 'data-mrpak-id';
           const SEL_ALL = '[data-no-code-ui-id],[data-mrpak-id]';
+          const ROOT_FILE_BASENAME = ${JSON.stringify(String(rootFileBasename || ''))};
           const getId = (el) => {
             try {
               return (el && el.getAttribute && (el.getAttribute(ATTR_NEW) || el.getAttribute(ATTR_OLD))) || null;
@@ -103,6 +110,35 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               return [];
             }
           };
+          const getIdFileBasename = (id) => {
+            const m = String(id || '').match(/^mrpak:([^:]+):/);
+            return m ? m[1] : '';
+          };
+          const isImportedId = (id) => {
+            const base = getIdFileBasename(id);
+            return !!base && !!ROOT_FILE_BASENAME && base !== ROOT_FILE_BASENAME;
+          };
+          const getBoundaryBlock = (el) => {
+            const boundary = el && el.closest ? el.closest('[data-mrpak-component-boundary="1"]') : null;
+            if (boundary) return boundary;
+            const block = el && el.closest ? el.closest(SEL_ALL) : el;
+            if (!block) return null;
+            let current = block;
+            let currentId = getId(current);
+            if (!currentId || !isImportedId(currentId)) {
+              return current;
+            }
+            while (current && current.parentElement) {
+              const parent = current.parentElement.closest ? current.parentElement.closest(SEL_ALL) : null;
+              if (!parent) break;
+              const parentId = getId(parent);
+              if (!parentId) break;
+              if (getIdFileBasename(parentId) !== getIdFileBasename(currentId)) break;
+              current = parent;
+              currentId = parentId;
+            }
+            return current;
+          };
           const MSG_SELECT = '${MRPAK_MSG.SELECT}';
           const MSG_APPLY = '${MRPAK_MSG.APPLY}';
           const MSG_TREE = '${MRPAK_MSG.TREE}';
@@ -123,6 +159,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_END_DRAG = '${MRPAK_CMD.END_DRAG}';
           let selected = null;
           let selectedGroup = [];
+          let selectedIds = [];
           let lastSelectedId = null;
           let moveMode = 'absolute'; // absolute | relative | grid8
           let moveUnit = 'px'; // px | %
@@ -199,6 +236,57 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             el.style.height = Math.max(0, r.height) + 'px';
           };
 
+          const getElementVisualRect = (el) => {
+            if (!el || !el.getBoundingClientRect) return null;
+            try {
+              if (el.getAttribute && el.getAttribute('data-mrpak-component-boundary') === '1') {
+                const descendants = Array.from(el.querySelectorAll('*')).filter((node) => {
+                  if (!node || !node.getBoundingClientRect) return false;
+                  const rect = node.getBoundingClientRect();
+                  return rect.width > 0.5 && rect.height > 0.5;
+                });
+                if (descendants.length > 0) {
+                  let left = Infinity;
+                  let top = Infinity;
+                  let right = -Infinity;
+                  let bottom = -Infinity;
+                  descendants.forEach((node) => {
+                    const rect = node.getBoundingClientRect();
+                    left = Math.min(left, rect.left);
+                    top = Math.min(top, rect.top);
+                    right = Math.max(right, rect.right);
+                    bottom = Math.max(bottom, rect.bottom);
+                  });
+                  if (Number.isFinite(left) && Number.isFinite(top) && Number.isFinite(right) && Number.isFinite(bottom)) {
+                    return {
+                      left,
+                      top,
+                      right,
+                      bottom,
+                      width: Math.max(0, right - left),
+                      height: Math.max(0, bottom - top),
+                      x: left,
+                      y: top,
+                    };
+                  }
+                }
+              }
+              const rect = el.getBoundingClientRect();
+              return {
+                left: rect.left,
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+                width: rect.width,
+                height: rect.height,
+                x: rect.x,
+                y: rect.y,
+              };
+            } catch (e) {
+              return null;
+            }
+          };
+
           const updateBoxOverlay = () => {
             if (!isActiveInstance()) return;
             try {
@@ -209,7 +297,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 setRect(overlay.parent, null);
                 return;
               }
-              const rect = selected.getBoundingClientRect();
+              const rect = getElementVisualRect(selected);
+              if (!rect) {
+                setRect(overlay.margin, null);
+                setRect(overlay.padding, null);
+                setRect(overlay.parent, null);
+                return;
+              }
               const cs = window.getComputedStyle(selected);
               const mt = toNum(cs.marginTop);
               const mr = toNum(cs.marginRight);
@@ -397,7 +491,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (!isActiveInstance()) return;
             const nodes = {};
             const rootIds = [];
-            const all = Array.from(document.querySelectorAll(SEL_ALL));
+            const all = Array.from(document.querySelectorAll(SEL_ALL))
+              .map((el) => getBoundaryBlock(el))
+              .filter(Boolean)
+              .filter((el, index, arr) => arr.indexOf(el) === index);
             
             // Сначала создаем все узлы
             for (const el of all) {
@@ -409,14 +506,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               let current = el.parentElement;
               while (current && current !== document.body && current !== document.documentElement) {
                 if (current.hasAttribute && (current.hasAttribute(ATTR_NEW) || current.hasAttribute(ATTR_OLD))) {
-                  parentEl = current;
+                  parentEl = getBoundaryBlock(current);
                   break;
                 }
                 current = current.parentElement;
               }
               
               const parentId = parentEl ? getId(parentEl) : null;
-              nodes[id] = { id, tagName: el.tagName, parentId, childIds: [] };
+              nodes[id] = {
+                id,
+                tagName: el.getAttribute('data-mrpak-component-name') || el.tagName,
+                parentId,
+                childIds: [],
+                isIsolatedComponent: el.getAttribute('data-mrpak-component-boundary') === '1' || isImportedId(id),
+                componentName: el.getAttribute('data-mrpak-component-name') || null,
+                sourcePath: el.getAttribute('data-mrpak-source') || null,
+              };
             }
             
             // Определяем детей и корневые элементы
@@ -441,7 +546,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 let current = parentEl;
                 while (current && current !== document.body && current !== document.documentElement) {
                   if (current.hasAttribute && (current.hasAttribute(ATTR_NEW) || current.hasAttribute(ATTR_OLD))) {
-                    parentWithId = current;
+                    parentWithId = getBoundaryBlock(current);
                     break;
                   }
                   current = current.parentElement;
@@ -452,7 +557,9 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   if (pid && nodes[pid]) {
                     // Получаем прямых детей с id-атрибутом в порядке DOM
                     const directChildren = Array.from(parentWithId.children)
+                      .map(child => getBoundaryBlock(child))
                       .filter(child => child && child.hasAttribute && (child.hasAttribute(ATTR_NEW) || child.hasAttribute(ATTR_OLD)))
+                      .filter((child, index, arr) => arr.indexOf(child) === index)
                       .map(child => ensureId(child))
                       .filter(Boolean);
                     nodes[pid].childIds = directChildren;
@@ -470,27 +577,68 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           function clearSelected() {
             if (!isActiveInstance()) return;
             try {
-              const allSelected = Array.from(document.querySelectorAll('.mrpak-selected'));
+              const allSelected = Array.from(document.querySelectorAll('.mrpak-selected, .mrpak-multi-selected'));
               allSelected.forEach((el) => {
-                try { el.classList.remove('mrpak-selected'); } catch(e) {}
+                try {
+                  el.classList.remove('mrpak-selected');
+                  el.classList.remove('mrpak-multi-selected');
+                } catch(e) {}
               });
             } catch(e) {}
             selected = null;
             selectedGroup = [];
+            selectedIds = [];
             updateBoxOverlay();
+          }
+
+          function applySelectionClasses() {
+            try {
+              const allSelected = Array.from(document.querySelectorAll('.mrpak-selected, .mrpak-multi-selected'));
+              allSelected.forEach((el) => {
+                try {
+                  el.classList.remove('mrpak-selected');
+                  el.classList.remove('mrpak-multi-selected');
+                } catch(e) {}
+              });
+              selectedIds.forEach((sid, idx) => {
+                const group = getElementsById(sid);
+                group.forEach((node) => {
+                  try {
+                    node.classList.add(idx === 0 ? 'mrpak-selected' : 'mrpak-multi-selected');
+                  } catch(e) {}
+                });
+              });
+            } catch (e) {}
+          }
+
+          function emitSelection() {
+            if (!selected) return;
+            const id = selectedIds[0] || ensureId(selected);
+            const rect = getElementVisualRect(selected);
+            post(MSG_SELECT, {
+              id,
+              ids: selectedIds.slice(),
+              meta: {
+                tagName: selected.tagName,
+                instances: selectedGroup.length,
+                selectedCount: selectedIds.length,
+                rect: rect ? { x: rect.x, y: rect.y, w: rect.width, h: rect.height } : null,
+              },
+            });
           }
 
           function selectEl(el) {
             if (!isActiveInstance()) return;
             if (!el) return;
             clearSelected();
+            el = getBoundaryBlock(el);
             const id = ensureId(el);
             selectedGroup = id ? getElementsById(id) : [];
             selected = selectedGroup[0] || el;
-            try { selectedGroup.forEach((node) => node.classList.add('mrpak-selected')); } catch(e) {}
+            selectedIds = id ? [id] : [];
+            applySelectionClasses();
             lastSelectedId = id;
-            const rect = selected.getBoundingClientRect();
-            post(MSG_SELECT, { id, meta: { tagName: selected.tagName, instances: selectedGroup.length, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } } });
+            emitSelection();
             updateBoxOverlay();
             buildTree();
             // отправляем снапшот inline style, чтобы UI мог показать базовые стили
@@ -517,6 +665,43 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const txt = selected.innerText || '';
               post(MSG_TEXT_SNAPSHOT, { id, text: txt });
             } catch(e) {}
+          }
+
+          function getLogicalParentIdForElement(el) {
+            const p = getLogicalParentBlock(el);
+            return p ? ensureId(p) : null;
+          }
+
+          function toggleSiblingSelection(el) {
+            if (!el) return;
+            const id = ensureId(el);
+            if (!id) return;
+            if (!selected || selectedIds.length === 0) {
+              selectEl(el);
+              return;
+            }
+
+            const anchorEl = getElementsById(selectedIds[0])[0] || selected;
+            const anchorParentId = getLogicalParentIdForElement(anchorEl);
+            const candidateParentId = getLogicalParentIdForElement(el);
+            if (anchorParentId !== candidateParentId) {
+              return;
+            }
+            if (id === selectedIds[0]) {
+              return;
+            }
+
+            const existingIdx = selectedIds.indexOf(id);
+            if (existingIdx >= 0) {
+              selectedIds = selectedIds.filter((sid) => sid !== id);
+            } else {
+              selectedIds = [...selectedIds, id];
+            }
+            selectedGroup = selectedIds[0] ? getElementsById(selectedIds[0]) : [];
+            selected = selectedGroup[0] || anchorEl;
+            applySelectionClasses();
+            emitSelection();
+            updateBoxOverlay();
           }
 
           // В режиме редактора делаем контент "неинтерактивным":
@@ -750,6 +935,17 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               } catch (e) {}
               return;
             }
+            if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) {
+              const multiEl = ev.target && ev.target.closest ? getBoundaryBlock(ev.target.closest(SEL_ALL)) : null;
+              if (!multiEl) return;
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              toggleSiblingSelection(multiEl);
+              return;
+            }
             
             const t = ev.target;
             // Если это интерактивный элемент, обрабатываем его
@@ -760,19 +956,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 ev.stopImmediatePropagation();
                 // Если у интерактивного элемента есть id-атрибут, выбираем его напрямую
                 if (t.hasAttribute && (t.hasAttribute(ATTR_NEW) || t.hasAttribute(ATTR_OLD))) {
-                  selectEl(t);
+                  selectEl(getBoundaryBlock(t));
                   return;
                 }
                 // Иначе выбираем родительский блок
                 const block = t.closest(SEL_ALL);
                 if (block && block !== t) {
-                  selectEl(block);
+                  selectEl(getBoundaryBlock(block));
                   return;
                 }
               } catch(e) {}
             }
             // Если это не интерактивный элемент, обрабатываем как обычный клик для выбора блока
-            const el = ev.target && ev.target.closest ? ev.target.closest(SEL_ALL) : null;
+            const el = ev.target && ev.target.closest ? getBoundaryBlock(ev.target.closest(SEL_ALL)) : null;
             if (!el) return;
             try {
               ev.preventDefault();
@@ -843,18 +1039,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 let targetEl = t;
                 let targetId = null;
                 if (t.hasAttribute && (t.hasAttribute(ATTR_NEW) || t.hasAttribute(ATTR_OLD))) {
-                  targetId = getId(t);
+                    targetEl = getBoundaryBlock(t);
+                    targetId = getId(targetEl);
                 } else {
                   // Иначе ищем родительский блок
                   const block = t.closest(SEL_ALL);
                   if (block && block !== t) {
-                    targetEl = block;
-                    targetId = getId(block);
+                    targetEl = getBoundaryBlock(block);
+                    targetId = getId(targetEl);
                   }
                 }
                 
                 if (targetId) {
                   selectEl(targetEl);
+                  if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) {
+                    return;
+                  }
                   // Если это Shift/Ctrl/Alt + клик, обрабатываем как drag
                   if (ev.ctrlKey || ev.metaKey) {
                     dragging = { sourceId: targetId, mode: 'reparent' };
@@ -876,8 +1076,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               } catch(e) {}
             }
             
-            const el = ev.target && ev.target.closest ? ev.target.closest(SEL_ALL) : null;
+            const el = ev.target && ev.target.closest ? getBoundaryBlock(ev.target.closest(SEL_ALL)) : null;
             if (!el) return;
+            if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) {
+              return;
+            }
             
             // Ctrl/Cmd + drag => reparent drag
             if (ev.ctrlKey || ev.metaKey) {
@@ -1200,7 +1403,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           try {
             const hint = document.createElement('div');
             hint.className = 'mrpak-hint';
-            hint.textContent = 'MRPAK Editor: клик = выбрать, Shift+Drag = переместить, Alt+Drag = изменить размер. Синяя рамка = границы родителя';
+            hint.textContent = 'MRPAK Editor: клик = выбрать, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize.';
             document.body.appendChild(hint);
           } catch(e) {}
 
@@ -1320,7 +1523,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               if (data.type === CMD_DELETE && data.id) {
                 const elements = getElementsById(String(data.id));
                 if (elements.length) {
-                  if (elements.some((node) => selectedGroup.includes(node))) clearSelected();
+                  if (selectedIds.includes(String(data.id)) || elements.some((node) => selectedGroup.includes(node))) clearSelected();
                   elements.forEach((node) => node.remove());
                   buildTree();
                 }
@@ -1418,9 +1621,9 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
  * @param {string} type - тип файла ('html', 'react', 'react-native')
  * @param {string} mode - режим работы ('preview' | 'edit')
  */
-export function injectBlockEditorScript(html: string, type: string, mode: string = 'preview') {
+export function injectBlockEditorScript(html: string, type: string, mode: string = 'preview', rootFileBasename: string = '') {
   const source = String(html ?? '');
-  const script = generateBlockEditorScript(type, mode);
+  const script = generateBlockEditorScript(type, mode, rootFileBasename);
 
   if (source.includes('</body>')) {
     return source.replace('</body>', script + '\n</body>');

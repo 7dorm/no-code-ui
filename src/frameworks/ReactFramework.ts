@@ -14,7 +14,7 @@ import {
   applyExternalStylePatch, 
   replaceStyleReferenceInJsx 
 } from '../blockEditor/PatchEngine';
-import { extractImports, detectComponents, normalizeReactModuleCode } from '../features/file-renderer/lib/react-processor';
+import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages } from '../features/file-renderer/lib/react-processor';
 import { readFile, writeFile } from '../shared/api/electron-api';
 import { resolvePath, resolvePathSync } from '../features/file-renderer/lib/path-resolver';
 import { injectBlockEditorScript } from '../features/file-renderer/lib/block-editor-script';
@@ -37,6 +37,29 @@ function parseRuntimeNamedImports(importSpec: string): Array<{ orig: string; ali
     })
     .filter((entry) => entry.orig && entry.alias);
 }
+
+const IMPORTED_COMPONENT_BOUNDARY_HELPER = `
+function MrpakImportedBoundary({
+  __mrpakComponent: Component,
+  __mrpakName,
+  __mrpakSource,
+  __mrpakId,
+  children,
+  ...rest
+}) {
+  return React.createElement(
+    'div',
+    {
+      'data-no-code-ui-id': __mrpakId,
+      'data-mrpak-component-boundary': '1',
+      'data-mrpak-component-name': __mrpakName,
+      'data-mrpak-source': __mrpakSource,
+      style: { display: 'contents' },
+    },
+    React.createElement(Component, rest, children)
+  );
+}
+`;
 
 /**
  * Реализация Framework для React файлов
@@ -514,6 +537,12 @@ export class ReactFramework extends Framework {
       // Удаляем импорты react-native (они будут доступны глобально)
       .replace(/import\s*\{[^}]*\}\s*from\s+['"]react-native['"];?\s*/gi, '')
       .trim();
+
+    const wrappedMainModule = wrapImportedComponentUsages(processedCode);
+    processedCode = wrappedMainModule.code;
+    if (wrappedMainModule.wrappedCount > 0) {
+      processedCode = `${IMPORTED_COMPONENT_BOUNDARY_HELPER}\n${processedCode}`;
+    }
     
     console.log('[ProcessReactCode] Initial processedCode length:', processedCode.length);
     console.log('[ProcessReactCode] Initial processedCode first 500 chars:', processedCode.substring(0, 500));
@@ -649,7 +678,8 @@ export class ReactFramework extends Framework {
       });
       
       // Обрабатываем экспорты через AST, чтобы корректно поддерживать TS/TSX и anonymous default export
-      const normalizedDependency = normalizeReactModuleCode(content);
+      const instrumentedDependency = this.instrument(String(content ?? ''), currentDepActualPath);
+      const normalizedDependency = normalizeReactModuleCode(instrumentedDependency.code);
       let processedDep = normalizedDependency.code;
       
       normalizedDependency.namedExports.forEach(({ localName, exportedName }) => {
@@ -1791,7 +1821,8 @@ export class ReactFramework extends Framework {
     `;
     
     // Инжектируем скрипт блочного редактора
-    const htmlWithEditor = injectBlockEditorScript(html, 'react', viewMode === 'edit' ? 'edit' : 'preview');
+    const rootBasename = String(filePath || '').replace(/\\/g, '/').split('/').pop() || '';
+    const htmlWithEditor = injectBlockEditorScript(html, 'react', viewMode === 'edit' ? 'edit' : 'preview', rootBasename);
     
     return {
       html: htmlWithEditor,

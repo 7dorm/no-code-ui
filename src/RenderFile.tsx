@@ -15,10 +15,11 @@ import { parse } from '@babel/parser';
 import { AstBidirectionalManager } from './blockEditor/AstBidirectional';
 import { injectBlockEditorScript } from './features/file-renderer/lib/block-editor-script';
 import { findProjectRoot, resolvePath, resolvePathSync } from './features/file-renderer/lib/path-resolver';
-import { extractImports, detectComponents } from './features/file-renderer/lib/react-processor';
+import { extractImports, detectComponents, wrapImportedComponentUsages } from './features/file-renderer/lib/react-processor';
 import { createFramework, isFrameworkSupported } from './frameworks/FrameworkFactory';
 import { BlockEditorSidebar } from './shared/ui/BlockEditorSidebar';
 import { parseStyleText } from './blockEditor/styleUtils';
+import { extractJsxToComponent } from './blockEditor/extractJsxToComponent';
 
 type StylePatch = Record<string, any>;
 
@@ -119,6 +120,123 @@ type LivePosition = {
   height: number | null;
 };
 
+function getPathBasename(filePath: string | null | undefined): string {
+  return String(filePath || '').replace(/\\/g, '/').split('/').pop() || '';
+}
+
+function getMrpakIdBasename(id: string | null | undefined): string {
+  const match = String(id || '').match(/^mrpak:([^:]+):/);
+  return match ? match[1] : '';
+}
+
+function stripKnownScriptExtension(filePath: string | null | undefined): string {
+  return String(filePath || '').replace(/\.(js|jsx|ts|tsx)$/i, '');
+}
+
+function resolveSourceFilePathFromDependencies(
+  currentFilePath: string,
+  sourcePath: string | null | undefined,
+  dependencyPaths: string[]
+): string | null {
+  const raw = String(sourcePath || '').trim();
+  if (!raw) return null;
+
+  const resolved = resolvePathSync(currentFilePath, raw);
+  const resolvedNoExt = stripKnownScriptExtension(resolved);
+  const candidates = dependencyPaths.filter(Boolean);
+
+  const exactMatch = candidates.find((candidate) => {
+    const normalized = String(candidate || '').replace(/\\/g, '/');
+    return normalized === resolved || stripKnownScriptExtension(normalized) === resolvedNoExt;
+  });
+  if (exactMatch) return exactMatch;
+
+  const fileName = getPathBasename(resolvedNoExt);
+  const suffixMatch = candidates.find((candidate) => {
+    const normalized = stripKnownScriptExtension(String(candidate || '').replace(/\\/g, '/'));
+    return normalized.endsWith(`/${resolvedNoExt}`) || normalized.endsWith(`/${fileName}`);
+  });
+  if (suffixMatch) return suffixMatch;
+
+  return resolved || null;
+}
+
+function enrichLayersTree(
+  tree: LayersTree,
+  filePath: string,
+  dependencyPaths: string[]
+): LayersTree {
+  const rootBasename = getPathBasename(filePath);
+  const dependencyByBasename = new Map<string, string[]>();
+  dependencyPaths.forEach((depPath) => {
+    const basename = getPathBasename(depPath);
+    if (!basename) return;
+    const list = dependencyByBasename.get(basename) || [];
+    list.push(depPath);
+    dependencyByBasename.set(basename, list);
+  });
+
+  const nextNodes: Record<string, any> = {};
+  Object.entries(tree?.nodes || {}).forEach(([id, node]) => {
+    const sourceBasename = getMrpakIdBasename(id);
+    const sourceCandidates = dependencyByBasename.get(sourceBasename) || [];
+    const explicitSourcePath = typeof node?.sourcePath === 'string' ? node.sourcePath : null;
+    const resolvedExplicitSourcePath = resolveSourceFilePathFromDependencies(
+      filePath,
+      explicitSourcePath,
+      dependencyPaths
+    );
+    const explicitSourceBasename = getPathBasename(resolvedExplicitSourcePath);
+    const explicitSourceCandidates = explicitSourceBasename
+      ? dependencyByBasename.get(explicitSourceBasename) || []
+      : [];
+    const sourceFilePath =
+      resolvedExplicitSourcePath && explicitSourceCandidates.length > 0
+        ? explicitSourceCandidates[0]
+        : resolvedExplicitSourcePath && explicitSourceBasename
+        ? resolvedExplicitSourcePath
+        : sourceBasename && sourceBasename !== rootBasename
+        ? sourceCandidates[0] || null
+        : filePath;
+    nextNodes[id] = {
+      ...node,
+      sourceBasename,
+      sourceFilePath,
+      componentName: node?.componentName || null,
+      isIsolatedComponent:
+        Boolean(node?.isIsolatedComponent) || Boolean(sourceBasename && sourceBasename !== rootBasename),
+    };
+  });
+
+  return {
+    ...tree,
+    nodes: nextNodes,
+  };
+}
+
+const IMPORTED_COMPONENT_BOUNDARY_HELPER = `
+function MrpakImportedBoundary({
+  __mrpakComponent: Component,
+  __mrpakName,
+  __mrpakSource,
+  __mrpakId,
+  children,
+  ...rest
+}) {
+  return React.createElement(
+    'div',
+    {
+      'data-no-code-ui-id': __mrpakId,
+      'data-mrpak-component-boundary': '1',
+      'data-mrpak-component-name': __mrpakName,
+      'data-mrpak-source': __mrpakSource,
+      style: { display: 'contents' },
+    },
+    React.createElement(Component, rest, children)
+  );
+}
+`;
+
 function RenderFile({
   filePath,
   projectPath,
@@ -127,6 +245,8 @@ function RenderFile({
   showSplitSidebar,
   showSplitPreview,
   showSplitCode,
+  onProjectFilesChanged,
+  onOpenFile,
 }: {
   filePath: string;
   projectPath: string | null;
@@ -135,6 +255,8 @@ function RenderFile({
   showSplitSidebar: boolean;
   showSplitPreview: boolean;
   showSplitCode: boolean;
+  onProjectFilesChanged?: () => void;
+  onOpenFile?: (path: string) => void;
 }) {
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
@@ -191,6 +313,7 @@ function RenderFile({
   // blockMap для исходного файла (для записи патчей в исходный код, без зависимости от обработанного превью)
   const [blockMapForFile, setBlockMapForFile] = useState<BlockMap>({});
   const [selectedBlock, setSelectedBlock] = useState<{ id: string; meta?: any } | null>(null); // { id, meta? }
+  const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([]);
   const [changesLog, setChangesLog] = useState<Array<{ ts: number; filePath: string; blockId: any; patch: any }>>([]); // [{ ts, filePath, blockId, patch }]
   const [editorHTML, setEditorHTML] = useState<string>('');
   const [stagedPatches, setStagedPatches] = useState<Record<string, StylePatch>>({}); // { [blockId]: patchObject }
@@ -1249,6 +1372,15 @@ function RenderFile({
       //console.log("HERREEEE: ", data.type)
 
       if (data.type === MRPAK_MSG.SELECT) {
+        const ids = Array.isArray(data.ids)
+          ? Array.from(new Set(data.ids.map((id: any) => String(id || '').trim()).filter(Boolean)))
+          : (data.id ? [String(data.id)] : []);
+        setSelectedBlockIds((prev) => {
+          if (prev.length === ids.length && prev.every((id, idx) => id === ids[idx])) {
+            return prev;
+          }
+          return ids;
+        });
         setSelectedBlock((prev) => {
           if (prev?.id === data.id) return prev;
           return { id: data.id, meta: data.meta };
@@ -1260,13 +1392,14 @@ function RenderFile({
 
       if (data.type === MRPAK_MSG.TREE) {
         if (data.tree) {
+          const nextTree = enrichLayersTree(data.tree, filePath, dependencyPaths);
           setLayersTree((prev) => {
             try {
-              if (prev && JSON.stringify(prev) === JSON.stringify(data.tree)) {
+              if (prev && JSON.stringify(prev) === JSON.stringify(nextTree)) {
                 return prev;
               }
             } catch {}
-            return data.tree;
+            return nextTree;
           });
         }
         return;
@@ -1384,7 +1517,7 @@ function RenderFile({
         return;
       }
     },
-    [applyBlockPatch, fileType, projectRoot, selectedBlock?.id]
+    [applyBlockPatch, dependencyPaths, filePath, fileType, projectRoot, selectedBlock?.id]
   );
 
   const handleEditorMessageRef = useRef(handleEditorMessage);
@@ -1998,6 +2131,116 @@ function RenderFile({
   );
 
   // Функция сохранения файла
+  const extractSelectedToComponent = useCallback(async () => {
+    try {
+      if (!filePath || !fileContent) return;
+      if (fileType !== 'react' && fileType !== 'react-native') {
+        setError('Вынос в компонент поддерживается только для React/React Native файлов.');
+        return;
+      }
+
+      const ids = selectedBlockIds.length > 0
+        ? selectedBlockIds
+        : (selectedBlock?.id ? [selectedBlock.id] : []);
+      if (ids.length === 0) {
+        setError('Сначала выберите блок(и) на холсте.');
+        return;
+      }
+
+      const hasMapEntry = (id: string) => {
+        const entry = blockMapForFile?.[id];
+        return !!(entry && Number.isFinite(entry.start) && Number.isFinite(entry.end));
+      };
+
+      const resolveToExtractableId = (rawId: string) => {
+        let current = String(rawId || '').trim();
+        if (!current) return null;
+        if (hasMapEntry(current)) return current;
+        const visited = new Set<string>();
+        while (current && !visited.has(current)) {
+          visited.add(current);
+          const parentId = layersTree?.nodes?.[current]?.parentId || null;
+          if (!parentId) break;
+          current = String(parentId);
+          if (hasMapEntry(current)) return current;
+        }
+        return null;
+      };
+
+      const resolvedIds = Array.from(
+        new Set(
+          ids
+            .map((id) => resolveToExtractableId(String(id)))
+            .filter((id): id is string => !!id)
+        )
+      );
+      if (resolvedIds.length === 0) {
+        setError('Выбраны runtime-элементы без соответствия в исходном коде. Выберите родительский блок с data-id и повторите.');
+        return;
+      }
+
+      const normalizedFilePath = String(filePath).replace(/\\/g, '/');
+      const slashIdx = normalizedFilePath.lastIndexOf('/');
+      const dirPath = slashIdx >= 0 ? normalizedFilePath.slice(0, slashIdx) : '';
+      const extMatch = normalizedFilePath.match(/(\.[^.\/\\]+)$/);
+      const ext = extMatch ? extMatch[1] : '.tsx';
+
+      let componentName = 'ExtractedBlock';
+      let candidatePath = dirPath ? `${dirPath}/${componentName}${ext}` : `${componentName}${ext}`;
+      for (let i = 1; i <= 99; i += 1) {
+        const readRes = await readFile(candidatePath);
+        if (!readRes?.success) {
+          if (i > 1) {
+            componentName = `ExtractedBlock${i}`;
+            candidatePath = dirPath ? `${dirPath}/${componentName}${ext}` : `${componentName}${ext}`;
+          }
+          break;
+        }
+        componentName = `ExtractedBlock${i + 1}`;
+        candidatePath = dirPath ? `${dirPath}/${componentName}${ext}` : `${componentName}${ext}`;
+      }
+
+      const extractResult = extractJsxToComponent({
+        code: fileContent,
+        filePath,
+        selectedIds: resolvedIds,
+        componentName,
+        fileType,
+        blockMap: blockMapForFile,
+      });
+
+      if (!extractResult.ok) {
+        setError(`Ошибка выноса блока: ${extractResult.error}`);
+        return;
+      }
+
+      const writeComponentRes = await writeFile(candidatePath, extractResult.newComponentCode, { backup: true });
+      if (!writeComponentRes?.success) {
+        setError(`Не удалось создать файл компонента: ${candidatePath}`);
+        return;
+      }
+
+      const writeMainRes = await writeFile(filePath, extractResult.newMainCode, { backup: true });
+      if (!writeMainRes?.success) {
+        setError('Не удалось обновить исходный файл после выноса.');
+        return;
+      }
+
+      onProjectFilesChanged?.();
+
+      setFileContent(extractResult.newMainCode);
+      setUnsavedContent(null);
+      setIsModified(false);
+      updateMonacoEditorWithScroll(extractResult.newMainCode);
+      setRenderVersion((v) => v + 1);
+      setSelectedBlockIds([]);
+      setSelectedBlock(null);
+      setLivePosition({ left: null, top: null, width: null, height: null });
+    } catch (e: any) {
+      setError(`Ошибка выноса блока: ${e?.message || e}`);
+    }
+  }, [filePath, fileContent, fileType, selectedBlockIds, selectedBlock?.id, blockMapForFile, layersTree, updateMonacoEditorWithScroll, onProjectFilesChanged]);
+
   const saveFile = useCallback(async (contentToSave: string | null = null) => {
     if (!filePath) {
       console.warn('💾 saveFile: Нет пути к файлу');
@@ -2336,6 +2579,8 @@ function RenderFile({
     setLoading(true);
     setError(null);
     setFileContent(null);
+    setSelectedBlock(null);
+    setSelectedBlockIds([]);
     setUnsavedContent(null);
     setIsModified(false);
 
@@ -3009,7 +3254,7 @@ function RenderFile({
         const inst = instrumentHtml(base, filePath);
         setBlockMap(inst.map || {});
         setBlockMapForFile(inst.map || {});
-        const nextHtml = injectBlockEditorScript(inst.html, 'html', 'edit');
+        const nextHtml = injectBlockEditorScript(inst.html, 'html', 'edit', getPathBasename(filePath));
         setEditorHTML((prev) => (prev === nextHtml ? prev : nextHtml));
         return;
       }
@@ -3017,7 +3262,7 @@ function RenderFile({
       if (fileType === 'react' && reactHTML) {
         // Для React файлов blockMap уже установлен при генерации reactHTML через createReactHTML
         // Используем готовый blockMap, который содержит правильные позиции для обработанного кода
-        const nextHtml = injectBlockEditorScript(reactHTML, 'react', 'edit');
+        const nextHtml = injectBlockEditorScript(reactHTML, 'react', 'edit', getPathBasename(filePath));
         setEditorHTML((prev) => (prev === nextHtml ? prev : nextHtml));
         return;
       }
@@ -3025,7 +3270,7 @@ function RenderFile({
       if (fileType === 'react-native' && reactNativeHTML) {
         // Для React Native файлов blockMap уже установлен при генерации reactNativeHTML через createReactNativeHTML
         // Используем готовый blockMap, который содержит правильные позиции для обработанного кода
-        const nextHtml = injectBlockEditorScript(reactNativeHTML, 'react-native', 'edit');
+        const nextHtml = injectBlockEditorScript(reactNativeHTML, 'react-native', 'edit', getPathBasename(filePath));
         setEditorHTML((prev) => (prev === nextHtml ? prev : nextHtml));
         return;
       }
@@ -3479,6 +3724,12 @@ function RenderFile({
       .replace(/export\s+default\s+/g, '')
       .trim();
 
+    const wrappedMainModule = wrapImportedComponentUsages(processedCode);
+    processedCode = wrappedMainModule.code;
+    if (wrappedMainModule.wrappedCount > 0) {
+      processedCode = `${IMPORTED_COMPONENT_BOUNDARY_HELPER}\n${processedCode}`;
+    }
+
     // Создаем код для модулей зависимостей
     let modulesCode = '';
     let collectedCss = '';
@@ -3656,7 +3907,8 @@ function RenderFile({
       });
 
       // Обрабатываем экспорты
-      let processedDep: string = String(content ?? '');
+      const instrumentedDependency = instrumentJsx(String(content ?? ''), currentDepActualPath);
+      let processedDep: string = String(instrumentedDependency.code ?? '');
 
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:605',message:'Processing dependency before removing imports',data:{importPath,contentLength:processedDep.length,hasImports:processedDep.includes('import'),hasExports:processedDep.includes('export')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
@@ -5423,6 +5675,9 @@ function RenderFile({
     canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
     livePosition,
+    selectedBlockIds,
+    onExtractSelection: extractSelectedToComponent,
+    onOpenFile,
   });
 
   const renderContentMetaOverlay = useCallback((label: string, componentName?: string | null) => (

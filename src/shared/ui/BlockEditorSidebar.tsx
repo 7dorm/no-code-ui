@@ -20,6 +20,8 @@ export function BlockEditorSidebar(props) {
     canRedo,
     onUndo,
     onRedo,
+    selectedBlockIds,
+    onExtractSelection,
     selectedBlock,
     layersTree,
     renderTreeNode,
@@ -183,6 +185,22 @@ export function BlockEditorSidebar(props) {
         <Text style={styles.sidebarMeta}>
           {selectedBlock?.id ? selectedBlock.id : 'Ничего не выбрано'}
         </Text>
+
+        <Text style={styles.hint}>
+          Выбрано: {Array.isArray(selectedBlockIds) && selectedBlockIds.length > 0 ? selectedBlockIds.length : (selectedBlock?.id ? 1 : 0)}. Мультивыбор sibling: Ctrl+Shift+Click.
+        </Text>
+        <View style={styles.stylesActionsRow}>
+          <TouchableOpacity
+            style={[
+              styles.layerSaveBtn,
+              (!selectedBlock?.id && (!Array.isArray(selectedBlockIds) || selectedBlockIds.length === 0)) && styles.layerOpBtnDisabled,
+            ]}
+            disabled={!selectedBlock?.id && (!Array.isArray(selectedBlockIds) || selectedBlockIds.length === 0)}
+            onPress={() => onExtractSelection?.()}
+          >
+            <Text style={styles.layerSaveBtnText}>Extract to file</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Слои</Text>
