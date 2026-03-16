@@ -66,6 +66,7 @@ export function BlockEditorSidebar(props) {
     handleMoveModeChange,
     moveUnit,
     handleMoveUnitChange,
+    onSendCommand,
     styleMode,
     setStyleMode,
     styleRows,
@@ -108,6 +109,35 @@ export function BlockEditorSidebar(props) {
     onSetText({ blockId: selectedBlock.id, text: textValue });
   };
 
+  const [sidebarTab, setSidebarTab] = React.useState<'inspector' | 'library'>('inspector');
+  const [libraryDragTag, setLibraryDragTag] = React.useState<string | null>(null);
+  const blockLibraryItems =
+    fileType === 'react-native'
+      ? ['View', 'Text', 'TouchableOpacity', 'Image', 'ScrollView']
+      : ['div', 'span', 'button', 'section', 'img'];
+
+  const startLibraryDrag = (tag: string) => {
+    if (!onSendCommand) return;
+    setLibraryDragTag(tag);
+    onSendCommand({ type: 'MRPAK_CMD_START_DRAG', source: 'library', tag });
+  };
+
+  React.useEffect(() => {
+    if (!libraryDragTag || !onSendCommand || typeof window === 'undefined') return;
+    const finish = () => {
+      onSendCommand({ type: 'MRPAK_CMD_END_DRAG', source: 'library', tag: libraryDragTag });
+      setLibraryDragTag(null);
+    };
+    window.addEventListener('mouseup', finish, true);
+    window.addEventListener('touchend', finish, true);
+    window.addEventListener('blur', finish, true);
+    return () => {
+      window.removeEventListener('mouseup', finish, true);
+      window.removeEventListener('touchend', finish, true);
+      window.removeEventListener('blur', finish, true);
+    };
+  }, [libraryDragTag, onSendCommand]);
+
   return (
     <View style={styles.sidebar}>
       <ScrollView
@@ -132,6 +162,23 @@ export function BlockEditorSidebar(props) {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.stylesTabs}>
+          <TouchableOpacity
+            style={[styles.stylesTab, sidebarTab === 'inspector' && styles.stylesTabActive]}
+            onPress={() => setSidebarTab('inspector')}
+          >
+            <Text style={styles.stylesTabText}>Inspector</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.stylesTab, sidebarTab === 'library' && styles.stylesTabActive]}
+            onPress={() => setSidebarTab('library')}
+          >
+            <Text style={styles.stylesTabText}>Library</Text>
+          </TouchableOpacity>
+        </View>
+
+        {sidebarTab === 'inspector' ? (
+          <>
         <Text style={styles.sidebarTitle}>Блок</Text>
         <Text style={styles.sidebarMeta}>
           {selectedBlock?.id ? selectedBlock.id : 'Ничего не выбрано'}
@@ -565,6 +612,28 @@ export function BlockEditorSidebar(props) {
         <Text style={styles.hint}>
           Подсказка: кликните по элементу в превью, чтобы выбрать блок.
         </Text>
+          </>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Block Library</Text>
+            <Text style={styles.hint}>Каталог блоков (заглушка, функционал добавим далее).</Text>
+            {blockLibraryItems.map((item) => (
+              <View key={`library-${item}`} style={{ marginBottom: '8px', opacity: 0.75 }}>
+                <TouchableOpacity
+                  style={styles.layerOpBtn}
+                  onPressIn={() => startLibraryDrag(item)}
+                >
+                  <Text style={styles.layerOpBtnText}>+ {item}</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            {libraryDragTag ? (
+              <Text style={styles.hint}>Перетащите на холст. Колесико: смена target-родителя.</Text>
+            ) : (
+              <Text style={styles.hint}>Зажмите элемент и наведите на холст для вставки в child.</Text>
+            )}
+          </View>
+        )}
       </ScrollView>
     </View>
   );

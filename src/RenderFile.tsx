@@ -247,6 +247,8 @@ function RenderFile({
 
   // Ref для stageReparentBlock (используется в handleEditorMessage до определения функции)
   const stageReparentBlockRef = useRef<((params: { sourceId: string; targetParentId: string }) => void) | null>(null);
+  // Ref для stageInsertBlock (используется в handleEditorMessage до определения функции)
+  const stageInsertBlockRef = useRef<((params: { targetId: string; mode: 'child' | 'sibling'; snippet: string }) => void) | null>(null);
 
   // getFileType и getMonacoLanguage импортированы из shared/lib/file-type-detector.js
 
@@ -1323,6 +1325,23 @@ function RenderFile({
           return;
         }
 
+        if (patch.__insertFromLibrary && !isIntermediate) {
+          const rawTag = String(patch.__insertFromLibrary?.tag || '').trim();
+          const normalizedTag = /^[A-Za-z][A-Za-z0-9_-]*$/.test(rawTag) ? rawTag : '';
+          let tag = normalizedTag;
+          if (!tag) {
+            tag = fileType === 'react-native' ? 'View' : 'div';
+          }
+          const snippet =
+            fileType === 'react-native'
+              ? `<${tag}></${tag}>`
+              : `<${tag}></${tag}>`;
+          if (stageInsertBlockRef.current) {
+            await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet });
+          }
+          return;
+        }
+
         // Обновляем livePosition для отображения в реальном времени (только для промежуточных изменений)
         if (isIntermediate && selectedBlock?.id === id) {
           setLivePosition((prev) => {
@@ -1365,7 +1384,7 @@ function RenderFile({
         return;
       }
     },
-    [applyBlockPatch]
+    [applyBlockPatch, fileType, projectRoot, selectedBlock?.id]
   );
 
   const handleEditorMessageRef = useRef(handleEditorMessage);
@@ -1755,6 +1774,9 @@ function RenderFile({
     },
     [blockMapForFile, ensureSnippetHasMrpakId, fileType, filePath, makeTempMrpakId, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory, projectRoot]
   );
+
+  // Обновляем ref для использования в handleEditorMessage
+  stageInsertBlockRef.current = stageInsertBlock;
 
   const stageReparentBlock = useCallback(
     ({ sourceId, targetParentId }) => {

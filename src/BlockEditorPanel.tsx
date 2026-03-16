@@ -664,6 +664,7 @@ export function useBlockEditorSidebarController({
     handleMoveModeChange,
     moveUnit,
     handleMoveUnitChange,
+    onSendCommand,
     styleMode,
     setStyleMode,
     styleRows,

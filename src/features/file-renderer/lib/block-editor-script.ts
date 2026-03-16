@@ -15,6 +15,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         .mrpak-box-overlay.mrpak-margin { border: 1px dashed rgba(245, 158, 11, 0.95); background: rgba(245, 158, 11, 0.06); }
         .mrpak-box-overlay.mrpak-padding { border: 1px dashed rgba(34, 197, 94, 0.95); background: rgba(34, 197, 94, 0.05); }
         .mrpak-box-overlay.mrpak-parent { border: 2px dashed rgba(246, 85, 49, 0.8); background: rgba(59, 131, 246, 0); pointer-events: none; }
+        .mrpak-box-overlay.mrpak-drop-target { border: 2px solid rgba(59, 130, 246, 0.95); background: rgba(59, 130, 246, 0.12); pointer-events: none; }
+        .mrpak-drop-label { position: fixed; z-index: 10000; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 8px; padding: 6px 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.25); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .mrpak-hint { position: fixed; z-index: 9999; bottom: 10px; right: 10px; background: rgba(15,23,42,0.85); color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; }
         ${isEditMode ? `
         /* Блокируем интерактивные элементы только в режиме редактора */
@@ -127,12 +129,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           let gridStep = 8;
           let dragging = null; // {sourceId}
           let dropTarget = null;
+          let externalDrag = null; // { tag, source: 'library' }
+          let externalHoverCandidates = [];
+          let externalHoverIndex = 0;
+          let externalPointer = { x: 0, y: 0 };
 
           const overlay = {
             margin: null,
             padding: null,
             parent: null,
+            dropTarget: null,
           };
+
+          let dropLabel = null;
 
           const ensureOverlay = () => {
             if (!overlay.margin) {
@@ -155,6 +164,20 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               el.style.display = 'none';
               document.body.appendChild(el);
               overlay.parent = el;
+            }
+            if (!overlay.dropTarget) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-drop-target';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.dropTarget = el;
+            }
+            if (!dropLabel) {
+              const label = document.createElement('div');
+              label.className = 'mrpak-drop-label';
+              label.style.display = 'none';
+              document.body.appendChild(label);
+              dropLabel = label;
             }
           };
 
@@ -535,6 +558,80 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             return candidate;
           };
 
+          const getCandidateBlocksAtPoint = (x, y) => {
+            let hovered = null;
+            try {
+              hovered = document.elementFromPoint(x, y);
+            } catch (e) {
+              hovered = null;
+            }
+            if (!hovered) return [];
+            const result = [];
+            let current = hovered.nodeType === 1 ? hovered : hovered.parentElement;
+            while (current && current !== document.body && current !== document.documentElement) {
+              if (current.matches && current.matches(SEL_ALL)) {
+                const id = ensureId(current);
+                if (id && !result.some((item) => item.id === id)) {
+                  result.push({ id, el: current });
+                }
+              }
+              current = current.parentElement;
+            }
+            return result;
+          };
+
+          const setExternalDropTarget = (entry) => {
+            if (!entry || !entry.id || !entry.el) {
+              dropTarget = null;
+              setRect(overlay.dropTarget, null);
+              if (dropLabel) dropLabel.style.display = 'none';
+              if (externalDrag) {
+                post(MSG_DROP_TARGET, { sourceId: externalDrag.tag || 'library', targetId: null, source: 'library' });
+              }
+              return;
+            }
+
+            dropTarget = entry.id;
+            const rect = entry.el.getBoundingClientRect();
+            setRect(overlay.dropTarget, rect);
+            if (dropLabel) {
+              const tag = (entry.el.tagName || 'Element').toLowerCase();
+              const shortId = String(entry.id).slice(-48);
+              dropLabel.textContent = 'Child of: <' + tag + '> ' + shortId;
+              dropLabel.style.display = 'block';
+              dropLabel.style.left = Math.max(8, rect.left) + 'px';
+              dropLabel.style.top = Math.max(8, rect.top - 30) + 'px';
+            }
+            if (externalDrag) {
+              post(MSG_DROP_TARGET, { sourceId: externalDrag.tag || 'library', targetId: entry.id, source: 'library' });
+            }
+          };
+
+          const updateExternalDropCandidate = (x, y) => {
+            if (!externalDrag) return;
+            externalPointer = { x, y };
+            externalHoverCandidates = getCandidateBlocksAtPoint(x, y);
+            if (externalHoverCandidates.length === 0) {
+              externalHoverIndex = 0;
+              setExternalDropTarget(null);
+              return;
+            }
+            if (externalHoverIndex >= externalHoverCandidates.length) {
+              externalHoverIndex = 0;
+            }
+            setExternalDropTarget(externalHoverCandidates[externalHoverIndex]);
+          };
+
+          const clearExternalDrag = () => {
+            externalDrag = null;
+            externalHoverCandidates = [];
+            externalHoverIndex = 0;
+            dropTarget = null;
+            setRect(overlay.dropTarget, null);
+            if (dropLabel) dropLabel.style.display = 'none';
+            post(MSG_DROP_TARGET, { sourceId: 'library', targetId: null, source: 'library' });
+          };
+
           function isInteractive(el) {
             if (!el || el.nodeType !== 1) return false;
             const tag = (el.tagName || '').toUpperCase();
@@ -549,6 +646,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           // Hover для drop target при перетаскивании (режим reparent)
           document.addEventListener('mousemove', (ev) => {
             if (!isActiveInstance()) return;
+            if (externalDrag) {
+              updateExternalDropCandidate(ev.clientX, ev.clientY);
+              return;
+            }
             if (!dragging || !dragging.sourceId || dragging.mode !== 'reparent') return;
             const el = ev.target && ev.target.closest ? ev.target.closest(SEL_ALL) : null;
             const sid = dragging.sourceId;
@@ -641,6 +742,14 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           document.addEventListener('click', (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return; // В preview режиме не обрабатываем клики для выбора
+            if (externalDrag) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              return;
+            }
             
             const t = ev.target;
             // Если это интерактивный элемент, обрабатываем его
@@ -677,6 +786,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           document.addEventListener('wheel', (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
+            if (externalDrag) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              if (!externalHoverCandidates || externalHoverCandidates.length === 0) {
+                updateExternalDropCandidate(ev.clientX, ev.clientY);
+              }
+              if (!externalHoverCandidates || externalHoverCandidates.length === 0) return;
+              const step = ev.deltaY > 0 ? 1 : -1;
+              const len = externalHoverCandidates.length;
+              externalHoverIndex = ((externalHoverIndex + step) % len + len) % len;
+              setExternalDropTarget(externalHoverCandidates[externalHoverIndex]);
+              return;
+            }
             if (!selected || drag || dragging) return;
 
             const x = ev.clientX;
@@ -704,6 +829,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           document.addEventListener('mousedown', (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return; // В preview режиме не обрабатываем
+            if (externalDrag) return;
             
             const t = ev.target;
             // Если это интерактивный элемент, обрабатываем его
@@ -1245,6 +1371,33 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 if (data.unit === '%' || data.unit === 'px') moveUnit = String(data.unit);
                 if (moveMode === 'grid8') moveUnit = 'px';
                 if (typeof data.grid === 'number') gridStep = data.grid;
+                return;
+              }
+              if (data.type === CMD_START_DRAG) {
+                const rawTag = String(data.tag || '').trim();
+                if (!rawTag) return;
+                externalDrag = { source: 'library', tag: rawTag };
+                externalHoverCandidates = [];
+                externalHoverIndex = 0;
+                dropTarget = null;
+                updateExternalDropCandidate(externalPointer.x || 0, externalPointer.y || 0);
+                return;
+              }
+              if (data.type === CMD_END_DRAG) {
+                if (externalDrag && dropTarget) {
+                  post(MSG_APPLY, {
+                    id: dropTarget,
+                    patch: {
+                      __insertFromLibrary: {
+                        source: 'library',
+                        tag: String(externalDrag.tag || ''),
+                        mode: 'child',
+                      },
+                    },
+                    isIntermediate: false,
+                  });
+                }
+                clearExternalDrag();
                 return;
               }
             } catch(e) {}
