@@ -499,6 +499,42 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           // В режиме редактора делаем контент "неинтерактивным":
           // - гасим клики/submit/клавиатурные активации по интерактивным элементам
           // - при этом сохраняем возможность выбирать блоки кликом и двигать Shift/Alt+Drag
+          const isPointWithinRect = (rect, x, y) => {
+            if (!rect) return false;
+            return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+          };
+
+          const isPointerInsideSelectedGroup = (x, y) => {
+            if (!selectedGroup || selectedGroup.length === 0) return false;
+            return selectedGroup.some((node) => {
+              try {
+                return isPointWithinRect(node.getBoundingClientRect(), x, y);
+              } catch (e) {
+                return false;
+              }
+            });
+          };
+
+          const getDirectChildBlockAtPoint = (parentEl, x, y) => {
+            if (!parentEl) return null;
+            let hovered = null;
+            try {
+              hovered = document.elementFromPoint(x, y);
+            } catch (e) {
+              hovered = null;
+            }
+            if (!hovered) return null;
+            let current = hovered.nodeType === 1 ? hovered : hovered.parentElement;
+            let candidate = null;
+            while (current && current !== parentEl) {
+              if (current.matches && current.matches(SEL_ALL)) {
+                candidate = current;
+              }
+              current = current.parentElement;
+            }
+            return candidate;
+          };
+
           function isInteractive(el) {
             if (!el || el.nodeType !== 1) return false;
             const tag = (el.tagName || '').toUpperCase();
@@ -638,6 +674,32 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           // Shift+Drag: перенос (MVP -> position:absolute + left/top/width/height)
           // Этот обработчик также блокирует интерактивные элементы (только в режиме редактора)
+          document.addEventListener('wheel', (ev) => {
+            if (!isActiveInstance()) return;
+            if (!EDIT_MODE) return;
+            if (!selected || drag || dragging) return;
+
+            const x = ev.clientX;
+            const y = ev.clientY;
+            if (!isPointerInsideSelectedGroup(x, y)) return;
+
+            let nextEl = null;
+            if (ev.deltaY < 0) {
+              nextEl = getLogicalParentBlock(selected);
+            } else if (ev.deltaY > 0) {
+              nextEl = getDirectChildBlockAtPoint(selected, x, y);
+            }
+
+            if (!nextEl || nextEl === selected) return;
+
+            try {
+              ev.preventDefault();
+              ev.stopPropagation();
+              ev.stopImmediatePropagation();
+            } catch (e) {}
+            selectEl(nextEl);
+          }, { passive: false, capture: true });
+
           let drag = null;
           document.addEventListener('mousedown', (ev) => {
             if (!isActiveInstance()) return;

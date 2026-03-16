@@ -1247,7 +1247,10 @@ function RenderFile({
       //console.log("HERREEEE: ", data.type)
 
       if (data.type === MRPAK_MSG.SELECT) {
-        setSelectedBlock({ id: data.id, meta: data.meta });
+        setSelectedBlock((prev) => {
+          if (prev?.id === data.id) return prev;
+          return { id: data.id, meta: data.meta };
+        });
         // Сбрасываем livePosition при выборе нового блока
         setLivePosition({ left: null, top: null, width: null, height: null });
         return;
@@ -1255,7 +1258,14 @@ function RenderFile({
 
       if (data.type === MRPAK_MSG.TREE) {
         if (data.tree) {
-          setLayersTree(data.tree);
+          setLayersTree((prev) => {
+            try {
+              if (prev && JSON.stringify(prev) === JSON.stringify(data.tree)) {
+                return prev;
+              }
+            } catch {}
+            return data.tree;
+          });
         }
         return;
       }
@@ -1263,8 +1273,19 @@ function RenderFile({
       if (data.type === MRPAK_MSG.STYLE_SNAPSHOT) {
         if (data.id) {
           setStyleSnapshots((prev) => ({
-            ...prev,
-            [data.id]: { inlineStyle: data.inlineStyle || '', computedStyle: data.computedStyle || null },
+            ...(prev || {}),
+            [data.id]: (() => {
+              const nextSnap = { inlineStyle: data.inlineStyle || '', computedStyle: data.computedStyle || null };
+              const prevSnap = prev?.[data.id];
+              if (
+                prevSnap &&
+                prevSnap.inlineStyle === nextSnap.inlineStyle &&
+                JSON.stringify(prevSnap.computedStyle || null) === JSON.stringify(nextSnap.computedStyle || null)
+              ) {
+                return prevSnap;
+              }
+              return nextSnap;
+            })(),
           }));
         }
         return;
@@ -1273,8 +1294,8 @@ function RenderFile({
       if (data.type === MRPAK_MSG.TEXT_SNAPSHOT) {
         if (data.id) {
           setTextSnapshots((prev) => ({
-            ...prev,
-            [data.id]: data.text ?? '',
+            ...(prev || {}),
+            [data.id]: prev?.[data.id] === (data.text ?? '') ? prev[data.id] : (data.text ?? ''),
           }));
         }
         return;
@@ -1346,6 +1367,15 @@ function RenderFile({
     },
     [applyBlockPatch]
   );
+
+  const handleEditorMessageRef = useRef(handleEditorMessage);
+  useEffect(() => {
+    handleEditorMessageRef.current = handleEditorMessage;
+  }, [handleEditorMessage]);
+
+  const handleEditorMessageStable = useCallback((event: any) => {
+    handleEditorMessageRef.current?.(event);
+  }, []);
 
   const handleRenameLayer = useCallback(
     async (mrpakId, name) => {
@@ -2957,21 +2987,24 @@ function RenderFile({
         const inst = instrumentHtml(base, filePath);
         setBlockMap(inst.map || {});
         setBlockMapForFile(inst.map || {});
-        setEditorHTML(injectBlockEditorScript(inst.html, 'html', 'edit'));
+        const nextHtml = injectBlockEditorScript(inst.html, 'html', 'edit');
+        setEditorHTML((prev) => (prev === nextHtml ? prev : nextHtml));
         return;
       }
 
       if (fileType === 'react' && reactHTML) {
         // Для React файлов blockMap уже установлен при генерации reactHTML через createReactHTML
         // Используем готовый blockMap, который содержит правильные позиции для обработанного кода
-        setEditorHTML(injectBlockEditorScript(reactHTML, 'react', 'edit'));
+        const nextHtml = injectBlockEditorScript(reactHTML, 'react', 'edit');
+        setEditorHTML((prev) => (prev === nextHtml ? prev : nextHtml));
         return;
       }
 
       if (fileType === 'react-native' && reactNativeHTML) {
         // Для React Native файлов blockMap уже установлен при генерации reactNativeHTML через createReactNativeHTML
         // Используем готовый blockMap, который содержит правильные позиции для обработанного кода
-        setEditorHTML(injectBlockEditorScript(reactNativeHTML, 'react-native', 'edit'));
+        const nextHtml = injectBlockEditorScript(reactNativeHTML, 'react-native', 'edit');
+        setEditorHTML((prev) => (prev === nextHtml ? prev : nextHtml));
         return;
       }
     } catch (e) {
@@ -4584,6 +4617,15 @@ function RenderFile({
         
         // Инициализируем window.__modules__ ДО загрузки модулей
         window.__modules__ = window.__modules__ || {};
+        const __mrpakOriginalConsoleError = console.error;
+        console.error = (...args) => {
+          const first = args && args.length ? String(args[0] || '') : '';
+          if (first.includes('Warning: Encountered two children with the same key')) {
+            console.warn(...args);
+            return;
+          }
+          __mrpakOriginalConsoleError(...args);
+        };
         console.log('Before loading modules, window.__modules__ initialized');
         
         // Загружаем модули зависимостей
@@ -5131,6 +5173,15 @@ function RenderFile({
         
         // Инициализируем window.__modules__ ДО загрузки модулей
         window.__modules__ = window.__modules__ || {};
+        const __mrpakOriginalConsoleError = console.error;
+        console.error = (...args) => {
+          const first = args && args.length ? String(args[0] || '') : '';
+          if (first.includes('Warning: Encountered two children with the same key')) {
+            console.warn(...args);
+            return;
+          }
+          __mrpakOriginalConsoleError(...args);
+        };
         console.log('Before loading modules, window.__modules__ initialized');
         
         // Загружаем модули зависимостей
@@ -5414,11 +5465,11 @@ function RenderFile({
     <BlockEditorPanel
       fileType={editorType}
       html={html}
-      onMessage={handleEditorMessage}
+      onMessage={handleEditorMessageStable}
       outgoingMessage={iframeCommand}
     />
   ), [
-    handleEditorMessage,
+    handleEditorMessageStable,
     iframeCommand,
   ]);
 
