@@ -9,9 +9,10 @@ import { applyStylePatch, applyHtmlOp, applyJsxDelete, applyJsxInsert, applyJsxR
 import { loadLayerNames, upsertLayerName } from './blockEditor/LayerNamesStore';
 import { MonacoEditorWrapper } from './shared/ui/monaco-editor-wrapper';
 import { getFileType, getMonacoLanguage } from './shared/lib/file-type-detector';
-import { readFile, writeFile, watchFile, unwatchFile, onFileChanged, readDirectory, readFileBase64 } from './shared/api/electron-api';
+import { readFile, writeFile as writeFileRaw, watchFile, unwatchFile, onFileChanged, readDirectory, readFileBase64 } from './shared/api/electron-api';
 import { syncCodeChangesToEditor, createEditorCommandsFromChanges } from './blockEditor/AstSync';
 import { parse } from '@babel/parser';
+import generate from '@babel/generator';
 import { AstBidirectionalManager } from './blockEditor/AstBidirectional';
 import { injectBlockEditorScript } from './features/file-renderer/lib/block-editor-script';
 import { findProjectRoot, resolvePath, resolvePathSync } from './features/file-renderer/lib/path-resolver';
@@ -125,6 +126,53 @@ type LivePosition = {
 
 function getPathBasename(filePath: string | null | undefined): string {
   return String(filePath || '').replace(/\\/g, '/').split('/').pop() || '';
+}
+
+function formatContentForWrite(filePath: string, content: string): string {
+  const normalizedPath = String(filePath || '').toLowerCase();
+  const source = String(content ?? '');
+
+  try {
+    if (normalizedPath.endsWith('.json')) {
+      const parsed = JSON.parse(source);
+      return JSON.stringify(parsed, null, 2) + '\n';
+    }
+
+    const isJsLike = /\.(js|jsx|ts|tsx)$/.test(normalizedPath);
+    if (!isJsLike) {
+      return source;
+    }
+
+    const isTs = /\.(ts|tsx)$/.test(normalizedPath);
+    const isJsx = /\.(jsx|tsx)$/.test(normalizedPath);
+
+    const ast = parse(source, {
+      sourceType: 'module',
+      plugins: [
+        'classProperties',
+        'classPrivateProperties',
+        'classPrivateMethods',
+        'decorators-legacy',
+        'dynamicImport',
+        'objectRestSpread',
+        'optionalChaining',
+        'nullishCoalescingOperator',
+        ...(isJsx ? (['jsx'] as const) : []),
+        ...(isTs ? (['typescript'] as const) : []),
+      ],
+    });
+
+    const output = generate(ast, {
+      compact: false,
+      concise: false,
+      retainLines: false,
+      comments: true,
+      jsescOption: { minimal: true },
+    });
+    return output.code + '\n';
+  } catch {
+    return source;
+  }
 }
 
 function isInternalSourceFilePath(filePath: string | null | undefined): boolean {
@@ -254,6 +302,9 @@ function RenderFile({
   showSplitSidebar,
   showSplitPreview,
   showSplitCode,
+  canvasWidth = 1280,
+  canvasHeight = 800,
+  canvasDevice = 'desktop',
   aggressivePreviewMode: externalAggressivePreviewMode = false,
   onProjectFilesChanged,
   onOpenFile,
@@ -266,11 +317,20 @@ function RenderFile({
   showSplitSidebar: boolean;
   showSplitPreview: boolean;
   showSplitCode: boolean;
+  canvasWidth?: number;
+  canvasHeight?: number;
+  canvasDevice?: 'desktop' | 'mobile';
   aggressivePreviewMode?: boolean;
   onProjectFilesChanged?: () => void;
   onOpenFile?: (path: string) => void;
 }) {
   const aggressivePreviewMode = externalAggressivePreviewMode;
+  const normalizedCanvasWidth = Math.max(240, Math.min(3840, Math.round(Number(canvasWidth) || 1280)));
+  const normalizedCanvasHeight = Math.max(240, Math.min(3840, Math.round(Number(canvasHeight) || 800)));
+  const previewViewportFrameStyle = useMemo(() => ({
+    width: normalizedCanvasWidth,
+    height: normalizedCanvasHeight,
+  }), [normalizedCanvasHeight, normalizedCanvasWidth]);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -349,6 +409,10 @@ function RenderFile({
   const [textSnapshots, setTextSnapshots] = useState<Record<string, string>>({}); // { [mrpakId]: text }
   const [externalStylesMap, setExternalStylesMap] = useState<Record<string, { path: string; type: string }>>({}); // { [varName]: { path: string, type: string } }
   const [livePosition, setLivePosition] = useState<LivePosition>({ left: null, top: null, width: null, height: null });
+  const writeFile = useCallback(async (targetPath: string, content: string, options: any = { backup: true }) => {
+    const formatted = formatContentForWrite(targetPath, content);
+    return writeFileRaw(targetPath, formatted, options);
+  }, []);
 
   // Две копии AST для bidirectional editing
   // Менеджер для bidirectional editing через два AST
@@ -791,6 +855,7 @@ function RenderFile({
     if (!monacoEditorRef?.current) return;
 
     try {
+      isUpdatingFromFileRef.current = true;
       const editor = monacoEditorRef.current;
       // Сохраняем полное состояние редактора (курсор, скролл, выделение)
       const viewState = editor.saveViewState();
@@ -834,6 +899,9 @@ function RenderFile({
         monacoEditorRef.current.setValue(newContent);
       }
     }
+    setTimeout(() => {
+      isUpdatingFromFileRef.current = false;
+    }, 0);
   }, []);
 
   const clearMonacoBlockSelection = useCallback(() => {
@@ -998,10 +1066,12 @@ function RenderFile({
           if (!newContent || typeof newContent !== 'string' || newContent.length === 0) {
             throw new Error('Результат применения изменений пуст или некорректен');
           }
-          const writeRes = await writeFile(filePath, newContent, { backup: true });
-          if (!writeRes?.success) throw new Error(writeRes?.error || 'Ошибка записи файла');
-          setFileContent(newContent);
-          setRenderVersion((v) => v + 1);
+          updateStagedPatches((prev) => ({
+            ...prev,
+            [blockId]: { ...(prev?.[blockId] || {}), ...patch },
+          }));
+          updateHasStagedChanges(true);
+          updateMonacoEditorWithScroll(newContent);
           return;
         }
 
@@ -1075,9 +1145,12 @@ function RenderFile({
             });
             
             if (commitResult.ok && commitResult.code) {
-              setFileContent(commitResult.code);
+              updateStagedPatches((prev) => ({
+                ...prev,
+                [blockId]: { ...(prev?.[blockId] || {}), ...patch },
+              }));
+              updateHasStagedChanges(true);
               updateMonacoEditorWithScroll(commitResult.code);
-              setRenderVersion((v) => v + 1);
               return;
             } else {
               throw new Error(`Framework fallback failed: ${commitResult.error || 'Unknown error'}`);
@@ -1124,13 +1197,16 @@ function RenderFile({
 
           try {
             // Автосохранение
-            await writeFile(filePath, newContent, { backup: true });
-            setFileContent(newContent);
+            
             // Обновляем codeAST из нового кода без синхронизации constructorAST (чтобы избежать рекурсии)
             await manager.updateCodeASTFromCode(newContent, true);
             // Обновляем Monaco Editor без перезагрузки с сохранением скролла
             updateMonacoEditorWithScroll(newContent);
-            setRenderVersion((v) => v + 1);
+            updateStagedPatches((prev) => ({
+              ...prev,
+              [blockId]: { ...(prev?.[blockId] || {}), ...patch },
+            }));
+            updateHasStagedChanges(true);
           } finally {
             // Сбрасываем флаг после небольшой задержки
             setTimeout(() => {
@@ -1179,12 +1255,14 @@ function RenderFile({
         isUpdatingFromConstructorRef.current = true;
 
         // Автосохранение в файл (только для финальных изменений)
-        await writeFile(filePath, newContent || '', { backup: true });
 
         // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-        setFileContent(newContent || '');
         updateMonacoEditorWithScroll(newContent);
-        setRenderVersion((v) => v + 1);
+        updateStagedPatches((prev) => ({
+          ...prev,
+          [blockId]: { ...(prev?.[blockId] || {}), ...patch },
+        }));
+        updateHasStagedChanges(true);
         setChangesLog((prev) => [
           { ts: Date.now() + Math.random(), filePath, blockId, patch },
           ...prev,
@@ -1209,7 +1287,7 @@ function RenderFile({
         setError(`Ошибка применения изменений: ${errorMessage}`);
       }
     },
-    [fileContent, fileType, filePath, blockMapForFile, externalStylesMap, resolvePath, readFile, writeFile, addToHistory, projectRoot, derivePreviousStylePatch]
+    [fileContent, fileType, filePath, blockMapForFile, externalStylesMap, resolvePath, readFile, writeFile, addToHistory, projectRoot, derivePreviousStylePatch, updateStagedPatches, updateHasStagedChanges]
   );
 
   const commitStagedPatches = useCallback(async () => {
@@ -1666,10 +1744,18 @@ function RenderFile({
                 }
 
                 const newContent = commitResult.code;
-                await writeFile(filePath, newContent || '', { backup: true });
-                setFileContent(newContent || '');
                 updateMonacoEditorWithScroll(newContent);
-                setRenderVersion((v) => v + 1);
+                updateStagedOps((prev) => [
+                  ...prev,
+                  {
+                    type: 'delete',
+                    blockId,
+                    fileType,
+                    filePath,
+                    mapEntry: entry || null,
+                  },
+                ]);
+                updateHasStagedChanges(true);
 
                 addToHistory({
                   type: 'delete',
@@ -1699,12 +1785,19 @@ function RenderFile({
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
-            setRenderVersion((v) => v + 1);
+            updateStagedOps((prev) => [
+              ...prev,
+              {
+                type: 'delete',
+                blockId,
+                fileType,
+                filePath,
+              },
+            ]);
+            updateHasStagedChanges(true);
 
             // Добавляем в историю для undo
             addToHistory({
@@ -1832,10 +1925,21 @@ function RenderFile({
                 }
 
                 const newContent = commitResult.code;
-                await writeFile(filePath, newContent || '', { backup: true });
-                setFileContent(newContent || '');
                 updateMonacoEditorWithScroll(newContent);
-                setRenderVersion((v) => v + 1);
+                updateStagedOps((prev) => [
+                  ...prev,
+                  {
+                    type: 'insert',
+                    targetId,
+                    mode: mode === 'sibling' ? 'after' : 'child',
+                    snippet: String(snippetWithId || ''),
+                    blockId: newId,
+                    fileType,
+                    filePath,
+                    mapEntry: entry || null,
+                  },
+                ]);
+                updateHasStagedChanges(true);
 
                 addToHistory({
                   type: 'insert',
@@ -1871,12 +1975,22 @@ function RenderFile({
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
-            setRenderVersion((v) => v + 1);
+            updateStagedOps((prev) => [
+              ...prev,
+              {
+                type: 'insert',
+                targetId,
+                mode: mode === 'sibling' ? 'after' : 'child',
+                snippet: String(snippetWithId || ''),
+                blockId: newId,
+                fileType,
+                filePath,
+              },
+            ]);
+            updateHasStagedChanges(true);
 
             // Добавляем в историю для undo
             addToHistory({
@@ -2005,12 +2119,21 @@ function RenderFile({
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
-            setRenderVersion((v) => v + 1);
+            updateStagedOps((prev) => [
+              ...prev,
+              {
+                type: 'reparent',
+                sourceId,
+                targetParentId,
+                targetBeforeId,
+                fileType,
+                filePath,
+              },
+            ]);
+            updateHasStagedChanges(true);
 
             // Добавляем в историю для undo
             addToHistory({
@@ -2116,12 +2239,20 @@ function RenderFile({
             const newContent = generateResult.code;
 
             // Автосохранение в файл
-            await writeFile(filePath, newContent || '', { backup: true });
 
             // Обновляем fileContent и Monaco Editor без перезагрузки с сохранением скролла
-            setFileContent(newContent || '');
             updateMonacoEditorWithScroll(newContent);
-            setRenderVersion((v) => v + 1);
+            updateStagedOps((prev) => [
+              ...prev,
+              {
+                type: 'setText',
+                blockId,
+                text: String(text ?? ''),
+                fileType,
+                filePath,
+              },
+            ]);
+            updateHasStagedChanges(true);
 
             // Добавляем в историю для undo
             addToHistory({
@@ -2361,50 +2492,16 @@ function RenderFile({
 
   // Обработка изменений в редакторе с автосохранением
   const handleEditorChange = useCallback((newValue) => {
-    setUnsavedContent(newValue);
-    setIsModified(true);
-
-    // Автосохранение с debounce (1 секунда)
+    if (isUpdatingFromFileRef.current) {
+      return;
+    }
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
     }
-
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      if (!filePath || !newValue) return;
-
-      try {
-        // Устанавливаем флаг, чтобы предотвратить рекурсию при обновлении из редактора кода
-        isUpdatingFromFileRef.current = true;
-
-        try {
-          // Для React/React Native: обновляем codeAST из кода и синхронизируем constructorAST
-          if ((fileType === 'react' || fileType === 'react-native') && projectRoot) {
-            const manager = astManagerRef.current;
-            if (manager) {
-              // Обновляем codeAST из нового кода и синхронизируем constructorAST
-              // НЕ обновляем конструктор напрямую - он работает только через constructorAST
-              await manager.updateCodeASTFromCode(newValue, false);
-            }
-          }
-
-          // Автосохранение в файл
-          await writeFile(filePath, newValue, { backup: true });
-          setFileContent(newValue);
-          setUnsavedContent(null);
-          setIsModified(false);
-          console.log('[handleEditorChange] Автосохранение выполнено');
-        } finally {
-          // Сбрасываем флаг после небольшой задержки
-          setTimeout(() => {
-            isUpdatingFromFileRef.current = false;
-          }, 100);
-        }
-      } catch (e) {
-        console.error('[handleEditorChange] Ошибка автосохранения:', e);
-        isUpdatingFromFileRef.current = false;
-      }
-    }, 1000);
-  }, [filePath, fileType, projectRoot]);
+    setUnsavedContent(newValue);
+    setIsModified(true);
+  }, []);
 
   // Обработка Ctrl+S (глобальный обработчик)
   useEffect(() => {
@@ -2439,6 +2536,11 @@ function RenderFile({
         }
 
         // В split режиме Ctrl+S сохраняет код из Monaco Editor
+        if (hasStagedChanges) {
+          console.log('💾 [Global Ctrl+S] Коммит staged-изменений...');
+          void commitStagedPatches();
+          return;
+        }
         if (viewMode === 'split' && isModified) {
           let contentToSave: string | null = null;
           if (monacoEditorRef?.current) {
@@ -2513,6 +2615,39 @@ function RenderFile({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [viewMode, undo, redo]);
+
+  // Переключение режима Alt-resize (margin/size/padding) стрелками ←/→
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (viewMode !== 'split') return;
+      if (!selectedBlock?.id) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const activeEl = document.activeElement as HTMLElement | null;
+      const tag = String(activeEl?.tagName || '').toLowerCase();
+      const isTypingTarget =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        !!activeEl?.isContentEditable ||
+        !!activeEl?.closest?.('.monaco-editor') ||
+        !!activeEl?.classList?.contains?.('inputarea');
+      if (isTypingTarget) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      sendIframeCommand({
+        type: MRPAK_CMD.SET_RESIZE_TARGET,
+        direction: e.key === 'ArrowLeft' ? 'left' : 'right',
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+    };
+  }, [viewMode, selectedBlock?.id, sendIframeCommand]);
 
   // Обработчики для изменения размера split панелей
   const handleSplitResizeStart = useCallback((target: 'main' | 'sidebar') => (e: any) => {
@@ -4900,8 +5035,8 @@ function RenderFile({
         // Передаем filePath в глобальную переменную для использования в скрипте
         window.__MRPAK_FILE_PATH__ = ${JSON.stringify(basePath)};
     </script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script>
       if (typeof Babel !== 'undefined' && Babel.registerPreset && Babel.availablePresets) {
@@ -5221,8 +5356,8 @@ function RenderFile({
         // Передаем filePath в глобальную переменную для использования в скрипте
         window.__MRPAK_FILE_PATH__ = ${JSON.stringify(basePath)};
     </script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script>
       // Функция для нормализации стилей React Native в CSS стили
@@ -5882,13 +6017,23 @@ function RenderFile({
             {showSplitPreview && (
               <View style={[styles.splitLeft, { width: previewWidth, maxWidth: showSplitCode ? '80%' : '100%', minWidth: showSplitCode ? '20%' : 0 }]}>
                 <View style={styles.blockEditorPreviewContainer}>
-                  {renderBlockEditorPreview(editorType, html)}
-                  {renderPreviewFallbackOverlay()}
-                  {hasStagedChanges && (
-                    <View style={styles.saveIndicator} pointerEvents="none">
-                      <Text style={styles.saveIndicatorText}>● Несохраненные изменения</Text>
+                  <View style={styles.previewViewportHost}>
+                    <View
+                      style={[
+                        styles.previewViewportFrame,
+                        previewViewportFrameStyle,
+                        canvasDevice === 'mobile' && styles.previewViewportFrameMobile,
+                      ]}
+                    >
+                      {renderBlockEditorPreview(editorType, html)}
+                      {renderPreviewFallbackOverlay()}
+                      {hasStagedChanges && (
+                        <View style={styles.saveIndicator} pointerEvents="none">
+                          <Text style={styles.saveIndicatorText}>● Несохраненные изменения</Text>
+                        </View>
+                      )}
                     </View>
-                  )}
+                  </View>
                 </View>
               </View>
             )}
@@ -5945,6 +6090,7 @@ function RenderFile({
     fileContent,
     filePath,
     fileType,
+    canvasDevice,
     handleEditorChange,
     handleSplitResizeStart,
     handleSplitResize,
@@ -5962,6 +6108,7 @@ function RenderFile({
     showSplitPreview,
     showSplitSidebar,
     shouldOfferAggressiveMode,
+    previewViewportFrameStyle,
     splitLeftWidth,
     splitSidebarStyles,
     splitSidebarWidth,
@@ -6035,22 +6182,34 @@ function RenderFile({
       <View style={styles.htmlContainer}>
         {renderContentMetaOverlay('HTML')}
         {viewMode === 'preview' ? (
-          <WebView
-            key={`html-${filePath}-${htmlDependencyPaths.length}-${renderVersion}-${(htmlToRender || '').length}`}
-            source={{ html: htmlToRender }}
-            style={styles.webview}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={false}
-            allowExternalScripts={true}
-            onLoad={() => {
-              console.log('RenderFile: HTML content loaded successfully');
-            }}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error('RenderFile: WebView error:', nativeEvent);
-            }}
-          />
+          <View style={styles.blockEditorPreviewContainer}>
+            <View style={styles.previewViewportHost}>
+              <View
+                style={[
+                  styles.previewViewportFrame,
+                  previewViewportFrameStyle,
+                  canvasDevice === 'mobile' && styles.previewViewportFrameMobile,
+                ]}
+              >
+                <WebView
+                  key={`html-${filePath}-${htmlDependencyPaths.length}-${renderVersion}-${(htmlToRender || '').length}`}
+                  source={{ html: htmlToRender }}
+                  style={styles.webview}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  startInLoadingState={false}
+                  allowExternalScripts={true}
+                  onLoad={() => {
+                    console.log('RenderFile: HTML content loaded successfully');
+                  }}
+                  onError={(syntheticEvent) => {
+                    const { nativeEvent } = syntheticEvent;
+                    console.error('RenderFile: WebView error:', nativeEvent);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('html', editorHTML || htmlToRender)
         ) : viewMode === 'changes' ? (
@@ -6101,29 +6260,39 @@ function RenderFile({
         {renderContentMetaOverlay('React', detectedComponentName)}
         {viewMode === 'preview' ? (
           <View style={styles.blockEditorPreviewContainer}>
-            <WebView
-              key={`react-${filePath}-${renderVersion}-${reactHTML?.length || 0}`}
-              source={{ html: reactHTML }}
-              style={styles.webview}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              startInLoadingState={true}
-              allowExternalScripts={true}
-              renderLoading={() => (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#667eea" />
-                </View>
-              )}
-              onLoad={() => {
-                console.log('RenderFile: React component loaded successfully');
-              }}
-              onError={(syntheticEvent) => {
-                const { nativeEvent } = syntheticEvent;
-                console.error('RenderFile: WebView error:', nativeEvent);
-                setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
-              }}
-            />
-            {renderPreviewFallbackOverlay()}
+            <View style={styles.previewViewportHost}>
+              <View
+                style={[
+                  styles.previewViewportFrame,
+                  previewViewportFrameStyle,
+                  canvasDevice === 'mobile' && styles.previewViewportFrameMobile,
+                ]}
+              >
+                <WebView
+                  key={`react-${filePath}-${renderVersion}-${reactHTML?.length || 0}`}
+                  source={{ html: reactHTML }}
+                  style={styles.webview}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  startInLoadingState={true}
+                  allowExternalScripts={true}
+                  renderLoading={() => (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#667eea" />
+                    </View>
+                  )}
+                  onLoad={() => {
+                    console.log('RenderFile: React component loaded successfully');
+                  }}
+                  onError={(syntheticEvent) => {
+                    const { nativeEvent } = syntheticEvent;
+                    console.error('RenderFile: WebView error:', nativeEvent);
+                    setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
+                  }}
+                />
+                {renderPreviewFallbackOverlay()}
+              </View>
+            </View>
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react', editorHTML || reactHTML)
@@ -6170,29 +6339,39 @@ function RenderFile({
         {renderContentMetaOverlay('React Native', detectedComponentName)}
         {viewMode === 'preview' ? (
           <View style={styles.blockEditorPreviewContainer}>
-            <WebView
-              key={`react-native-${filePath}-${renderVersion}-${reactNativeHTML?.length || 0}`}
-              source={{ html: reactNativeHTML }}
-              style={styles.webview}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              startInLoadingState={true}
-              allowExternalScripts={true}
-              renderLoading={() => (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#667eea" />
-                </View>
-              )}
-              onLoad={() => {
-                console.log('RenderFile: React Native component loaded successfully');
-              }}
-              onError={(syntheticEvent) => {
-                const { nativeEvent } = syntheticEvent;
-                console.error('RenderFile: WebView error:', nativeEvent);
-                setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
-              }}
-            />
-            {renderPreviewFallbackOverlay()}
+            <View style={styles.previewViewportHost}>
+              <View
+                style={[
+                  styles.previewViewportFrame,
+                  previewViewportFrameStyle,
+                  canvasDevice === 'mobile' && styles.previewViewportFrameMobile,
+                ]}
+              >
+                <WebView
+                  key={`react-native-${filePath}-${renderVersion}-${reactNativeHTML?.length || 0}`}
+                  source={{ html: reactNativeHTML }}
+                  style={styles.webview}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  startInLoadingState={true}
+                  allowExternalScripts={true}
+                  renderLoading={() => (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#667eea" />
+                    </View>
+                  )}
+                  onLoad={() => {
+                    console.log('RenderFile: React Native component loaded successfully');
+                  }}
+                  onError={(syntheticEvent) => {
+                    const { nativeEvent } = syntheticEvent;
+                    console.error('RenderFile: WebView error:', nativeEvent);
+                    setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
+                  }}
+                />
+                {renderPreviewFallbackOverlay()}
+              </View>
+            </View>
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react-native', editorHTML || reactNativeHTML)
@@ -6331,7 +6510,7 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     width: '100%',
-    minHeight: 600,
+    minHeight: 0,
     backgroundColor: '#ffffff',
   },
   loadingContainer: {
@@ -6408,6 +6587,26 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     minHeight: 0,
+  },
+  previewViewportHost: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    overflow: 'auto',
+    backgroundColor: '#0f1115',
+  },
+  previewViewportFrame: {
+    position: 'relative',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    overflow: 'hidden',
+    boxShadow: '0 12px 30px rgba(0,0,0,0.28)',
+  },
+  previewViewportFrameMobile: {
+    borderRadius: 18,
   },
   previewFallbackOverlay: {
     position: 'absolute',

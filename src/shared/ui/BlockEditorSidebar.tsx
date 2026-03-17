@@ -460,7 +460,7 @@ export function BlockEditorSidebar(props) {
                 <option value="relative">Relative</option>
                 <option value="grid8">GridSnap(8)</option>
               </select>
-              <Text style={styles.insertLabel}>Р•РґРёРЅРёС†С‹</Text>
+              <Text style={styles.insertLabel}>Единицы</Text>
               <select
                 style={{ ...htmlInputStyle, height: '36px', marginBottom: '10px' }}
                 value={moveMode === 'grid8' ? 'px' : (moveUnit || 'px')}

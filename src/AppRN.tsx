@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import RenderFile from './RenderFile';
 import FileTree, { type FileSelection } from './FileTree';
 import { openDirectoryDialog, setRootDirectory, isFileSystemAPIAvailable } from './shared/api/filesystem-api';
@@ -17,6 +17,11 @@ function AppRN() {
   const [showSplitPreview, setShowSplitPreview] = useState(true);
   const [showSplitCode, setShowSplitCode] = useState(true);
   const [aggressivePreviewMode, setAggressivePreviewMode] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [canvasWidth, setCanvasWidth] = useState<number>(1280);
+  const [canvasHeight, setCanvasHeight] = useState<number>(800);
+  const [canvasWidthInput, setCanvasWidthInput] = useState<string>('1280');
+  const [canvasHeightInput, setCanvasHeightInput] = useState<string>('800');
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileSelection | null>(null);
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
@@ -159,6 +164,34 @@ function AppRN() {
     }
   };
 
+  const applyCanvasPreset = (mode: 'desktop' | 'mobile') => {
+    setPreviewDevice(mode);
+    if (mode === 'desktop') {
+      setCanvasWidth(1280);
+      setCanvasHeight(800);
+      setCanvasWidthInput('1280');
+      setCanvasHeightInput('800');
+      return;
+    }
+    setCanvasWidth(390);
+    setCanvasHeight(844);
+    setCanvasWidthInput('390');
+    setCanvasHeightInput('844');
+  };
+
+  const commitCanvasInput = (rawValue: string, axis: 'w' | 'h') => {
+    const parsed = Number.parseInt(String(rawValue || '').trim(), 10);
+    const fallback = axis === 'w' ? canvasWidth : canvasHeight;
+    const next = Number.isFinite(parsed) ? Math.max(240, Math.min(3840, parsed)) : fallback;
+    if (axis === 'w') {
+      setCanvasWidth(next);
+      setCanvasWidthInput(String(next));
+    } else {
+      setCanvasHeight(next);
+      setCanvasHeightInput(String(next));
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Верхняя панель */}
@@ -211,6 +244,42 @@ function AppRN() {
                   </TouchableOpacity>
                 </View>
               )}
+              <View style={styles.canvasControls}>
+                <View style={styles.deviceSwitch}>
+                  <TouchableOpacity
+                    style={[styles.modeButton, previewDevice === 'desktop' && styles.modeButtonActive]}
+                    onPress={() => applyCanvasPreset('desktop')}
+                  >
+                    <Text style={[styles.modeButtonText, previewDevice === 'desktop' && styles.modeButtonTextActive]}>ПК</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modeButton, previewDevice === 'mobile' && styles.modeButtonActive]}
+                    onPress={() => applyCanvasPreset('mobile')}
+                  >
+                    <Text style={[styles.modeButtonText, previewDevice === 'mobile' && styles.modeButtonTextActive]}>Моб</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.canvasInputs}>
+                  <Text style={styles.canvasLabel}>W</Text>
+                  <TextInput
+                    value={canvasWidthInput}
+                    onChangeText={setCanvasWidthInput}
+                    onBlur={() => commitCanvasInput(canvasWidthInput, 'w')}
+                    onSubmitEditing={() => commitCanvasInput(canvasWidthInput, 'w')}
+                    keyboardType="numeric"
+                    style={styles.canvasInput}
+                  />
+                  <Text style={styles.canvasLabel}>H</Text>
+                  <TextInput
+                    value={canvasHeightInput}
+                    onChangeText={setCanvasHeightInput}
+                    onBlur={() => commitCanvasInput(canvasHeightInput, 'h')}
+                    onSubmitEditing={() => commitCanvasInput(canvasHeightInput, 'h')}
+                    keyboardType="numeric"
+                    style={styles.canvasInput}
+                  />
+                </View>
+              </View>
               {isInternalSourceFile(selectedFile.filePath) && (
                 <TouchableOpacity
                   style={[styles.modeButton, aggressivePreviewMode && styles.modeButtonActive]}
@@ -305,6 +374,9 @@ function AppRN() {
               showSplitSidebar={showSplitSidebar}
               showSplitPreview={showSplitPreview}
               showSplitCode={showSplitCode}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
+              canvasDevice={previewDevice}
               aggressivePreviewMode={aggressivePreviewMode}
               onProjectFilesChanged={() => setFileTreeVersion((v) => v + 1)}
               onOpenFile={handleSelectFile}
@@ -381,6 +453,43 @@ const styles = StyleSheet.create({
     paddingLeft: 6,
     borderLeftWidth: 1,
     borderLeftColor: '#2a2d2e',
+  },
+  canvasControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 2,
+    paddingLeft: 6,
+    borderLeftWidth: 1,
+    borderLeftColor: '#2a2d2e',
+  },
+  deviceSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  canvasInputs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  canvasLabel: {
+    fontSize: 11,
+    color: '#9ca3af',
+    fontWeight: '600',
+    minWidth: 10,
+  },
+  canvasInput: {
+    width: 64,
+    height: 28,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#3a3f44',
+    backgroundColor: '#111315',
+    color: '#e5e7eb',
+    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 0,
   },
   modeButton: {
     minHeight: 28,

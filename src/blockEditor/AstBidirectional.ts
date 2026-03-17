@@ -39,8 +39,9 @@ function parseCodeToAst(code: any, filePath: any) {
 function generateCodeFromAst(ast: any, originalCode: any) {
   try {
     const result = generate(ast, {
-      retainLines: true,
+      retainLines: false,
       compact: false,
+      concise: false,
       jsescOption: { minimal: true },
       comments: true,
     }, originalCode);
@@ -673,4 +674,3 @@ export class AstBidirectionalManager {
     return this.constructorAST;
   }
 }
-

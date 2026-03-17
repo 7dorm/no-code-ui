@@ -1620,8 +1620,8 @@ export class ReactFramework extends Framework {
     <script>
         window.__MRPAK_FILE_PATH__ = ${JSON.stringify(filePath)};
     </script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script>
       if (typeof Babel !== 'undefined' && Babel.registerPreset && Babel.availablePresets) {

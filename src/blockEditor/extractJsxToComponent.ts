@@ -510,8 +510,9 @@ export function extractJsxToComponent(params: ExtractParams): ExtractResult {
   const mainGenerated = generate(
     ast,
     {
-      retainLines: true,
+      retainLines: false,
       compact: false,
+      concise: false,
       comments: true,
       jsescOption: { minimal: true },
     },

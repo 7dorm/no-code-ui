@@ -26,6 +26,7 @@ export const MRPAK_CMD = {
   REQUEST_TEXT_SNAPSHOT: 'MRPAK_CMD_REQUEST_TEXT_SNAPSHOT',
   START_DRAG: 'MRPAK_CMD_START_DRAG',
   END_DRAG: 'MRPAK_CMD_END_DRAG',
+  SET_RESIZE_TARGET: 'MRPAK_CMD_SET_RESIZE_TARGET',
 };
 
 export function isMrpakMessage(data: any) {
@@ -36,5 +37,4 @@ export function isMrpakMessage(data: any) {
     data.type.startsWith('MRPAK_')
   );
 }
-
 

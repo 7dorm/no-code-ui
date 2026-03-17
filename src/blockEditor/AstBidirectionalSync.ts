@@ -51,8 +51,9 @@ export function generateCodeFromAst(ast: any, originalCode: any = '') {
 
   try {
     const result = generate(ast, {
-      retainLines: true,
+      retainLines: false,
       compact: false,
+      concise: false,
       jsescOption: { minimal: true },
       comments: true,
     }, originalCode);
@@ -180,5 +181,4 @@ export function syncCodeToConstructor({ editorAST, constructorAST, filePath, sen
     return { ok: false, error: error.message };
   }
 }
-
 

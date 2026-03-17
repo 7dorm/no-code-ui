@@ -172,8 +172,9 @@ export function applyDeleteWithAst({ code, id, filePath }: any) {
   let generatedCode: any;
   try {
     const result = generate(ast, {
-      retainLines: true,
+      retainLines: false,
       compact: false,
+      concise: false,
       jsescOption: { minimal: true },
       comments: true,
     }, source);
@@ -277,8 +278,9 @@ export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }: 
   let generatedCode: any;
   try {
     const result = generate(ast, {
-      retainLines: true,
+      retainLines: false,
       compact: false,
+      concise: false,
       jsescOption: { minimal: true },
       comments: true,
     }, source);
@@ -289,5 +291,4 @@ export function applyInsertWithAst({ code, targetId, mode, snippet, filePath }: 
 
   return { ok: true, code: generatedCode, changed: true };
 }
-
 

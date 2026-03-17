@@ -475,8 +475,9 @@ export function normalizeReactModuleCode(code: string): {
 
     return {
       code: generate(ast, {
-        retainLines: true,
+        retainLines: false,
         compact: false,
+        concise: false,
         comments: true,
       }).code,
       defaultExportInfo,
@@ -612,8 +613,9 @@ export function wrapImportedComponentUsages(code: string): {
 
     return {
       code: generate(ast, {
-        retainLines: true,
+        retainLines: false,
         compact: false,
+        concise: false,
         comments: true,
       }).code,
       wrappedCount,
@@ -728,8 +730,8 @@ export function createReactHTMLTemplate({
         // Передаем filePath в глобальную переменную для использования в скрипте
         window.__MRPAK_FILE_PATH__ = ${JSON.stringify(basePath)};
     </script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
         body {

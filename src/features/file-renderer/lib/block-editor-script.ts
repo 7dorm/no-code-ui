@@ -17,9 +17,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         .mrpak-box-overlay { position: fixed; z-index: 9998; pointer-events: none; box-sizing: border-box; }
         .mrpak-box-overlay.mrpak-margin { border: 1px dashed rgba(245, 158, 11, 0.95); background: rgba(245, 158, 11, 0.06); }
         .mrpak-box-overlay.mrpak-padding { border: 1px dashed rgba(34, 197, 94, 0.95); background: rgba(34, 197, 94, 0.05); }
+        .mrpak-box-overlay.mrpak-content { border: 1px solid rgba(59, 130, 246, 0.95); background: rgba(59, 130, 246, 0.08); }
+        .mrpak-box-overlay.mrpak-connector { border: 0; border-top: 1px solid rgba(56, 189, 248, 0.85); background: transparent; transform-origin: 0 0; }
         .mrpak-box-overlay.mrpak-parent { border: 2px dashed rgba(246, 85, 49, 0.8); background: rgba(59, 131, 246, 0); pointer-events: none; }
         .mrpak-box-overlay.mrpak-drop-target { border: 2px solid rgba(59, 130, 246, 0.95); background: rgba(59, 130, 246, 0.12); pointer-events: none; }
         .mrpak-drop-label { position: fixed; z-index: 10000; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 8px; padding: 6px 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.25); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mrpak-shift-badge { position: fixed; z-index: 10001; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(245, 158, 11, 0.65); border-radius: 6px; padding: 4px 6px; font: 11px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 3px 8px rgba(0,0,0,0.22); }
         .mrpak-hint { position: fixed; z-index: 9999; bottom: 10px; right: 10px; background: rgba(15,23,42,0.85); color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; }
         ${isEditMode ? `
         /* Блокируем интерактивные элементы только в режиме редактора */
@@ -61,7 +64,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 el.classList.remove('mrpak-multi-selected');
               } catch (e) {}
             });
-            Array.from(document.querySelectorAll('.mrpak-box-overlay, .mrpak-hint')).forEach((el) => {
+            Array.from(document.querySelectorAll('.mrpak-box-overlay, .mrpak-hint, .mrpak-drop-label, .mrpak-shift-badge')).forEach((el) => {
               try { el.remove(); } catch (e) {}
             });
           } catch (e) {}
@@ -167,6 +170,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_REQ_TEXT = '${MRPAK_CMD.REQUEST_TEXT_SNAPSHOT}';
           const CMD_START_DRAG = '${MRPAK_CMD.START_DRAG}';
           const CMD_END_DRAG = '${MRPAK_CMD.END_DRAG}';
+          const CMD_SET_RESIZE_TARGET = '${MRPAK_CMD.SET_RESIZE_TARGET}';
           let selected = null;
           let selectedGroup = [];
           let selectedIds = [];
@@ -174,6 +178,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           let moveMode = 'absolute'; // absolute | relative | grid8
           let moveUnit = 'px'; // px | %
           let gridStep = 8;
+          let resizeTargetMode = 'size'; // size | margin | padding | content-lock
           let dragging = null; // {sourceId}
           let dropTarget = null;
           let externalDrag = null; // { tag, source: 'library' }
@@ -184,11 +189,17 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const overlay = {
             margin: null,
             padding: null,
+            content: null,
             parent: null,
             dropTarget: null,
+            connTL: null,
+            connTR: null,
+            connBL: null,
+            connBR: null,
           };
 
           let dropLabel = null;
+          let shiftBadge = null;
 
           const ensureOverlay = () => {
             if (!overlay.margin) {
@@ -212,6 +223,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               document.body.appendChild(el);
               overlay.parent = el;
             }
+            if (!overlay.content) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-content';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.content = el;
+            }
             if (!overlay.dropTarget) {
               const el = document.createElement('div');
               el.className = 'mrpak-box-overlay mrpak-drop-target';
@@ -219,12 +237,47 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               document.body.appendChild(el);
               overlay.dropTarget = el;
             }
+            if (!overlay.connTL) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-connector';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.connTL = el;
+            }
+            if (!overlay.connTR) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-connector';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.connTR = el;
+            }
+            if (!overlay.connBL) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-connector';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.connBL = el;
+            }
+            if (!overlay.connBR) {
+              const el = document.createElement('div');
+              el.className = 'mrpak-box-overlay mrpak-connector';
+              el.style.display = 'none';
+              document.body.appendChild(el);
+              overlay.connBR = el;
+            }
             if (!dropLabel) {
               const label = document.createElement('div');
               label.className = 'mrpak-drop-label';
               label.style.display = 'none';
               document.body.appendChild(label);
               dropLabel = label;
+            }
+            if (!shiftBadge) {
+              const badge = document.createElement('div');
+              badge.className = 'mrpak-shift-badge';
+              badge.style.display = 'none';
+              document.body.appendChild(badge);
+              shiftBadge = badge;
             }
           };
 
@@ -244,6 +297,54 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             el.style.top = r.top + 'px';
             el.style.width = Math.max(0, r.width) + 'px';
             el.style.height = Math.max(0, r.height) + 'px';
+          };
+          const setConnector = (el, x1, y1, x2, y2) => {
+            if (!el) return;
+            if (![x1, y1, x2, y2].every(Number.isFinite)) {
+              el.style.display = 'none';
+              return;
+            }
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (!Number.isFinite(len) || len < 0.5) {
+              el.style.display = 'none';
+              return;
+            }
+            el.style.display = 'block';
+            el.style.left = x1 + 'px';
+            el.style.top = y1 + 'px';
+            el.style.width = len + 'px';
+            el.style.height = '0px';
+            el.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+          };
+          const hideConnectors = () => {
+            setConnector(overlay.connTL, NaN, NaN, NaN, NaN);
+            setConnector(overlay.connTR, NaN, NaN, NaN, NaN);
+            setConnector(overlay.connBL, NaN, NaN, NaN, NaN);
+            setConnector(overlay.connBR, NaN, NaN, NaN, NaN);
+          };
+
+          const updateResizeOverlayStyles = () => {
+            try {
+              ensureOverlay();
+              const mode = resizeTargetMode || 'size';
+              if (overlay.margin) overlay.margin.style.borderStyle = mode === 'margin' ? 'solid' : 'dashed';
+              if (overlay.padding) overlay.padding.style.borderStyle = mode === 'padding' ? 'solid' : 'dashed';
+              if (overlay.content) overlay.content.style.borderStyle = (mode === 'size' || mode === 'content-lock') ? 'solid' : 'dashed';
+            } catch (e) {}
+          };
+
+          const setShiftBadge = (text, x, y) => {
+            if (!shiftBadge) return;
+            if (!text) {
+              shiftBadge.style.display = 'none';
+              return;
+            }
+            shiftBadge.style.display = 'block';
+            shiftBadge.textContent = text;
+            shiftBadge.style.left = Math.round(x) + 'px';
+            shiftBadge.style.top = Math.round(y) + 'px';
           };
 
           const getElementVisualRect = (el) => {
@@ -304,17 +405,27 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               if (!selected) {
                 setRect(overlay.margin, null);
                 setRect(overlay.padding, null);
+                setRect(overlay.content, null);
                 setRect(overlay.parent, null);
+                hideConnectors();
+                setShiftBadge('', 0, 0);
                 return;
               }
               const rect = getElementVisualRect(selected);
               if (!rect) {
                 setRect(overlay.margin, null);
                 setRect(overlay.padding, null);
+                setRect(overlay.content, null);
                 setRect(overlay.parent, null);
+                hideConnectors();
+                setShiftBadge('', 0, 0);
                 return;
               }
               const cs = window.getComputedStyle(selected);
+              const bt = toNum(cs.borderTopWidth);
+              const br = toNum(cs.borderRightWidth);
+              const bb = toNum(cs.borderBottomWidth);
+              const bl = toNum(cs.borderLeftWidth);
               const mt = toNum(cs.marginTop);
               const mr = toNum(cs.marginRight);
               const mb = toNum(cs.marginBottom);
@@ -351,16 +462,51 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 height: rect.height + mt + mb,
               });
               setRect(overlay.padding, {
-                left: rect.left + pl,
-                top: rect.top + pt,
-                width: rect.width - pl - pr,
-                height: rect.height - pt - pb,
+                left: rect.left + bl,
+                top: rect.top + bt,
+                width: rect.width - bl - br,
+                height: rect.height - bt - bb,
               });
+              setRect(overlay.content, {
+                left: rect.left + bl + pl,
+                top: rect.top + bt + pt,
+                width: rect.width - bl - br - pl - pr,
+                height: rect.height - bt - bb - pt - pb,
+              });
+              if ((resizeTargetMode || 'size') === 'content-lock') {
+                const padLeft = rect.left + bl;
+                const padTop = rect.top + bt;
+                const padRight = rect.right - br;
+                const padBottom = rect.bottom - bb;
+                const contentLeft = rect.left + bl + pl;
+                const contentTop = rect.top + bt + pt;
+                const contentRight = rect.right - br - pr;
+                const contentBottom = rect.bottom - bb - pb;
+                setConnector(overlay.connTL, padLeft, padTop, contentLeft, contentTop);
+                setConnector(overlay.connTR, padRight, padTop, contentRight, contentTop);
+                setConnector(overlay.connBL, padLeft, padBottom, contentLeft, contentBottom);
+                setConnector(overlay.connBR, padRight, padBottom, contentRight, contentBottom);
+              } else {
+                hideConnectors();
+              }
+
+              const mode = cs.position === 'relative' ? 'relative' : moveMode;
+              const hasVisibleOffset = mode === 'relative' || Math.abs(ml) > 0.5 || Math.abs(mt) > 0.5;
+              if (hasVisibleOffset) {
+                const labelText = 'offset ml:' + Math.round(ml) + ' mt:' + Math.round(mt);
+                setShiftBadge(labelText, rect.left - ml, rect.top - mt - 24);
+              } else {
+                setShiftBadge('', 0, 0);
+              }
+              updateResizeOverlayStyles();
             } catch (e) {
               try {
                 setRect(overlay.margin, null);
                 setRect(overlay.padding, null);
+                setRect(overlay.content, null);
                 setRect(overlay.parent, null);
+                hideConnectors();
+                setShiftBadge('', 0, 0);
               } catch (e2) {}
             }
           };
@@ -376,6 +522,14 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const mr = toNum(cs.marginRight);
               const mb = toNum(cs.marginBottom);
               const ml = toNum(cs.marginLeft);
+              const bt = toNum(cs.borderTopWidth);
+              const br = toNum(cs.borderRightWidth);
+              const bb = toNum(cs.borderBottomWidth);
+              const bl = toNum(cs.borderLeftWidth);
+              const pt = toNum(cs.paddingTop);
+              const pr = toNum(cs.paddingRight);
+              const pb = toNum(cs.paddingBottom);
+              const pl = toNum(cs.paddingLeft);
               const futureMl = ml + dx;
               const futureMt = mt + dy;
               const parentInfo = getParentContentRect(el);
@@ -399,6 +553,18 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 width: Math.max(0, rect.width + futureMl + mr),
                 height: Math.max(0, rect.height + futureMt + mb),
               });
+              setRect(overlay.content, {
+                left: rect.left + bl + pl,
+                top: rect.top + bt + pt,
+                width: Math.max(0, rect.width - bl - br - pl - pr),
+                height: Math.max(0, rect.height - bt - bb - pt - pb),
+              });
+              setRect(overlay.padding, {
+                left: rect.left + bl,
+                top: rect.top + bt,
+                width: Math.max(0, rect.width - bl - br),
+                height: Math.max(0, rect.height - bt - bb),
+              });
 
               const unionLeft = Math.min(parentLeft, movedLeft);
               const unionTop = Math.min(parentTop, movedTop);
@@ -411,6 +577,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 width: Math.max(0, unionRight - unionLeft),
                 height: Math.max(0, unionBottom - unionTop),
               });
+              setShiftBadge('offset ml:' + Math.round(futureMl) + ' mt:' + Math.round(futureMt), movedLeft, movedTop - 24);
             } catch (e) {}
           };
 
@@ -461,6 +628,89 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             } catch (e) {}
             return moveMode;
           };
+          const getResizeAnchorRect = (el, resizeTarget) => {
+            const rect = getElementVisualRect(el);
+            if (!rect) return null;
+            const cs = window.getComputedStyle(el);
+            const bt = toNum(cs.borderTopWidth);
+            const br = toNum(cs.borderRightWidth);
+            const bb = toNum(cs.borderBottomWidth);
+            const bl = toNum(cs.borderLeftWidth);
+            const mt = toNum(cs.marginTop);
+            const mr = toNum(cs.marginRight);
+            const mb = toNum(cs.marginBottom);
+            const ml = toNum(cs.marginLeft);
+            const pt = toNum(cs.paddingTop);
+            const pr = toNum(cs.paddingRight);
+            const pb = toNum(cs.paddingBottom);
+            const pl = toNum(cs.paddingLeft);
+
+            if (resizeTarget === 'margin') {
+              return {
+                left: rect.left - ml,
+                top: rect.top - mt,
+                right: rect.right + mr,
+                bottom: rect.bottom + mb,
+                width: rect.width + ml + mr,
+                height: rect.height + mt + mb,
+              };
+            }
+            if (resizeTarget === 'padding') {
+              return {
+                left: rect.left + bl,
+                top: rect.top + bt,
+                right: rect.right - br,
+                bottom: rect.bottom - bb,
+                width: Math.max(0, rect.width - bl - br),
+                height: Math.max(0, rect.height - bt - bb),
+              };
+            }
+            // size/content target
+            return {
+              left: rect.left + bl + pl,
+              top: rect.top + bt + pt,
+              right: rect.right - br - pr,
+              bottom: rect.bottom - bb - pb,
+              width: Math.max(0, rect.width - bl - br - pl - pr),
+              height: Math.max(0, rect.height - bt - bb - pt - pb),
+            };
+          };
+          const getResizeHandleFromPoint = (rect, x, y) => {
+            if (!rect) return 'se';
+            const corners = [
+              { h: 'nw', x: rect.left, y: rect.top },
+              { h: 'ne', x: rect.right, y: rect.top },
+              { h: 'sw', x: rect.left, y: rect.bottom },
+              { h: 'se', x: rect.right, y: rect.bottom },
+            ];
+            let best = corners[3];
+            let bestD = Infinity;
+            for (const c of corners) {
+              const dx = x - c.x;
+              const dy = y - c.y;
+              const d = dx * dx + dy * dy;
+              if (d < bestD) {
+                bestD = d;
+                best = c;
+              }
+            }
+            return best.h;
+          };
+          const getResizeDeltaByHandle = (handle, dx, dy) => {
+            const h = String(handle || 'se');
+            const widthDelta = h.indexOf('w') >= 0 ? -dx : dx;
+            const heightDelta = h.indexOf('n') >= 0 ? -dy : dy;
+            const shiftX = h.indexOf('w') >= 0 ? dx : 0;
+            const shiftY = h.indexOf('n') >= 0 ? dy : 0;
+            return { widthDelta, heightDelta, shiftX, shiftY };
+          };
+          const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+          const computeStyleSizeFromContent = (contentSize, padA, padB, borderA, borderB, boxSizing) => {
+            if (String(boxSizing || '').toLowerCase() === 'border-box') {
+              return Math.max(0, contentSize + padA + padB + borderA + borderB);
+            }
+            return Math.max(0, contentSize);
+          };
           const applyAlignmentPreset = (el, horizontal, vertical) => {
             if (!el) return;
             const id = ensureId(el);
@@ -487,61 +737,46 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 ? contentTop + (contentHeight - rect.height) / 2
                 : contentTop + contentHeight - rect.height;
 
-            if (activeMoveMode === 'relative') {
-              const cs = window.getComputedStyle(el);
-              const baseLeft = pxToNum(cs.marginLeft);
-              const baseTop = pxToNum(cs.marginTop);
-              const nextLeft = snap(baseLeft + (desiredLeft - rect.left));
-              const nextTop = snap(baseTop + (desiredTop - rect.top));
-              const leftValue = formatMoveValue(
-                nextLeft,
-                getMoveAxisReferenceSize(activeMoveMode, 'x', contentWidth, contentHeight),
-                activeMoveMode
-              );
-              const topValue = formatMoveValue(
-                nextTop,
-                getMoveAxisReferenceSize(activeMoveMode, 'y', contentWidth, contentHeight),
-                activeMoveMode
-              );
-              const moveKeys = getMovePatchKeys('relative');
-              el.style.position = 'relative';
-              el.style.left = '';
-              el.style.top = '';
-              el.style[moveKeys.x] = String(leftValue);
-              el.style[moveKeys.y] = String(topValue);
-              post(MSG_APPLY, {
-                id,
-                patch: {
-                  position: 'relative',
-                  left: '',
-                  top: '',
-                  [moveKeys.x]: leftValue,
-                  [moveKeys.y]: topValue,
-                },
-                isIntermediate: false,
-              });
-            } else {
-              const nextLeft = snap(desiredLeft - contentLeft);
-              const nextTop = snap(desiredTop - contentTop);
-              const leftValue = formatMoveValue(
-                nextLeft,
-                getMoveAxisReferenceSize('absolute', 'x', contentWidth, contentHeight),
-                'absolute'
-              );
-              const topValue = formatMoveValue(
-                nextTop,
-                getMoveAxisReferenceSize('absolute', 'y', contentWidth, contentHeight),
-                'absolute'
-              );
+            {
+              // Для пресетов выравнивания (стрелок): absolute + left/top + transform
+              // Если родитель static, делаем его relative чтобы якорем стал именно он.
+              const parentEl = el.parentElement;
+              if (parentEl && parentEl !== document.body && parentEl !== document.documentElement) {
+                const parentCs = window.getComputedStyle(parentEl);
+                if (parentCs.position === 'static') {
+                  parentEl.style.position = 'relative';
+                  const parentId = ensureId(parentEl);
+                  post(MSG_APPLY, {
+                    id: parentId,
+                    patch: { position: 'relative' },
+                    isIntermediate: false,
+                  });
+                }
+              }
+
+              const horizontalPresetMap = { left: 0, center: 50, right: 100 };
+              const verticalPresetMap = { top: 0, center: 50, bottom: 100 };
+              const leftValue = horizontalPresetMap[horizontal] + '%';
+              const topValue = verticalPresetMap[vertical] + '%';
+              const tx = horizontal === 'left' ? '0%' : horizontal === 'center' ? '-50%' : '-100%';
+              const ty = vertical === 'top' ? '0%' : vertical === 'center' ? '-50%' : '-100%';
+              const transformValue = 'translate(' + tx + ', ' + ty + ')';
               el.style.position = 'absolute';
               el.style.left = String(leftValue);
               el.style.top = String(topValue);
+              el.style.marginLeft = '';
+              el.style.marginTop = '';
+              el.style.transform = transformValue;
+              el.setAttribute('data-move-mode', 'absolute');
               post(MSG_APPLY, {
                 id,
                 patch: {
                   position: 'absolute',
                   left: leftValue,
                   top: topValue,
+                  marginLeft: '',
+                  marginTop: '',
+                  transform: transformValue,
                 },
                 isIntermediate: false,
               });
@@ -1100,6 +1335,21 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             document.addEventListener('keydown', (ev) => {
               if (!isActiveInstance()) return;
               if (drag || dragging) return;
+              if ((ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && selected) {
+                try {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  ev.stopImmediatePropagation();
+                } catch (e) {}
+                const modes = ['margin', 'size', 'padding', 'content-lock'];
+                const current = modes.indexOf(resizeTargetMode);
+                const step = ev.key === 'ArrowRight' ? 1 : -1;
+                const next = (current + step + modes.length) % modes.length;
+                resizeTargetMode = modes[next];
+                updateResizeOverlayStyles();
+                updateBoxOverlay();
+                return;
+              }
               const t = ev.target;
               if (t && (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,[role=button],[role=link],[contenteditable]')))) {
                 try {
@@ -1273,13 +1523,45 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                     return;
                   } else if (ev.shiftKey || ev.altKey) {
                     dragging = { sourceId: targetId, mode: ev.altKey ? 'resize' : 'move' };
-                    const startRect = targetEl.getBoundingClientRect();
+                    const startRect = getElementVisualRect(targetEl) || targetEl.getBoundingClientRect();
+                    const startCs = window.getComputedStyle(targetEl);
+                    const startBt = toNum(startCs.borderTopWidth);
+                    const startBr = toNum(startCs.borderRightWidth);
+                    const startBb = toNum(startCs.borderBottomWidth);
+                    const startBl = toNum(startCs.borderLeftWidth);
+                    const startParentInfo = getParentContentRect(targetEl);
+                    const startPadLeft = startParentInfo.padding.left;
+                    const startPadTop = startParentInfo.padding.top;
+                    const startTarget = resizeTargetMode || 'size';
+                    const anchorRect = ev.altKey ? (getResizeAnchorRect(targetEl, startTarget) || startRect) : startRect;
+                    const startHandle = ev.altKey ? getResizeHandleFromPoint(anchorRect, ev.clientX, ev.clientY) : 'se';
                     drag = {
                       mode: ev.altKey ? 'resize' : 'move',
                       sx: ev.clientX,
                       sy: ev.clientY,
                       rect: startRect,
                       moveMode: getElementMoveMode(targetEl),
+                      resizeTarget: startTarget,
+                      resizeHandle: startHandle,
+                      startMarginRight: pxToNum(startCs.marginRight),
+                      startMarginBottom: pxToNum(startCs.marginBottom),
+                      startPaddingRight: pxToNum(startCs.paddingRight),
+                      startPaddingBottom: pxToNum(startCs.paddingBottom),
+                      startPaddingLeft: pxToNum(startCs.paddingLeft),
+                      startPaddingTop: pxToNum(startCs.paddingTop),
+                      startBorderTop: startBt,
+                      startBorderRight: startBr,
+                      startBorderBottom: startBb,
+                      startBorderLeft: startBl,
+                      startBoxSizing: String(startCs.boxSizing || ''),
+                      startPaddingBoxWidth: snap(startRect.width - startBl - startBr),
+                      startPaddingBoxHeight: snap(startRect.height - startBt - startBb),
+                      startLeft: snap(startRect.left - startParentInfo.rect.left - startPadLeft),
+                      startTop: snap(startRect.top - startParentInfo.rect.top - startPadTop),
+                      startMarginLeft: pxToNum(startCs.marginLeft),
+                      startMarginTop: pxToNum(startCs.marginTop),
+                      startWidth: snap(startRect.width),
+                      startHeight: snap(startRect.height),
                     };
                     return;
                   }
@@ -1310,7 +1592,18 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             ev.stopPropagation();
             const id = ensureId(selected);
             dragging = { sourceId: id, mode: ev.altKey ? 'resize' : 'move' };
-            const startRect = selected.getBoundingClientRect();
+            const startRect = getElementVisualRect(selected) || selected.getBoundingClientRect();
+            const startCs = window.getComputedStyle(selected);
+            const startBt = toNum(startCs.borderTopWidth);
+            const startBr = toNum(startCs.borderRightWidth);
+            const startBb = toNum(startCs.borderBottomWidth);
+            const startBl = toNum(startCs.borderLeftWidth);
+            const startParentInfo = getParentContentRect(selected);
+            const startPadLeft = startParentInfo.padding.left;
+            const startPadTop = startParentInfo.padding.top;
+            const startTarget = resizeTargetMode || 'size';
+            const anchorRect = ev.altKey ? (getResizeAnchorRect(selected, startTarget) || startRect) : startRect;
+            const startHandle = ev.altKey ? getResizeHandleFromPoint(anchorRect, ev.clientX, ev.clientY) : 'se';
             const elementMoveMode = getElementMoveMode(selected);
             drag = {
               mode: ev.altKey ? 'resize' : 'move',
@@ -1318,6 +1611,27 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               sy: ev.clientY,
               rect: startRect,
               moveMode: elementMoveMode,
+              resizeTarget: startTarget,
+              resizeHandle: startHandle,
+              startMarginRight: pxToNum(startCs.marginRight),
+              startMarginBottom: pxToNum(startCs.marginBottom),
+              startPaddingRight: pxToNum(startCs.paddingRight),
+              startPaddingBottom: pxToNum(startCs.paddingBottom),
+              startPaddingLeft: pxToNum(startCs.paddingLeft),
+              startPaddingTop: pxToNum(startCs.paddingTop),
+              startBorderTop: startBt,
+              startBorderRight: startBr,
+              startBorderBottom: startBb,
+              startBorderLeft: startBl,
+              startBoxSizing: String(startCs.boxSizing || ''),
+              startPaddingBoxWidth: snap(startRect.width - startBl - startBr),
+              startPaddingBoxHeight: snap(startRect.height - startBt - startBb),
+              startLeft: snap(startRect.left - startParentInfo.rect.left - startPadLeft),
+              startTop: snap(startRect.top - startParentInfo.rect.top - startPadTop),
+              startMarginLeft: pxToNum(startCs.marginLeft),
+              startMarginTop: pxToNum(startCs.marginTop),
+              startWidth: snap(startRect.width),
+              startHeight: snap(startRect.height),
             };
           }, true);
 
@@ -1354,27 +1668,126 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 updateRelativeParentPreview(selected, constrainedDx, constrainedDy);
               }
             } else {
-              const parentInfo = getParentContentRect(selected);
-              const parentRect = parentInfo.rect;
-              const padLeft = parentInfo.padding.left;
-              const padTop = parentInfo.padding.top;
-              const padRight = parentInfo.padding.right;
-              const padBottom = parentInfo.padding.bottom;
-              
-              const w = snap(Math.max(1, drag.rect.width + dx));
-              const h = snap(Math.max(1, drag.rect.height + dy));
-              
-              // Ограничиваем размер чтобы не выходить за padding-box родителя
-              const maxW = parentRect.width - padLeft - padRight;
-              const maxH = parentRect.height - padTop - padBottom;
-              const cw = Math.min(w, maxW);
-              const ch = Math.min(h, maxH);
-              
-              applyToSelectedGroup((node) => {
-                node.style.width = cw + 'px';
-                node.style.height = ch + 'px';
-              });
-              updateBoxOverlay();
+              const resizeTarget = drag.resizeTarget || resizeTargetMode;
+              const handle = drag.resizeHandle || 'se';
+              const delta = getResizeDeltaByHandle(handle, dx, dy);
+              const w = snap(Math.max(0, drag.rect.width + delta.widthDelta));
+              const h = snap(Math.max(0, drag.rect.height + delta.heightDelta));
+              const shiftX = snap(delta.shiftX);
+              const shiftY = snap(delta.shiftY);
+              if (resizeTarget === 'margin') {
+                const handleStr = String(handle || 'se');
+                const nextMl = handleStr.indexOf('w') >= 0
+                  ? snap((drag.startMarginLeft || 0) - dx)
+                  : snap((drag.startMarginLeft || 0));
+                const nextMr = handleStr.indexOf('e') >= 0
+                  ? snap((drag.startMarginRight || 0) + dx)
+                  : snap((drag.startMarginRight || 0));
+                const nextMt = handleStr.indexOf('n') >= 0
+                  ? snap((drag.startMarginTop || 0) - dy)
+                  : snap((drag.startMarginTop || 0));
+                const nextMb = handleStr.indexOf('s') >= 0
+                  ? snap((drag.startMarginBottom || 0) + dy)
+                  : snap((drag.startMarginBottom || 0));
+                drag.finalMargins = {
+                  left: nextMl,
+                  top: nextMt,
+                  right: nextMr,
+                  bottom: nextMb,
+                };
+                updateBoxOverlay();
+                const baseRect = getElementVisualRect(selected);
+                if (baseRect) {
+                  setRect(overlay.margin, {
+                    left: baseRect.left - nextMl,
+                    top: baseRect.top - nextMt,
+                    width: baseRect.width + nextMl + nextMr,
+                    height: baseRect.height + nextMt + nextMb,
+                  });
+                }
+              } else if (resizeTarget === 'padding') {
+                const handleStr = String(handle || 'se');
+                const nextPl = handleStr.indexOf('w') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingLeft || 0) + dx))
+                  : snap(Math.max(0, (drag.startPaddingLeft || 0)));
+                const nextPr = handleStr.indexOf('e') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingRight || 0) - dx))
+                  : snap(Math.max(0, (drag.startPaddingRight || 0)));
+                const nextPt = handleStr.indexOf('n') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingTop || 0) + dy))
+                  : snap(Math.max(0, (drag.startPaddingTop || 0)));
+                const nextPb = handleStr.indexOf('s') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingBottom || 0) - dy))
+                  : snap(Math.max(0, (drag.startPaddingBottom || 0)));
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = nextPl + 'px';
+                  node.style.paddingTop = nextPt + 'px';
+                  node.style.paddingRight = nextPr + 'px';
+                  node.style.paddingBottom = nextPb + 'px';
+                });
+              } else if (resizeTarget === 'content-lock') {
+                const handleStr = String(handle || 'se');
+                let nextPl = drag.startPaddingLeft || 0;
+                let nextPr = drag.startPaddingRight || 0;
+                let nextPt = drag.startPaddingTop || 0;
+                let nextPb = drag.startPaddingBottom || 0;
+                const lockW = Math.max(0, drag.startPaddingBoxWidth || 0);
+                const lockH = Math.max(0, drag.startPaddingBoxHeight || 0);
+                if (handleStr.indexOf('w') >= 0) nextPl = clamp(nextPl + dx, 0, Math.max(0, lockW - nextPr));
+                if (handleStr.indexOf('e') >= 0) nextPr = clamp(nextPr - dx, 0, Math.max(0, lockW - nextPl));
+                if (handleStr.indexOf('n') >= 0) nextPt = clamp(nextPt + dy, 0, Math.max(0, lockH - nextPb));
+                if (handleStr.indexOf('s') >= 0) nextPb = clamp(nextPb - dy, 0, Math.max(0, lockH - nextPt));
+                const nextContentW = Math.max(0, lockW - nextPl - nextPr);
+                const nextContentH = Math.max(0, lockH - nextPt - nextPb);
+                const widthStyle = computeStyleSizeFromContent(
+                  nextContentW,
+                  nextPl,
+                  nextPr,
+                  drag.startBorderLeft || 0,
+                  drag.startBorderRight || 0,
+                  drag.startBoxSizing
+                );
+                const heightStyle = computeStyleSizeFromContent(
+                  nextContentH,
+                  nextPt,
+                  nextPb,
+                  drag.startBorderTop || 0,
+                  drag.startBorderBottom || 0,
+                  drag.startBoxSizing
+                );
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = nextPl + 'px';
+                  node.style.paddingTop = nextPt + 'px';
+                  node.style.paddingRight = nextPr + 'px';
+                  node.style.paddingBottom = nextPb + 'px';
+                  node.style.width = widthStyle + 'px';
+                  node.style.height = heightStyle + 'px';
+                });
+                drag.finalContentLock = {
+                  paddingLeft: nextPl,
+                  paddingTop: nextPt,
+                  paddingRight: nextPr,
+                  paddingBottom: nextPb,
+                  width: widthStyle,
+                  height: heightStyle,
+                };
+              } else {
+                applyToSelectedGroup((node) => {
+                  node.style.transform = '';
+                  node.style.width = w + 'px';
+                  node.style.height = h + 'px';
+                  if ((drag.moveMode || getElementMoveMode(node)) === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                    node.style.left = snap((drag.startLeft || 0) + shiftX) + 'px';
+                    node.style.top = snap((drag.startTop || 0) + shiftY) + 'px';
+                  } else if ((drag.moveMode || getElementMoveMode(node)) === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                    node.style.marginLeft = snap((drag.startMarginLeft || 0) + shiftX) + 'px';
+                    node.style.marginTop = snap((drag.startMarginTop || 0) + shiftY) + 'px';
+                  }
+                });
+              }
+              if (resizeTarget !== 'margin') {
+                updateBoxOverlay();
+              }
             }
           }, true);
 
@@ -1436,31 +1849,141 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 drag.finalPosition = 'absolute';
               }
             } else {
-              const parentInfo = getParentContentRect(selected);
-              const parentRect = parentInfo.rect;
-              const padLeft = parentInfo.padding.left;
-              const padTop = parentInfo.padding.top;
-              const padRight = parentInfo.padding.right;
-              const padBottom = parentInfo.padding.bottom;
-              
-              const w = snap(Math.max(1, drag.rect.width + dx));
-              const h = snap(Math.max(1, drag.rect.height + dy));
-              
-              // Ограничиваем размер чтобы не выходить за padding-box родителя
-              const maxW = parentRect.width - padLeft - padRight;
-              const maxH = parentRect.height - padTop - padBottom;
-              const cw = Math.min(w, maxW);
-              const ch = Math.min(h, maxH);
-              
-              applyToSelectedGroup((node) => {
-                node.style.width = cw + 'px';
-                node.style.height = ch + 'px';
-              });
-              updateBoxOverlay();
-              
-              // Сохраняем финальные размеры в drag объект
-              drag.finalWidth = cw;
-              drag.finalHeight = ch;
+              const resizeTarget = drag.resizeTarget || resizeTargetMode;
+              const handle = drag.resizeHandle || 'se';
+              const delta = getResizeDeltaByHandle(handle, dx, dy);
+              const w = snap(Math.max(0, drag.rect.width + delta.widthDelta));
+              const h = snap(Math.max(0, drag.rect.height + delta.heightDelta));
+              const shiftX = snap(delta.shiftX);
+              const shiftY = snap(delta.shiftY);
+              if (resizeTarget === 'margin') {
+                const handleStr = String(handle || 'se');
+                const nextMl = handleStr.indexOf('w') >= 0
+                  ? snap((drag.startMarginLeft || 0) - dx)
+                  : snap((drag.startMarginLeft || 0));
+                const nextMr = handleStr.indexOf('e') >= 0
+                  ? snap((drag.startMarginRight || 0) + dx)
+                  : snap((drag.startMarginRight || 0));
+                const nextMt = handleStr.indexOf('n') >= 0
+                  ? snap((drag.startMarginTop || 0) - dy)
+                  : snap((drag.startMarginTop || 0));
+                const nextMb = handleStr.indexOf('s') >= 0
+                  ? snap((drag.startMarginBottom || 0) + dy)
+                  : snap((drag.startMarginBottom || 0));
+                drag.finalMargins = {
+                  left: nextMl,
+                  top: nextMt,
+                  right: nextMr,
+                  bottom: nextMb,
+                };
+                updateBoxOverlay();
+                const baseRect = getElementVisualRect(selected);
+                if (baseRect) {
+                  setRect(overlay.margin, {
+                    left: baseRect.left - nextMl,
+                    top: baseRect.top - nextMt,
+                    width: baseRect.width + nextMl + nextMr,
+                    height: baseRect.height + nextMt + nextMb,
+                  });
+                }
+              } else if (resizeTarget === 'padding') {
+                const handleStr = String(handle || 'se');
+                const nextPl = handleStr.indexOf('w') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingLeft || 0) + dx))
+                  : snap(Math.max(0, (drag.startPaddingLeft || 0)));
+                const nextPr = handleStr.indexOf('e') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingRight || 0) - dx))
+                  : snap(Math.max(0, (drag.startPaddingRight || 0)));
+                const nextPt = handleStr.indexOf('n') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingTop || 0) + dy))
+                  : snap(Math.max(0, (drag.startPaddingTop || 0)));
+                const nextPb = handleStr.indexOf('s') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingBottom || 0) - dy))
+                  : snap(Math.max(0, (drag.startPaddingBottom || 0)));
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = nextPl + 'px';
+                  node.style.paddingTop = nextPt + 'px';
+                  node.style.paddingRight = nextPr + 'px';
+                  node.style.paddingBottom = nextPb + 'px';
+                });
+                drag.finalPaddings = {
+                  left: nextPl,
+                  top: nextPt,
+                  right: nextPr,
+                  bottom: nextPb,
+                };
+              } else if (resizeTarget === 'content-lock') {
+                const handleStr = String(handle || 'se');
+                let nextPl = drag.startPaddingLeft || 0;
+                let nextPr = drag.startPaddingRight || 0;
+                let nextPt = drag.startPaddingTop || 0;
+                let nextPb = drag.startPaddingBottom || 0;
+                const lockW = Math.max(0, drag.startPaddingBoxWidth || 0);
+                const lockH = Math.max(0, drag.startPaddingBoxHeight || 0);
+                if (handleStr.indexOf('w') >= 0) nextPl = clamp(nextPl + dx, 0, Math.max(0, lockW - nextPr));
+                if (handleStr.indexOf('e') >= 0) nextPr = clamp(nextPr - dx, 0, Math.max(0, lockW - nextPl));
+                if (handleStr.indexOf('n') >= 0) nextPt = clamp(nextPt + dy, 0, Math.max(0, lockH - nextPb));
+                if (handleStr.indexOf('s') >= 0) nextPb = clamp(nextPb - dy, 0, Math.max(0, lockH - nextPt));
+                const nextContentW = Math.max(0, lockW - nextPl - nextPr);
+                const nextContentH = Math.max(0, lockH - nextPt - nextPb);
+                const widthStyle = computeStyleSizeFromContent(
+                  nextContentW,
+                  nextPl,
+                  nextPr,
+                  drag.startBorderLeft || 0,
+                  drag.startBorderRight || 0,
+                  drag.startBoxSizing
+                );
+                const heightStyle = computeStyleSizeFromContent(
+                  nextContentH,
+                  nextPt,
+                  nextPb,
+                  drag.startBorderTop || 0,
+                  drag.startBorderBottom || 0,
+                  drag.startBoxSizing
+                );
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = nextPl + 'px';
+                  node.style.paddingTop = nextPt + 'px';
+                  node.style.paddingRight = nextPr + 'px';
+                  node.style.paddingBottom = nextPb + 'px';
+                  node.style.width = widthStyle + 'px';
+                  node.style.height = heightStyle + 'px';
+                });
+                drag.finalContentLock = {
+                  paddingLeft: nextPl,
+                  paddingTop: nextPt,
+                  paddingRight: nextPr,
+                  paddingBottom: nextPb,
+                  width: widthStyle,
+                  height: heightStyle,
+                };
+              } else {
+                applyToSelectedGroup((node) => {
+                  node.style.transform = '';
+                  node.style.width = w + 'px';
+                  node.style.height = h + 'px';
+                  if ((drag.moveMode || getElementMoveMode(node)) === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                    node.style.left = snap((drag.startLeft || 0) + shiftX) + 'px';
+                    node.style.top = snap((drag.startTop || 0) + shiftY) + 'px';
+                  } else if ((drag.moveMode || getElementMoveMode(node)) === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                    node.style.marginLeft = snap((drag.startMarginLeft || 0) + shiftX) + 'px';
+                    node.style.marginTop = snap((drag.startMarginTop || 0) + shiftY) + 'px';
+                  }
+                });
+                drag.finalWidth = w;
+                drag.finalHeight = h;
+                if ((drag.moveMode || getElementMoveMode(selected)) === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                  drag.finalLeft = snap((drag.startLeft || 0) + shiftX);
+                  drag.finalTop = snap((drag.startTop || 0) + shiftY);
+                } else if ((drag.moveMode || getElementMoveMode(selected)) === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                  drag.finalMarginLeft = snap((drag.startMarginLeft || 0) + shiftX);
+                  drag.finalMarginTop = snap((drag.startMarginTop || 0) + shiftY);
+                }
+              }
+              if (resizeTarget !== 'margin') {
+                updateBoxOverlay();
+              }
             }
           }, { passive: false });
 
@@ -1533,19 +2056,153 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 }
               }
             } else {
-              // Используем сохраненные финальные размеры
-              if (drag.finalWidth !== undefined && drag.finalHeight !== undefined) {
+              const resizeTarget = drag.resizeTarget || resizeTargetMode;
+              if (resizeTarget === 'margin' && drag.finalMargins) {
                 applyToSelectedGroup((node) => {
+                  if (drag.startWidth !== undefined && drag.startHeight !== undefined) {
+                    node.style.width = drag.startWidth + 'px';
+                    node.style.height = drag.startHeight + 'px';
+                  }
+                  node.style.marginLeft = drag.finalMargins.left + 'px';
+                  node.style.marginTop = drag.finalMargins.top + 'px';
+                  node.style.marginRight = drag.finalMargins.right + 'px';
+                  node.style.marginBottom = drag.finalMargins.bottom + 'px';
+                });
+                updateBoxOverlay();
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth + 'px', height: drag.startHeight + 'px' } : {}),
+                      marginLeft: drag.finalMargins.left + 'px',
+                      marginTop: drag.finalMargins.top + 'px',
+                      marginRight: drag.finalMargins.right + 'px',
+                      marginBottom: drag.finalMargins.bottom + 'px',
+                    },
+                    isIntermediate: false
+                  });
+                } else {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth, height: drag.startHeight } : {}),
+                      marginLeft: drag.finalMargins.left,
+                      marginTop: drag.finalMargins.top,
+                      marginRight: drag.finalMargins.right,
+                      marginBottom: drag.finalMargins.bottom,
+                    },
+                    isIntermediate: false
+                  });
+                }
+              } else if (resizeTarget === 'padding' && drag.finalPaddings) {
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = drag.finalPaddings.left + 'px';
+                  node.style.paddingTop = drag.finalPaddings.top + 'px';
+                  node.style.paddingRight = drag.finalPaddings.right + 'px';
+                  node.style.paddingBottom = drag.finalPaddings.bottom + 'px';
+                });
+                updateBoxOverlay();
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: drag.finalPaddings.left + 'px',
+                      paddingTop: drag.finalPaddings.top + 'px',
+                      paddingRight: drag.finalPaddings.right + 'px',
+                      paddingBottom: drag.finalPaddings.bottom + 'px'
+                    },
+                    isIntermediate: false
+                  });
+                } else {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: drag.finalPaddings.left,
+                      paddingTop: drag.finalPaddings.top,
+                      paddingRight: drag.finalPaddings.right,
+                      paddingBottom: drag.finalPaddings.bottom
+                    },
+                    isIntermediate: false
+                  });
+                }
+              } else if (resizeTarget === 'content-lock' && drag.finalContentLock) {
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = drag.finalContentLock.paddingLeft + 'px';
+                  node.style.paddingTop = drag.finalContentLock.paddingTop + 'px';
+                  node.style.paddingRight = drag.finalContentLock.paddingRight + 'px';
+                  node.style.paddingBottom = drag.finalContentLock.paddingBottom + 'px';
+                  node.style.width = drag.finalContentLock.width + 'px';
+                  node.style.height = drag.finalContentLock.height + 'px';
+                });
+                updateBoxOverlay();
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: drag.finalContentLock.paddingLeft + 'px',
+                      paddingTop: drag.finalContentLock.paddingTop + 'px',
+                      paddingRight: drag.finalContentLock.paddingRight + 'px',
+                      paddingBottom: drag.finalContentLock.paddingBottom + 'px',
+                      width: drag.finalContentLock.width + 'px',
+                      height: drag.finalContentLock.height + 'px',
+                    },
+                    isIntermediate: false
+                  });
+                } else {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: drag.finalContentLock.paddingLeft,
+                      paddingTop: drag.finalContentLock.paddingTop,
+                      paddingRight: drag.finalContentLock.paddingRight,
+                      paddingBottom: drag.finalContentLock.paddingBottom,
+                      width: drag.finalContentLock.width,
+                      height: drag.finalContentLock.height,
+                    },
+                    isIntermediate: false
+                  });
+                }
+              } else if (drag.finalWidth !== undefined && drag.finalHeight !== undefined) {
+                applyToSelectedGroup((node) => {
+                  node.style.transform = '';
                   node.style.width = drag.finalWidth + 'px';
                   node.style.height = drag.finalHeight + 'px';
+                  if (drag.finalLeft !== undefined && drag.finalTop !== undefined) {
+                    node.style.left = drag.finalLeft + 'px';
+                    node.style.top = drag.finalTop + 'px';
+                  }
+                  if (drag.finalMarginLeft !== undefined && drag.finalMarginTop !== undefined) {
+                    node.style.marginLeft = drag.finalMarginLeft + 'px';
+                    node.style.marginTop = drag.finalMarginTop + 'px';
+                  }
                 });
                 updateBoxOverlay();
                 
+                const patch = {};
                 if ('${type}' === 'html') {
-                  post(MSG_APPLY, { id, patch: { width: drag.finalWidth + 'px', height: drag.finalHeight + 'px' }, isIntermediate: false });
+                  patch.width = drag.finalWidth + 'px';
+                  patch.height = drag.finalHeight + 'px';
+                  if (drag.finalLeft !== undefined && drag.finalTop !== undefined) {
+                    patch.left = drag.finalLeft + 'px';
+                    patch.top = drag.finalTop + 'px';
+                  }
+                  if (drag.finalMarginLeft !== undefined && drag.finalMarginTop !== undefined) {
+                    patch.marginLeft = drag.finalMarginLeft + 'px';
+                    patch.marginTop = drag.finalMarginTop + 'px';
+                  }
                 } else {
-                  post(MSG_APPLY, { id, patch: { width: drag.finalWidth, height: drag.finalHeight }, isIntermediate: false });
+                  patch.width = drag.finalWidth;
+                  patch.height = drag.finalHeight;
+                  if (drag.finalLeft !== undefined && drag.finalTop !== undefined) {
+                    patch.left = drag.finalLeft;
+                    patch.top = drag.finalTop;
+                  }
+                  if (drag.finalMarginLeft !== undefined && drag.finalMarginTop !== undefined) {
+                    patch.marginLeft = drag.finalMarginLeft;
+                    patch.marginTop = drag.finalMarginTop;
+                  }
                 }
+                post(MSG_APPLY, { id, patch, isIntermediate: false });
               }
             }
 
@@ -1672,23 +2329,227 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 post(MSG_APPLY, { id, patch, isIntermediate: false });
               }
             } else {
-              const w = snap(Math.max(1, drag.rect.width + dx));
-              const h = snap(Math.max(1, drag.rect.height + dy));
-              // constrain size чтобы не выходить за padding-box справа/снизу
-              const maxW = parentRect.width - padLeft - padRight;
-              const maxH = parentRect.height - padTop - padBottom;
-              const cw = Math.min(w, maxW);
-              const ch = Math.min(h, maxH);
-
-              applyToSelectedGroup((node) => {
-                node.style.width = cw + 'px';
-                node.style.height = ch + 'px';
-              });
-              updateBoxOverlay();
-              if ('${type}' === 'html') {
-                post(MSG_APPLY, { id, patch: { width: cw + 'px', height: ch + 'px' }, isIntermediate: false });
+              const resizeTarget = drag.resizeTarget || resizeTargetMode;
+              const handle = drag.resizeHandle || 'se';
+              const delta = getResizeDeltaByHandle(handle, dx, dy);
+              const w = snap(Math.max(0, drag.rect.width + delta.widthDelta));
+              const h = snap(Math.max(0, drag.rect.height + delta.heightDelta));
+              const shiftX = snap(delta.shiftX);
+              const shiftY = snap(delta.shiftY);
+              if (resizeTarget === 'margin') {
+                const handleStr = String(handle || 'se');
+                const nextMl = handleStr.indexOf('w') >= 0
+                  ? snap((drag.startMarginLeft || 0) - dx)
+                  : snap((drag.startMarginLeft || 0));
+                const nextMr = handleStr.indexOf('e') >= 0
+                  ? snap((drag.startMarginRight || 0) + dx)
+                  : snap((drag.startMarginRight || 0));
+                const nextMt = handleStr.indexOf('n') >= 0
+                  ? snap((drag.startMarginTop || 0) - dy)
+                  : snap((drag.startMarginTop || 0));
+                const nextMb = handleStr.indexOf('s') >= 0
+                  ? snap((drag.startMarginBottom || 0) + dy)
+                  : snap((drag.startMarginBottom || 0));
+                applyToSelectedGroup((node) => {
+                  if (drag.startWidth !== undefined && drag.startHeight !== undefined) {
+                    node.style.width = drag.startWidth + 'px';
+                    node.style.height = drag.startHeight + 'px';
+                  }
+                  node.style.marginLeft = nextMl + 'px';
+                  node.style.marginTop = nextMt + 'px';
+                  node.style.marginRight = nextMr + 'px';
+                  node.style.marginBottom = nextMb + 'px';
+                });
+                updateBoxOverlay();
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth + 'px', height: drag.startHeight + 'px' } : {}),
+                      marginLeft: nextMl + 'px',
+                      marginTop: nextMt + 'px',
+                      marginRight: nextMr + 'px',
+                      marginBottom: nextMb + 'px',
+                    },
+                    isIntermediate: false
+                  });
+                } else {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth, height: drag.startHeight } : {}),
+                      marginLeft: nextMl,
+                      marginTop: nextMt,
+                      marginRight: nextMr,
+                      marginBottom: nextMb,
+                    },
+                    isIntermediate: false
+                  });
+                }
+              } else if (resizeTarget === 'padding') {
+                const handleStr = String(handle || 'se');
+                const nextPl = handleStr.indexOf('w') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingLeft || 0) + dx))
+                  : snap(Math.max(0, (drag.startPaddingLeft || 0)));
+                const nextPr = handleStr.indexOf('e') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingRight || 0) - dx))
+                  : snap(Math.max(0, (drag.startPaddingRight || 0)));
+                const nextPt = handleStr.indexOf('n') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingTop || 0) + dy))
+                  : snap(Math.max(0, (drag.startPaddingTop || 0)));
+                const nextPb = handleStr.indexOf('s') >= 0
+                  ? snap(Math.max(0, (drag.startPaddingBottom || 0) - dy))
+                  : snap(Math.max(0, (drag.startPaddingBottom || 0)));
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = nextPl + 'px';
+                  node.style.paddingTop = nextPt + 'px';
+                  node.style.paddingRight = nextPr + 'px';
+                  node.style.paddingBottom = nextPb + 'px';
+                });
+                updateBoxOverlay();
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: nextPl + 'px',
+                      paddingTop: nextPt + 'px',
+                      paddingRight: nextPr + 'px',
+                      paddingBottom: nextPb + 'px'
+                    },
+                    isIntermediate: false
+                  });
+                } else {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: nextPl,
+                      paddingTop: nextPt,
+                      paddingRight: nextPr,
+                      paddingBottom: nextPb
+                    },
+                    isIntermediate: false
+                  });
+                }
+              } else if (resizeTarget === 'content-lock') {
+                const handleStr = String(handle || 'se');
+                let nextPl = drag.startPaddingLeft || 0;
+                let nextPr = drag.startPaddingRight || 0;
+                let nextPt = drag.startPaddingTop || 0;
+                let nextPb = drag.startPaddingBottom || 0;
+                const lockW = Math.max(0, drag.startPaddingBoxWidth || 0);
+                const lockH = Math.max(0, drag.startPaddingBoxHeight || 0);
+                if (handleStr.indexOf('w') >= 0) nextPl = clamp(nextPl + dx, 0, Math.max(0, lockW - nextPr));
+                if (handleStr.indexOf('e') >= 0) nextPr = clamp(nextPr - dx, 0, Math.max(0, lockW - nextPl));
+                if (handleStr.indexOf('n') >= 0) nextPt = clamp(nextPt + dy, 0, Math.max(0, lockH - nextPb));
+                if (handleStr.indexOf('s') >= 0) nextPb = clamp(nextPb - dy, 0, Math.max(0, lockH - nextPt));
+                const nextContentW = Math.max(0, lockW - nextPl - nextPr);
+                const nextContentH = Math.max(0, lockH - nextPt - nextPb);
+                const widthStyle = computeStyleSizeFromContent(
+                  nextContentW,
+                  nextPl,
+                  nextPr,
+                  drag.startBorderLeft || 0,
+                  drag.startBorderRight || 0,
+                  drag.startBoxSizing
+                );
+                const heightStyle = computeStyleSizeFromContent(
+                  nextContentH,
+                  nextPt,
+                  nextPb,
+                  drag.startBorderTop || 0,
+                  drag.startBorderBottom || 0,
+                  drag.startBoxSizing
+                );
+                applyToSelectedGroup((node) => {
+                  node.style.paddingLeft = nextPl + 'px';
+                  node.style.paddingTop = nextPt + 'px';
+                  node.style.paddingRight = nextPr + 'px';
+                  node.style.paddingBottom = nextPb + 'px';
+                  node.style.width = widthStyle + 'px';
+                  node.style.height = heightStyle + 'px';
+                });
+                updateBoxOverlay();
+                if ('${type}' === 'html') {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: nextPl + 'px',
+                      paddingTop: nextPt + 'px',
+                      paddingRight: nextPr + 'px',
+                      paddingBottom: nextPb + 'px',
+                      width: widthStyle + 'px',
+                      height: heightStyle + 'px',
+                    },
+                    isIntermediate: false
+                  });
+                } else {
+                  post(MSG_APPLY, {
+                    id,
+                    patch: {
+                      paddingLeft: nextPl,
+                      paddingTop: nextPt,
+                      paddingRight: nextPr,
+                      paddingBottom: nextPb,
+                      width: widthStyle,
+                      height: heightStyle,
+                    },
+                    isIntermediate: false
+                  });
+                }
               } else {
-                post(MSG_APPLY, { id, patch: { width: cw, height: ch }, isIntermediate: false });
+                // Разрешаем ресайз за пределы родителя
+                const cw = w;
+                const ch = h;
+                let nextLeft = undefined;
+                let nextTop = undefined;
+                let nextMarginLeft = undefined;
+                let nextMarginTop = undefined;
+                if (activeMoveMode === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                  nextLeft = snap((drag.startLeft || 0) + shiftX);
+                  nextTop = snap((drag.startTop || 0) + shiftY);
+                } else if (activeMoveMode === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                  nextMarginLeft = snap((drag.startMarginLeft || 0) + shiftX);
+                  nextMarginTop = snap((drag.startMarginTop || 0) + shiftY);
+                }
+                applyToSelectedGroup((node) => {
+                  node.style.transform = '';
+                  node.style.width = cw + 'px';
+                  node.style.height = ch + 'px';
+                  if (nextLeft !== undefined && nextTop !== undefined) {
+                    node.style.left = nextLeft + 'px';
+                    node.style.top = nextTop + 'px';
+                  }
+                  if (nextMarginLeft !== undefined && nextMarginTop !== undefined) {
+                    node.style.marginLeft = nextMarginLeft + 'px';
+                    node.style.marginTop = nextMarginTop + 'px';
+                  }
+                });
+                updateBoxOverlay();
+                const patch = {};
+                if ('${type}' === 'html') {
+                  patch.width = cw + 'px';
+                  patch.height = ch + 'px';
+                  if (nextLeft !== undefined && nextTop !== undefined) {
+                    patch.left = nextLeft + 'px';
+                    patch.top = nextTop + 'px';
+                  }
+                  if (nextMarginLeft !== undefined && nextMarginTop !== undefined) {
+                    patch.marginLeft = nextMarginLeft + 'px';
+                    patch.marginTop = nextMarginTop + 'px';
+                  }
+                } else {
+                  patch.width = cw;
+                  patch.height = ch;
+                  if (nextLeft !== undefined && nextTop !== undefined) {
+                    patch.left = nextLeft;
+                    patch.top = nextTop;
+                  }
+                  if (nextMarginLeft !== undefined && nextMarginTop !== undefined) {
+                    patch.marginLeft = nextMarginLeft;
+                    patch.marginTop = nextMarginTop;
+                  }
+                }
+                post(MSG_APPLY, { id, patch, isIntermediate: false });
               }
             }
 
@@ -1701,7 +2562,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           try {
             const hint = document.createElement('div');
             hint.className = 'mrpak-hint';
-            hint.textContent = 'MRPAK Editor: клик = выбрать, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize.';
+            hint.textContent = 'MRPAK Editor: клик = выбрать, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize, ←/→ = resize mode (margin/size/padding/content-lock).';
             document.body.appendChild(hint);
           } catch(e) {}
 
@@ -1909,6 +2770,18 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   });
                 }
                 clearExternalDrag();
+                return;
+              }
+              if (data.type === CMD_SET_RESIZE_TARGET) {
+                const modes = ['margin', 'size', 'padding', 'content-lock'];
+                const dir = data.direction === 'left' ? -1 : data.direction === 'right' ? 1 : 0;
+                if (dir !== 0) {
+                  const current = modes.indexOf(resizeTargetMode);
+                  const next = (current + dir + modes.length) % modes.length;
+                  resizeTargetMode = modes[next];
+                  updateResizeOverlayStyles();
+                  updateBoxOverlay();
+                }
                 return;
               }
             } catch(e) {}
