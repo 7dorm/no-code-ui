@@ -1070,6 +1070,20 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           };
 
+          // Блокируем hover/enter события, чтобы onPointerEnter/onMouseEnter не срабатывали в edit режиме
+          const blockHoverEvents = (ev) => {
+            if (!isActiveInstance()) return;
+            if (!EDIT_MODE) return;
+            const t = ev.target;
+            if (!t) return;
+            if (t.closest && t.closest(SEL_ALL)) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+              } catch (e) {}
+            }
+          };
+
           // Блокируем все события на интерактивных элементах (кроме mousedown, который обрабатывается отдельно) только в режиме редактора
           if (EDIT_MODE) {
             document.addEventListener('mouseup', blockInteractiveEvents, true);
@@ -1102,6 +1116,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }, true);
             document.addEventListener('keyup', blockInteractiveEvents, true);
             document.addEventListener('keypress', blockInteractiveEvents, true);
+            document.addEventListener('pointerenter', blockHoverEvents, true);
+            document.addEventListener('pointerover', blockHoverEvents, true);
+            document.addEventListener('mouseenter', blockHoverEvents, true);
+            document.addEventListener('mouseover', blockHoverEvents, true);
           }
           
           // Обработка клика для выбора блоков (только в режиме редактора)
