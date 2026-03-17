@@ -30,18 +30,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         [data-no-code-ui-id] a,
         [data-no-code-ui-id] [role="button"],
         [data-no-code-ui-id] [role="link"],
-        [data-no-code-ui-id] [contenteditable="true"],
-        [data-no-code-ui-id] [contenteditable=""],
         [data-mrpak-id] button,
         [data-mrpak-id] input,
         [data-mrpak-id] select,
         [data-mrpak-id] textarea,
         [data-mrpak-id] a,
         [data-mrpak-id] [role="button"],
-        [data-mrpak-id] [role="link"],
-        [data-mrpak-id] [contenteditable="true"],
-        [data-mrpak-id] [contenteditable=""] {
-          pointer-events: none !important;
+        [data-mrpak-id] [role="link"] {
           user-select: none !important;
           -webkit-user-select: none !important;
           -moz-user-select: none !important;
@@ -1048,7 +1043,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
             if (drag || dragging) return;
-            const t = ev.target;
+            let t = ev.target;
+            if (t && t.nodeType === 3) {
+              t = t.parentElement;
+            }
             if (!t) return;
             // Проверяем, является ли элемент интерактивным
             if (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,label,form,[role=button],[role=link],[role=checkbox],[role=switch],[contenteditable]'))) {
@@ -1074,14 +1072,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const blockHoverEvents = (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
-            const t = ev.target;
-            if (!t) return;
-            if (t.closest && t.closest(SEL_ALL)) {
-              try {
-                ev.preventDefault();
-                ev.stopPropagation();
-              } catch (e) {}
-            }
+            try {
+              ev.preventDefault();
+              ev.stopPropagation();
+              ev.stopImmediatePropagation();
+            } catch (e) {}
           };
 
           // Блокируем все события на интерактивных элементах (кроме mousedown, который обрабатывается отдельно) только в режиме редактора
@@ -1090,8 +1085,17 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             document.addEventListener('dblclick', blockInteractiveEvents, true);
             document.addEventListener('change', blockInteractiveEvents, true);
             document.addEventListener('input', blockInteractiveEvents, true);
+            document.addEventListener('beforeinput', blockInteractiveEvents, true);
+            document.addEventListener('compositionstart', blockInteractiveEvents, true);
+            document.addEventListener('compositionupdate', blockInteractiveEvents, true);
+            document.addEventListener('compositionend', blockInteractiveEvents, true);
+            document.addEventListener('paste', blockInteractiveEvents, true);
+            document.addEventListener('cut', blockInteractiveEvents, true);
+            document.addEventListener('copy', blockInteractiveEvents, true);
             document.addEventListener('focus', blockInteractiveEvents, true);
             document.addEventListener('blur', blockInteractiveEvents, true);
+            document.addEventListener('focusin', blockInteractiveEvents, true);
+            document.addEventListener('focusout', blockInteractiveEvents, true);
             document.addEventListener('keydown', (ev) => {
               if (!isActiveInstance()) return;
               if (drag || dragging) return;
@@ -1118,8 +1122,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             document.addEventListener('keypress', blockInteractiveEvents, true);
             document.addEventListener('pointerenter', blockHoverEvents, true);
             document.addEventListener('pointerover', blockHoverEvents, true);
+            document.addEventListener('pointerout', blockHoverEvents, true);
+            document.addEventListener('pointermove', blockHoverEvents, true);
             document.addEventListener('mouseenter', blockHoverEvents, true);
             document.addEventListener('mouseover', blockHoverEvents, true);
+            document.addEventListener('mouseout', blockHoverEvents, true);
+            document.addEventListener('mousemove', blockHoverEvents, true);
           }
           
           // Обработка клика для выбора блоков (только в режиме редактора)
@@ -1226,7 +1234,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (!EDIT_MODE) return; // В preview режиме не обрабатываем
             if (externalDrag) return;
             
-            const t = ev.target;
+            let t = ev.target;
+            if (t && t.nodeType === 3) {
+              t = t.parentElement;
+            }
             // Если это интерактивный элемент, обрабатываем его
             if (t && (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,label,form,[role=button],[role=link],[contenteditable]')))) {
               try {
