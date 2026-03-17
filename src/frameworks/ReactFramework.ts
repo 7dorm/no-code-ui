@@ -38,6 +38,40 @@ function parseRuntimeNamedImports(importSpec: string): Array<{ orig: string; ali
     .filter((entry) => entry.orig && entry.alias);
 }
 
+function createSafeStubBinding(name: string) {
+  const safeName = String(name || '').replace(/[^a-zA-Z0-9_$]/g, '') || 'stubValue';
+  if (/^[A-Z]/.test(safeName)) {
+    return `const ${safeName} = () => null;`;
+  }
+  return `const ${safeName} = undefined;`;
+}
+
+function buildSafeStubImportReplacement(fullStatement: string) {
+  const match = String(fullStatement || '').match(/import\s+(.*?)\s+from/);
+  if (!match) return '';
+  const importSpec = match[1].trim();
+  const starAsMatch = String(fullStatement || '').match(/import\s+\*\s+as\s+(\w+)/);
+  if (starAsMatch) {
+    return `const ${starAsMatch[1]} = {};`;
+  }
+  if (importSpec.includes(',')) {
+    const parts = importSpec.split(',').map((part) => part.trim()).filter(Boolean);
+    return parts.map((part) => {
+      if (part.startsWith('{')) {
+        return parseRuntimeNamedImports(part).map((entry) => createSafeStubBinding(entry.alias)).join('\n');
+      }
+      return createSafeStubBinding(part);
+    }).filter(Boolean).join('\n');
+  }
+  if (importSpec.startsWith('{')) {
+    return parseRuntimeNamedImports(importSpec).map((entry) => createSafeStubBinding(entry.alias)).join('\n');
+  }
+  if (importSpec.startsWith('* as ')) {
+    return `const ${importSpec.replace('* as ', '').trim()} = {};`;
+  }
+  return createSafeStubBinding(importSpec);
+}
+
 const IMPORTED_COMPONENT_BOUNDARY_HELPER = `
 function MrpakImportedBoundary({
   __mrpakComponent: Component,
@@ -469,7 +503,8 @@ export class ReactFramework extends Framework {
    * Обрабатывает код React файла с поддержкой зависимостей
    * Перенесено из RenderFile.jsx: processReactCode
    */
-  async processReactCode(code: string, basePath: string) {
+  async processReactCode(code: string, basePath: string, options: { safeVisualMode?: boolean } = {}) {
+    const safeVisualMode = !!options.safeVisualMode;
     // Извлекаем импорты
     const fileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
     const imports = extractImports(code, fileName);
@@ -489,6 +524,9 @@ export class ReactFramework extends Framework {
     
     // Загружаем все зависимости рекурсивно
     for (const imp of imports) {
+      if (safeVisualMode) {
+        continue;
+      }
       // Пропускаем только внешние библиотеки (npm пакеты)
       if (imp.path.startsWith('react') && !imp.path.startsWith('react/') && 
           !imp.path.startsWith('react-dom') && 
@@ -1211,6 +1249,18 @@ export class ReactFramework extends Framework {
     // Обрабатываем импорты в основном файле
     for (const imp of imports) {
       // Специальная обработка для react-native импортов
+      if (safeVisualMode) {
+        if (
+          imp.path.startsWith('react') ||
+          imp.path.startsWith('react-dom') ||
+          imp.path.startsWith('react-native') ||
+          imp.path.startsWith('http')
+        ) {
+          continue;
+        }
+        importReplacements[imp.fullStatement] = buildSafeStubImportReplacement(imp.fullStatement);
+        continue;
+      }
       if (imp.path === 'react-native') {
         const match = imp.fullStatement.match(/import\s+(.*?)\s+from/);
         if (!match) continue;
@@ -1440,19 +1490,20 @@ export class ReactFramework extends Framework {
    * Генерирует HTML для превью/редактора
    * Перенесено из RenderFile.jsx: createReactHTML
    */
-  async generateHTML(code: string, filePath: string, options: { viewMode?: string, projectRoot?: string, selectedComponentName?: string | null } = {}) {
+  async generateHTML(code: string, filePath: string, options: { viewMode?: string, projectRoot?: string, selectedComponentName?: string | null, aggressivePreviewMode?: boolean } = {}) {
     const viewMode = options.viewMode || 'preview';
     const projectRoot = options.projectRoot || null;
     const requestedComponentName =
       typeof options.selectedComponentName === 'string' && options.selectedComponentName.trim()
         ? options.selectedComponentName.trim()
         : null;
+    const safeVisualMode = !!options.aggressivePreviewMode;
     
     // ВАЖНО: сначала инструментируем ИСХОДНЫЙ код, чтобы data-no-code-ui-id были стабильны
     const instOriginal = this.instrument(code, filePath, { projectRoot });
     
     // Обрабатываем код (загружаем зависимости, заменяем импорты)
-    const processed = await this.processReactCode(instOriginal.code, filePath);
+    const processed = await this.processReactCode(instOriginal.code, filePath, { safeVisualMode });
     const processedCodeBeforeInst = processed.processedCode;
     const modulesCode = processed.modulesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
@@ -1715,6 +1766,15 @@ export class ReactFramework extends Framework {
             margin-bottom: 20px;
             font-size: 14px;
         }
+        .safe-visual {
+            color: #7c2d12;
+            padding: 10px;
+            background: #ffedd5;
+            border: 1px solid #fdba74;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -1722,6 +1782,7 @@ export class ReactFramework extends Framework {
         <strong>React Component Preview</strong><br>
         Компонент загружается из выбранного файла...
     </div>
+    ${safeVisualMode ? '<div class="safe-visual"><strong>Safe Visual Mode</strong><br>Сложный проект открыт в упрощенном режиме. Импортированные JS/TS модули заменены безопасными заглушками, поэтому отображение может быть частичным.</div>' : ''}
     <div id="root"></div>
     <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
         // Делаем все React хуки доступными в Babel скрипте

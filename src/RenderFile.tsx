@@ -124,6 +124,11 @@ function getPathBasename(filePath: string | null | undefined): string {
   return String(filePath || '').replace(/\\/g, '/').split('/').pop() || '';
 }
 
+function isInternalSourceFilePath(filePath: string | null | undefined): boolean {
+  const normalized = String(filePath || '').replace(/\\/g, '/');
+  return /(^|\/)src\/.+\.(jsx?|tsx?)$/i.test(normalized) && !/(^|\/)tests\//i.test(normalized);
+}
+
 function getMrpakIdBasename(id: string | null | undefined): string {
   const match = String(id || '').match(/^mrpak:([^:]+):/);
   return match ? match[1] : '';
@@ -246,6 +251,7 @@ function RenderFile({
   showSplitSidebar,
   showSplitPreview,
   showSplitCode,
+  aggressivePreviewMode: externalAggressivePreviewMode = false,
   onProjectFilesChanged,
   onOpenFile,
 }: {
@@ -257,9 +263,11 @@ function RenderFile({
   showSplitSidebar: boolean;
   showSplitPreview: boolean;
   showSplitCode: boolean;
+  aggressivePreviewMode?: boolean;
   onProjectFilesChanged?: () => void;
   onOpenFile?: (path: string) => void;
 }) {
+  const aggressivePreviewMode = externalAggressivePreviewMode;
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -281,6 +289,7 @@ function RenderFile({
   const [isProcessingReact, setIsProcessingReact] = useState<boolean>(false);
   const [reactNativeHTML, setReactNativeHTML] = useState<string>('');
   const [isProcessingReactNative, setIsProcessingReactNative] = useState<boolean>(false);
+  const [previewOpenError, setPreviewOpenError] = useState<string | null>(null);
   const [renderVersion, setRenderVersion] = useState<number>(0); // увеличиваем, чтобы форсировать перерисовку WebView
 
   // Пути к зависимым файлам для отслеживания изменений
@@ -313,6 +322,10 @@ function RenderFile({
       return null;
     }
   }, [fileContent, fileType, selectedComponentName]);
+
+  useEffect(() => {
+    setPreviewOpenError(null);
+  }, [filePath]);
 
   // Состояние редактора блоков
   const [blockMap, setBlockMap] = useState<BlockMap>({});
@@ -2907,6 +2920,7 @@ function RenderFile({
             viewMode,
             projectRoot: projectRoot || undefined,
             selectedComponentName,
+            aggressivePreviewMode,
           });
           console.log('RenderFile: Generated React HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
@@ -2914,9 +2928,11 @@ function RenderFile({
           setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths); // Сохраняем пути зависимостей
+          setPreviewOpenError(null);
         } catch (error) {
           console.error('RenderFile: Error generating HTML:', error);
           const errorMessage = error instanceof Error ? error.message : String(error);
+          setPreviewOpenError(errorMessage);
           setReactHTML(`<html><body><div class="error">Ошибка обработки: ${errorMessage}</div></body></html>`);
           setDependencyPaths([]);
           setBlockMapForFile({});
@@ -2930,7 +2946,7 @@ function RenderFile({
       setIsProcessingReact(false);
       setDependencyPaths([]);
     }
-  }, [fileType, fileContent, filePath, viewMode, projectRoot, selectedComponentName]);
+  }, [fileType, fileContent, filePath, viewMode, projectRoot, selectedComponentName, aggressivePreviewMode]);
 
   // Обработка React Native файлов с зависимостями
   useEffect(() => {
@@ -2944,6 +2960,7 @@ function RenderFile({
             viewMode,
             projectRoot: projectRoot || undefined,
             selectedComponentName,
+            aggressivePreviewMode,
           });
           console.log('RenderFile: Generated React Native HTML length:', result.html.length);
           console.log('RenderFile: Dependency paths:', result.dependencyPaths);
@@ -2951,9 +2968,11 @@ function RenderFile({
           setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths); // Сохраняем пути зависимостей
+          setPreviewOpenError(null);
         } catch (error) {
           console.error('RenderFile: Error generating HTML:', error);
           const errorMessage = error instanceof Error ? error.message : String(error);
+          setPreviewOpenError(errorMessage);
           setReactNativeHTML(`<html><body><div class="error">Ошибка обработки: ${errorMessage}</div></body></html>`);
           setDependencyPaths([]);
           setBlockMapForFile({});
@@ -2967,7 +2986,7 @@ function RenderFile({
       setIsProcessingReactNative(false);
       setDependencyPaths([]);
     }
-  }, [fileType, fileContent, filePath, viewMode, projectRoot, selectedComponentName]);
+  }, [fileType, fileContent, filePath, viewMode, projectRoot, selectedComponentName, aggressivePreviewMode]);
 
   // Отслеживание изменений зависимых файлов
   useEffect(() => {
@@ -4866,6 +4885,26 @@ function RenderFile({
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+      if (typeof Babel !== 'undefined' && Babel.registerPreset && Babel.availablePresets) {
+        Babel.registerPreset('mrpak-tsx', {
+          presets: [
+            [Babel.availablePresets['react'], { runtime: 'classic' }],
+            [Babel.availablePresets['typescript'], { allExtensions: true, isTSX: true }]
+          ]
+        });
+      }
+    </script>
+    <script>
+        if (typeof Babel !== 'undefined' && Babel.registerPreset && Babel.availablePresets) {
+            Babel.registerPreset('mrpak-tsx', {
+                presets: [
+                    [Babel.availablePresets['react'], { runtime: 'classic' }],
+                    [Babel.availablePresets['typescript'], { allExtensions: true, isTSX: true }]
+                ]
+            });
+        }
+    </script>
     <style>
         body {
             margin: 0;
@@ -4903,7 +4942,7 @@ function RenderFile({
         Компонент загружается из выбранного файла...
     </div>
     <div id="root"></div>
-    <script type="text/babel" data-type="module" data-presets="react,typescript">
+    <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
         // React доступен глобально через CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         
@@ -5454,7 +5493,7 @@ function RenderFile({
         Компонент загружается из выбранного файла...
     </div>
     <div id="root"></div>
-    <script type="text/babel" data-type="module" data-presets="react,typescript">
+    <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
         // React и React Native Web доступны глобально через CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         const ReactNative = window.ReactNative || {};
@@ -5756,6 +5795,13 @@ function RenderFile({
     },
   }), [blockEditorSidebarProps.styles]);
 
+  const shouldOfferAggressiveMode = useMemo(() => {
+    if (fileType !== 'react' && fileType !== 'react-native') {
+      return false;
+    }
+    return isInternalSourceFilePath(filePath);
+  }, [filePath, fileType]);
+
   const renderBlockEditorPreview = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => (
     <BlockEditorPanel
       fileType={editorType}
@@ -5767,6 +5813,32 @@ function RenderFile({
     handleEditorMessageStable,
     iframeCommand,
   ]);
+
+  const renderPreviewFallbackOverlay = useCallback(() => {
+    const canUseAggressiveMode =
+      shouldOfferAggressiveMode &&
+      (!!previewOpenError || shouldOfferAggressiveMode) &&
+      !aggressivePreviewMode;
+
+    if (!canUseAggressiveMode && !aggressivePreviewMode) {
+      return null;
+    }
+
+    return (
+      <View style={styles.previewFallbackOverlay}>
+        <View style={styles.previewFallbackCard}>
+          <Text style={styles.previewFallbackTitle}>
+            {aggressivePreviewMode ? 'Агрессивный режим активен' : 'Обычный режим не смог открыть файл'}
+          </Text>
+          <Text style={styles.previewFallbackText}>
+            {aggressivePreviewMode
+              ? 'Превью работает в режиме best-effort. Часть зависимостей может быть заменена заглушками.'
+              : (previewOpenError || 'Этот файл выглядит как часть сложного проекта. Если обычное превью падает, откройте его в агрессивном режиме.')}
+          </Text>
+        </View>
+      </View>
+    );
+  }, [aggressivePreviewMode, previewOpenError, shouldOfferAggressiveMode]);
 
   const renderBlockEditorSplitMode = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => {
     const hasAnyVisiblePanel = showSplitSidebar || showSplitPreview || showSplitCode;
@@ -5793,6 +5865,7 @@ function RenderFile({
               <View style={[styles.splitLeft, { width: previewWidth, maxWidth: showSplitCode ? '80%' : '100%', minWidth: showSplitCode ? '20%' : 0 }]}>
                 <View style={styles.blockEditorPreviewContainer}>
                   {renderBlockEditorPreview(editorType, html)}
+                  {renderPreviewFallbackOverlay()}
                   {hasStagedChanges && (
                     <View style={styles.saveIndicator} pointerEvents="none">
                       <Text style={styles.saveIndicatorText}>● Несохраненные изменения</Text>
@@ -5863,12 +5936,14 @@ function RenderFile({
     isResizing,
     resizeTarget,
     renderBlockEditorPreview,
+    renderPreviewFallbackOverlay,
     saveFile,
     setSplitContainerNode,
     setSplitMainPanelsNode,
     showSplitCode,
     showSplitPreview,
     showSplitSidebar,
+    shouldOfferAggressiveMode,
     splitLeftWidth,
     splitSidebarStyles,
     splitSidebarWidth,
@@ -6007,27 +6082,31 @@ function RenderFile({
       <View style={styles.htmlContainer}>
         {renderContentMetaOverlay('React', detectedComponentName)}
         {viewMode === 'preview' ? (
-          <WebView
-            key={`react-${filePath}-${renderVersion}-${reactHTML?.length || 0}`}
-            source={{ html: reactHTML }}
-            style={styles.webview}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            allowExternalScripts={true}
-            renderLoading={() => (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#667eea" />
-              </View>
-            )}
-            onLoad={() => {
-              console.log('RenderFile: React component loaded successfully');
-            }}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error('RenderFile: WebView error:', nativeEvent);
-            }}
-          />
+          <View style={styles.blockEditorPreviewContainer}>
+            <WebView
+              key={`react-${filePath}-${renderVersion}-${reactHTML?.length || 0}`}
+              source={{ html: reactHTML }}
+              style={styles.webview}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              allowExternalScripts={true}
+              renderLoading={() => (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#667eea" />
+                </View>
+              )}
+              onLoad={() => {
+                console.log('RenderFile: React component loaded successfully');
+              }}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error('RenderFile: WebView error:', nativeEvent);
+                setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
+              }}
+            />
+            {renderPreviewFallbackOverlay()}
+          </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react', editorHTML || reactHTML)
         ) : viewMode === 'changes' ? (
@@ -6072,27 +6151,31 @@ function RenderFile({
       <View style={styles.htmlContainer}>
         {renderContentMetaOverlay('React Native', detectedComponentName)}
         {viewMode === 'preview' ? (
-          <WebView
-            key={`react-native-${filePath}-${renderVersion}-${reactNativeHTML?.length || 0}`}
-            source={{ html: reactNativeHTML }}
-            style={styles.webview}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            allowExternalScripts={true}
-            renderLoading={() => (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#667eea" />
-              </View>
-            )}
-            onLoad={() => {
-              console.log('RenderFile: React Native component loaded successfully');
-            }}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error('RenderFile: WebView error:', nativeEvent);
-            }}
-          />
+          <View style={styles.blockEditorPreviewContainer}>
+            <WebView
+              key={`react-native-${filePath}-${renderVersion}-${reactNativeHTML?.length || 0}`}
+              source={{ html: reactNativeHTML }}
+              style={styles.webview}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              allowExternalScripts={true}
+              renderLoading={() => (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#667eea" />
+                </View>
+              )}
+              onLoad={() => {
+                console.log('RenderFile: React Native component loaded successfully');
+              }}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error('RenderFile: WebView error:', nativeEvent);
+                setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
+              }}
+            />
+            {renderPreviewFallbackOverlay()}
+          </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react-native', editorHTML || reactNativeHTML)
         ) : viewMode === 'changes' ? (
@@ -6307,6 +6390,49 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     minHeight: 0,
+  },
+  previewFallbackOverlay: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    zIndex: 1200,
+    alignItems: 'center',
+  },
+  previewFallbackCard: {
+    width: '100%',
+    maxWidth: 560,
+    backgroundColor: 'rgba(12, 18, 31, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.45)',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    boxShadow: '0 10px 24px rgba(0,0,0,0.28)',
+  },
+  previewFallbackTitle: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  previewFallbackText: {
+    color: 'rgba(226, 232, 240, 0.82)',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  previewFallbackButton: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: '#2563eb',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  previewFallbackButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   splitModeRoot: {
     flex: 1,

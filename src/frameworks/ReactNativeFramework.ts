@@ -25,6 +25,7 @@ export class ReactNativeFramework extends ReactFramework {
       typeof options.selectedComponentName === 'string' && options.selectedComponentName.trim()
         ? options.selectedComponentName.trim()
         : null;
+    const safeVisualMode = !!options.aggressivePreviewMode;
     
     // ВАЖНО: сначала инструментируем ИСХОДНЫЙ код, чтобы data-no-code-ui-id были стабильны
     // Используем AST парсинг для JS/TS файлов с fallback
@@ -44,7 +45,7 @@ export class ReactNativeFramework extends ReactFramework {
     }
     
     // Обрабатываем код (загружаем зависимости, заменяем импорты)
-    const processed = await this.processReactCode(instOriginal.code, filePath);
+    const processed = await this.processReactCode(instOriginal.code, filePath, { safeVisualMode });
     const processedCodeBeforeInst = processed.processedCode;
     const modulesCode = processed.modulesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
@@ -861,9 +862,19 @@ export class ReactNativeFramework extends ReactFramework {
             border-radius: 4px;
             margin: 20px 0;
         }
+        .safe-visual {
+            color: #7c2d12;
+            padding: 10px;
+            background: #ffedd5;
+            border: 1px solid #fdba74;
+            border-radius: 4px;
+            margin: 0 0 20px 0;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
+    ${safeVisualMode ? '<div class="safe-visual"><strong>Safe Visual Mode</strong><br>Сложный React Native проект открыт в упрощенном режиме. Импортированные JS/TS модули заменены безопасными заглушками.</div>' : ''}
     <div id="root"></div>
     <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
         // Ждем загрузки React Native Web

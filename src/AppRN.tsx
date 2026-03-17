@@ -7,10 +7,16 @@ import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
 import { createProject } from './features/file-operations/lib/file-operations';
 
 function AppRN() {
+  const isInternalSourceFile = (path: string | null | undefined) => {
+    const normalized = String(path || '').replace(/\\/g, '/');
+    return /(^|\/)src\/.+\.(jsx?|tsx?)$/i.test(normalized) && !/(^|\/)tests\//i.test(normalized);
+  };
+
   const [viewMode, setViewMode] = useState<'preview' | 'split' | 'changes'>('preview');
   const [showSplitSidebar, setShowSplitSidebar] = useState(true);
   const [showSplitPreview, setShowSplitPreview] = useState(true);
   const [showSplitCode, setShowSplitCode] = useState(true);
+  const [aggressivePreviewMode, setAggressivePreviewMode] = useState(false);
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileSelection | null>(null);
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
@@ -99,6 +105,7 @@ function AppRN() {
   };
 
   const handleSelectFile = (selection: FileSelection | string | null) => {
+    setAggressivePreviewMode(false);
     if (!selection) {
       setSelectedFile(null);
       return;
@@ -204,6 +211,16 @@ function AppRN() {
                   </TouchableOpacity>
                 </View>
               )}
+              {isInternalSourceFile(selectedFile.filePath) && (
+                <TouchableOpacity
+                  style={[styles.modeButton, aggressivePreviewMode && styles.modeButtonActive]}
+                  onPress={() => setAggressivePreviewMode((prev) => !prev)}
+                >
+                  <Text style={[styles.modeButtonText, aggressivePreviewMode && styles.modeButtonTextActive]}>
+                    Агрессивный режим
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
           {!projectPath && (
@@ -288,6 +305,7 @@ function AppRN() {
               showSplitSidebar={showSplitSidebar}
               showSplitPreview={showSplitPreview}
               showSplitCode={showSplitCode}
+              aggressivePreviewMode={aggressivePreviewMode}
               onProjectFilesChanged={() => setFileTreeVersion((v) => v + 1)}
               onOpenFile={handleSelectFile}
             />
