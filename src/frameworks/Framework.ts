@@ -90,7 +90,15 @@ export class Framework {
    * @param {string} params.targetId - ID целевого родителя
    * @returns {Object} { ok: boolean, code?: string, error?: string }
    */
-  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId }: { code: string, sourceEntry: any, sourceId: string, targetEntry: any, targetId: string }) {
+  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId, targetBeforeEntry, targetBeforeId }: {
+    code: string;
+    sourceEntry: any;
+    sourceId: string;
+    targetEntry: any;
+    targetId: string;
+    targetBeforeEntry?: any;
+    targetBeforeId?: string | null;
+  }) {
     throw new Error('Framework.applyReparent() must be implemented');
   }
 
@@ -186,4 +194,3 @@ export class Framework {
     throw new Error('Framework.buildInsertSnippet() must be implemented');
   }
 }
-

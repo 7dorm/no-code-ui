@@ -248,7 +248,15 @@ export class HtmlFramework extends Framework {
    * @param {Object} params.targetEntry - запись целевого родителя
    * @param {string} params.targetId - ID целевого родителя
    */
-  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId } : { code: string, sourceEntry: any, sourceId: string, targetEntry: any, targetId: string }) {
+  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId } : {
+    code: string;
+    sourceEntry: any;
+    sourceId: string;
+    targetEntry: any;
+    targetId: string;
+    targetBeforeEntry?: any;
+    targetBeforeId?: string | null;
+  }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -463,4 +471,3 @@ export class HtmlFramework extends Framework {
     return `<${tagName}${attrs}${onClickAttr}>${body}</${tagName}>`;
   }
 }
-

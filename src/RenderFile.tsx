@@ -95,9 +95,12 @@ type StagedOpSetText = {
 
 type StagedOpReparent = {
   type: 'reparent';
-  blockId: string;
-  oldParentId: string;
-  newParentId: string;
+  blockId?: string;
+  oldParentId?: string;
+  newParentId?: string;
+  sourceId?: string;
+  targetParentId?: string;
+  targetBeforeId?: string | null;
   fileType: string | null;
   filePath: string;
 };
@@ -388,7 +391,7 @@ function RenderFile({
   }, []);
 
   // Ref для stageReparentBlock (используется в handleEditorMessage до определения функции)
-  const stageReparentBlockRef = useRef<((params: { sourceId: string; targetParentId: string }) => void) | null>(null);
+  const stageReparentBlockRef = useRef<((params: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => void) | null>(null);
   // Ref для stageInsertBlock (используется в handleEditorMessage до определения функции)
   const stageInsertBlockRef = useRef<((params: { targetId: string; mode: 'child' | 'sibling'; snippet: string }) => void) | null>(null);
 
@@ -755,6 +758,9 @@ function RenderFile({
               blockId: operation.blockId,
               oldParentId: operation.oldParentId,
               newParentId: operation.newParentId,
+              sourceId: operation.blockId,
+              targetParentId: operation.newParentId,
+              targetBeforeId: operation.targetBeforeId || null,
               fileType: operation.fileType,
               filePath: operation.filePath,
             },
@@ -763,11 +769,13 @@ function RenderFile({
           return updated;
         });
         console.log('⏭️ [Redo] Отправляю команду REPARENT в iframe');
-        sendIframeCommand({
-          type: MRPAK_CMD.REPARENT,
-          sourceId: operation.blockId,
-          targetParentId: operation.newParentId,
-        });
+        if (!operation.targetBeforeId) {
+          sendIframeCommand({
+            type: MRPAK_CMD.REPARENT,
+            sourceId: operation.blockId,
+            targetParentId: operation.newParentId,
+          });
+        }
         break;
       }
       default:
@@ -1935,15 +1943,15 @@ function RenderFile({
   stageInsertBlockRef.current = stageInsertBlock;
 
   const stageReparentBlock = useCallback(
-    ({ sourceId, targetParentId }) => {
-      console.log('stageReparentBlock called:', { sourceId, targetParentId });
+    ({ sourceId, targetParentId, targetBeforeId = null }) => {
+      console.log('stageReparentBlock called:', { sourceId, targetParentId, targetBeforeId });
       if (!sourceId || !targetParentId || sourceId === targetParentId) {
         console.log('stageReparentBlock: skipping - invalid ids');
         return;
       }
 
       // Защита от дублирования
-      const operationKey = `${sourceId}:${targetParentId}`;
+      const operationKey = `${sourceId}:${targetParentId}:${targetBeforeId ?? ''}`;
       const now = Date.now();
       if (lastReparentOperationRef.current) {
         const { key, timestamp } = lastReparentOperationRef.current;
@@ -1969,7 +1977,7 @@ function RenderFile({
                 }
                 astManagerRef.current = newManager;
                 // Продолжаем с новым менеджером
-                return await stageReparentBlock({ sourceId, targetParentId });
+                return await stageReparentBlock({ sourceId, targetParentId, targetBeforeId });
               } else {
                 throw new Error('projectRoot not available for AST bidirectional editing');
               }
@@ -1980,6 +1988,7 @@ function RenderFile({
               type: 'reparent',
               sourceId,
               targetParentId,
+              targetBeforeId,
             });
 
             if (!updateResult.ok) {
@@ -2006,8 +2015,12 @@ function RenderFile({
             // Добавляем в историю для undo
             addToHistory({
               type: 'reparent',
-              sourceId,
-              targetParentId,
+              blockId: sourceId,
+              oldParentId: layersTree?.nodes?.[sourceId]?.parentId || null,
+              newParentId: targetParentId,
+              targetBeforeId,
+              fileType,
+              filePath,
             });
           } catch (e) {
             console.error('stageReparentBlock error:', e);
@@ -2017,7 +2030,9 @@ function RenderFile({
         })();
 
         // Локально переносим в iframe
-        sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
+        if (!targetBeforeId) {
+          sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
+        }
         return;
       }
 
@@ -2031,6 +2046,7 @@ function RenderFile({
             type: 'reparent',
             sourceId,
             targetParentId,
+            targetBeforeId,
             fileType,
             filePath,
             mapEntrySource: sourceEntry || null,
@@ -2042,9 +2058,11 @@ function RenderFile({
       updateHasStagedChanges(true);
 
       // Локально переносим в iframe
-      sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
+      if (!targetBeforeId) {
+        sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
+      }
     },
-    [blockMapForFile, fileType, filePath, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory, projectRoot]
+    [blockMapForFile, fileType, filePath, sendIframeCommand, updateStagedOps, updateHasStagedChanges, addToHistory, projectRoot, layersTree]
   );
 
   // Обновляем ref для использования в handleEditorMessage

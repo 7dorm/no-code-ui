@@ -1957,10 +1957,10 @@ export class ReactFramework extends Framework {
   /**
    * Переносит элемент в другого родителя
    */
-  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId }
-    : {code: string, sourceEntry: any, sourceId: string, targetEntry: any, targetId: string}
+  applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId, targetBeforeEntry, targetBeforeId }
+    : {code: string, sourceEntry: any, sourceId: string, targetEntry: any, targetId: string, targetBeforeEntry?: any, targetBeforeId?: string | null}
   ) {
-    return applyJsxReparent({ code, sourceEntry, targetEntry });
+    return applyJsxReparent({ code, sourceEntry, targetEntry, targetBeforeEntry, targetBeforeId });
   }
 
   /**
@@ -2266,8 +2266,12 @@ export class ReactFramework extends Framework {
         }
         workCode = res.code || workCode;
       } else if (op.type === 'reparent') {
-        let sourceEntry = findOpeningTagEntryById(workCode, op.sourceId);
-        let targetEntry = findOpeningTagEntryById(workCode, op.targetParentId);
+        const sourceId = op.sourceId || op.blockId;
+        const targetParentId = op.targetParentId || op.newParentId;
+        const targetBeforeId = op.targetBeforeId || null;
+        let sourceEntry = findOpeningTagEntryById(workCode, sourceId);
+        let targetEntry = findOpeningTagEntryById(workCode, targetParentId);
+        let targetBeforeEntry = targetBeforeId ? findOpeningTagEntryById(workCode, targetBeforeId) : null;
         
         if (!sourceEntry && op.mapEntrySource && typeof op.mapEntrySource.start === 'number' && typeof op.mapEntrySource.end === 'number') {
           const openTag = workCode.slice(op.mapEntrySource.start, op.mapEntrySource.end);
@@ -2275,8 +2279,8 @@ export class ReactFramework extends Framework {
             sourceEntry = { start: op.mapEntrySource.start, end: op.mapEntrySource.end, tagName: op.mapEntrySource.tagName };
           }
         }
-        if (!sourceEntry && blockMapForFile && blockMapForFile[op.sourceId]) {
-          const fileEntry = blockMapForFile[op.sourceId];
+        if (!sourceEntry && blockMapForFile && blockMapForFile[sourceId]) {
+          const fileEntry = blockMapForFile[sourceId];
           if (typeof fileEntry.start === 'number' && typeof fileEntry.end === 'number') {
             const openTag = workCode.slice(fileEntry.start, fileEntry.end);
             if (openTag.startsWith('<')) {
@@ -2291,8 +2295,8 @@ export class ReactFramework extends Framework {
             targetEntry = { start: op.mapEntryTarget.start, end: op.mapEntryTarget.end, tagName: op.mapEntryTarget.tagName };
           }
         }
-        if (!targetEntry && blockMapForFile && blockMapForFile[op.targetParentId]) {
-          const fileEntry = blockMapForFile[op.targetParentId];
+        if (!targetEntry && blockMapForFile && blockMapForFile[targetParentId]) {
+          const fileEntry = blockMapForFile[targetParentId];
           if (typeof fileEntry.start === 'number' && typeof fileEntry.end === 'number') {
             const openTag = workCode.slice(fileEntry.start, fileEntry.end);
             if (openTag.startsWith('<')) {
@@ -2300,20 +2304,31 @@ export class ReactFramework extends Framework {
             }
           }
         }
+        if (!targetBeforeEntry && targetBeforeId && blockMapForFile && blockMapForFile[targetBeforeId]) {
+          const beforeEntry = blockMapForFile[targetBeforeId];
+          if (typeof beforeEntry.start === 'number' && typeof beforeEntry.end === 'number') {
+            const openTag = workCode.slice(beforeEntry.start, beforeEntry.end);
+            if (openTag.startsWith('<')) {
+              targetBeforeEntry = { start: beforeEntry.start, end: beforeEntry.end, tagName: beforeEntry.tagName };
+            }
+          }
+        }
         
         if (!sourceEntry || !targetEntry) {
           console.warn('ReactFramework.commitPatches: reparent target/source not found by id', {
-            sourceId: op.sourceId,
-            targetParentId: op.targetParentId
+            sourceId,
+            targetParentId
           });
           continue;
         }
         const res = this.applyReparent({
           code: workCode,
           sourceEntry,
-          sourceId: op.sourceId,
+          sourceId,
           targetEntry,
-          targetId: op.targetParentId
+          targetId: targetParentId,
+          targetBeforeEntry,
+          targetBeforeId,
         });
         if (!res?.ok) {
           throw new Error(res?.error || 'Не удалось перенести блок');

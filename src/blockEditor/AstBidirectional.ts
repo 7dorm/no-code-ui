@@ -361,6 +361,7 @@ export class AstBidirectionalManager {
       // Перемещение элемента
       const sourceId = changes.sourceId;
       const targetParentId = changes.targetParentId;
+      const targetBeforeId = changes.targetBeforeId || null;
 
       if (!sourceId || !targetParentId) {
         return { ok: false, error: 'sourceId and targetParentId required for reparent' };
@@ -369,6 +370,7 @@ export class AstBidirectionalManager {
       // Находим исходный элемент
       let sourcePath: any = null;
       let targetParentPath: any = null;
+      let targetBeforePath: any = null;
 
       traverse(this.codeAST, {
         JSXOpeningElement(path: any) {
@@ -394,6 +396,15 @@ export class AstBidirectionalManager {
               targetParentPath = jsxElementPath;
             }
           }
+          if (targetBeforeId && id === targetBeforeId) {
+            let jsxElementPath = path;
+            while (jsxElementPath && !t.isJSXElement(jsxElementPath.node) && !t.isJSXFragment(jsxElementPath.node)) {
+              jsxElementPath = jsxElementPath.parentPath;
+            }
+            if (jsxElementPath) {
+              targetBeforePath = jsxElementPath;
+            }
+          }
         }
       });
 
@@ -411,7 +422,16 @@ export class AstBidirectionalManager {
       }
 
       // Добавляем в новое место
-      targetParentPath.node.children.push(sourcePath.node);
+      if (targetBeforeId && targetBeforePath && targetBeforePath.parentPath === targetParentPath) {
+        const beforeIndex = targetParentPath.node.children.indexOf(targetBeforePath.node);
+        if (beforeIndex >= 0) {
+          targetParentPath.node.children.splice(beforeIndex, 0, sourcePath.node);
+        } else {
+          targetParentPath.node.children.push(sourcePath.node);
+        }
+      } else {
+        targetParentPath.node.children.push(sourcePath.node);
+      }
 
       modified = true;
     } else {
@@ -653,5 +673,4 @@ export class AstBidirectionalManager {
     return this.constructorAST;
   }
 }
-
 

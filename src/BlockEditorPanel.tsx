@@ -46,7 +46,11 @@ export type BlockEditorPanelProps = {
     snippet: any;
   }) => void;
   onDeleteBlock: (id: string) => void;
-  onReparentBlock: ({ sourceId, targetParentId }: { sourceId: any; targetParentId: any; }) => void;
+  onReparentBlock: ({ sourceId, targetParentId, targetBeforeId }: {
+    sourceId: any;
+    targetParentId: any;
+    targetBeforeId?: any;
+  }) => void;
   onSetText: ({ blockId, text }: {
     blockId: any;
     text: any;
@@ -214,6 +218,8 @@ export function useBlockEditorSidebarController({
   const [textValue, setTextValue] = useState('');
   const [reparentMode, setReparentMode] = useState(false);
   const [reparentTargetId, setReparentTargetId] = useState(null);
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+  const [treeDropHint, setTreeDropHint] = useState<{ targetId: string; zone: 'before' | 'inside' | 'after' } | null>(null);
   const [moveMode, setMoveMode] = useState('relative'); // absolute | relative | grid8
   const [moveUnit, setMoveUnit] = useState<'px' | '%'>('px');
   const [isMoveModeInitialized, setIsMoveModeInitialized] = useState(false);
@@ -693,6 +699,69 @@ export function useBlockEditorSidebarController({
     return s.length > 28 ? s.slice(0, 28) + '…' : s;
   };
 
+  const isDescendantNode = (possibleParentId: string, possibleChildId: string) => {
+    const nodes = layersTree?.nodes || {};
+    const firstLevel = Array.isArray(nodes?.[possibleParentId]?.childIds)
+      ? nodes[possibleParentId].childIds
+      : [];
+    const stack = firstLevel.map((id: any) => String(id));
+    const visited = new Set<string>();
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || visited.has(current)) continue;
+      if (current === possibleChildId) return true;
+      visited.add(current);
+      const childIds = nodes?.[current]?.childIds;
+      if (Array.isArray(childIds) && childIds.length) {
+        stack.push(...childIds.map((id: any) => String(id)));
+      }
+    }
+    return false;
+  };
+
+  const calculateDropZone = (event: any): 'before' | 'inside' | 'after' => {
+    const rect = event?.currentTarget?.getBoundingClientRect?.();
+    if (!rect) return 'inside';
+    const y = event?.clientY ?? event?.nativeEvent?.clientY ?? rect.top + rect.height / 2;
+    const ratio = (y - rect.top) / Math.max(rect.height, 1);
+    if (ratio < 0.25) return 'before';
+    if (ratio > 0.75) return 'after';
+    return 'inside';
+  };
+
+  const commitTreeReparent = (sourceIdRaw: any, targetIdRaw: any, zone: 'before' | 'inside' | 'after') => {
+    const sourceId = String(sourceIdRaw || '');
+    const targetId = String(targetIdRaw || '');
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    if (isDescendantNode(sourceId, targetId)) return;
+
+    const nodes = layersTree?.nodes || {};
+    const targetNode = nodes[targetId];
+    if (!targetNode) return;
+
+    if (zone === 'inside') {
+      onReparentBlock && onReparentBlock({ sourceId, targetParentId: targetId });
+      return;
+    }
+
+    const targetParentId = targetNode.parentId ? String(targetNode.parentId) : '';
+    if (!targetParentId || sourceId === targetParentId) return;
+
+    const siblings: string[] = Array.isArray(nodes?.[targetParentId]?.childIds)
+      ? nodes[targetParentId].childIds.map((id: any) => String(id))
+      : [];
+    const targetIndex = siblings.indexOf(targetId);
+    if (targetIndex < 0) return;
+
+    let targetBeforeId: string | null = targetId;
+    if (zone === 'after') {
+      targetBeforeId = siblings[targetIndex + 1] || null;
+    }
+    if (targetBeforeId === sourceId) return;
+
+    onReparentBlock && onReparentBlock({ sourceId, targetParentId, targetBeforeId });
+  };
+
   const renderTreeNode = (id: any, depth = 0) => {
     if (!layersTree?.nodes?.[id]) return null;
     const node = layersTree.nodes[id];
@@ -704,14 +773,57 @@ export function useBlockEditorSidebarController({
     const displayTitle = node?.isIsolatedComponent
       ? (customName || `${node?.componentName || node?.tagName || node?.sourceBasename || 'component'}`)
       : title;
+    const dragHighlightStyle = treeDropHint?.targetId === String(id)
+      ? (
+        treeDropHint.zone === 'inside'
+          ? { boxShadow: 'inset 0 0 0 1px rgba(34,197,94,0.95)', backgroundColor: 'rgba(34,197,94,0.16)' }
+          : treeDropHint.zone === 'before'
+            ? { boxShadow: 'inset 0 2px 0 rgba(59,130,246,0.95)' }
+            : { boxShadow: 'inset 0 -2px 0 rgba(59,130,246,0.95)' }
+      )
+      : null;
 
     return (
       <View key={id} style={{ marginLeft: depth * 10, marginBottom: 6 }}>
+        <div
+          draggable={true}
+          onDragStart={(event: any) => {
+            const sourceId = String(id);
+            setDragSourceId(sourceId);
+            setTreeDropHint(null);
+            try {
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', sourceId);
+            } catch (_) {}
+          }}
+          onDragOver={(event: any) => {
+            if (!dragSourceId || dragSourceId === String(id)) return;
+            if (isDescendantNode(dragSourceId, String(id))) return;
+            const zone = calculateDropZone(event);
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            setTreeDropHint({ targetId: String(id), zone });
+          }}
+          onDrop={(event: any) => {
+            event.preventDefault();
+            const sourceId = dragSourceId || event?.dataTransfer?.getData?.('text/plain');
+            const zone = treeDropHint?.targetId === String(id) ? treeDropHint.zone : calculateDropZone(event);
+            if (!sourceId) return;
+            commitTreeReparent(sourceId, id, zone);
+            setTreeDropHint(null);
+            setDragSourceId(null);
+          }}
+          onDragEnd={() => {
+            setTreeDropHint(null);
+            setDragSourceId(null);
+          }}
+        >
         <TouchableOpacity
           style={[
             blockEditorPanelStyles.layerRow,
             isSelected && blockEditorPanelStyles.layerRowSelected,
             isDrop && blockEditorPanelStyles.layerRowDropTarget,
+            dragHighlightStyle as any,
           ]}
           onPress={(event: any) => {
             const nativeEvent = event?.nativeEvent || event;
@@ -742,6 +854,7 @@ export function useBlockEditorSidebarController({
             <Text style={styles.layerEditBtnText}>✎</Text>
           </TouchableOpacity>
         </TouchableOpacity>
+        </div>
 
         {editingLayerId === id && (
           <View style={blockEditorPanelStyles.layerEditBox}>
@@ -985,6 +1098,11 @@ export const blockEditorPanelStyles = StyleSheet.create({
   },
   layerRowSelected: {
     backgroundColor: 'rgba(102,126,234,0.25)',
+  },
+  layerRowDropTarget: {
+    backgroundColor: 'rgba(34,197,94,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.65)',
   },
   layerRowText: {
     flex: 1,

@@ -1072,6 +1072,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const blockHoverEvents = (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
+            if (drag || dragging) return;
             try {
               ev.preventDefault();
               ev.stopPropagation();

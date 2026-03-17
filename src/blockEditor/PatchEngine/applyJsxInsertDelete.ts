@@ -494,12 +494,16 @@ export function applyJsxInsert({ code, entry, mode, snippet }: any) {
   return { ok: true, code: out, changed: true };
 }
 
-export function applyJsxReparent({ code, sourceEntry, targetEntry }: any) {
+export function applyJsxReparent({ code, sourceEntry, targetEntry, targetBeforeEntry, targetBeforeId }: any) {
   const src = String(code ?? '');
   const sourceRange = findJsxElementRange({ code: src, entry: sourceEntry });
   const targetRange = findJsxElementRange({ code: src, entry: targetEntry });
+  const beforeRange = targetBeforeEntry ? findJsxElementRange({ code: src, entry: targetBeforeEntry }) : null;
   if (!sourceRange || !targetRange) {
     return { ok: false, error: 'applyJsxReparent: cannot resolve ranges' };
+  }
+  if (targetBeforeId && !beforeRange) {
+    return { ok: false, error: 'applyJsxReparent: targetBefore range not found' };
   }
   if (sourceRange.start >= targetRange.start && sourceRange.end <= targetRange.end) {
     return { ok: false, error: 'applyJsxReparent: нельзя перенести в своего потомка' };
@@ -509,15 +513,21 @@ export function applyJsxReparent({ code, sourceEntry, targetEntry }: any) {
   const removed = src.slice(0, sourceRange.start) + src.slice(sourceRange.end);
 
   // точка вставки: перед закрывающим тегом target в ОРИГИНАЛЕ
-  const targetTag = targetEntry.tagName;
-  const closeTagStart = src.lastIndexOf(`</${targetTag}`, targetRange.end);
-  if (closeTagStart < 0) {
-    return { ok: false, error: 'applyJsxReparent: target closing tag not found' };
+  let insertPosOriginal = -1;
+  if (beforeRange) {
+    insertPosOriginal = beforeRange.start;
+  } else {
+    const targetTag = targetEntry.tagName;
+    const closeTagStart = src.lastIndexOf(`</${targetTag}`, targetRange.end);
+    if (closeTagStart < 0) {
+      return { ok: false, error: 'applyJsxReparent: target closing tag not found' };
+    }
+    insertPosOriginal = closeTagStart;
   }
 
   // корректируем позицию после удаления
   const delta = sourceRange.end - sourceRange.start;
-  const insertPos = sourceRange.start < closeTagStart ? closeTagStart - delta : closeTagStart;
+  const insertPos = sourceRange.start < insertPosOriginal ? insertPosOriginal - delta : insertPosOriginal;
 
   const insertText = `\n${extracted}\n`;
   const out = removed.slice(0, insertPos) + insertText + removed.slice(insertPos);
@@ -591,6 +601,3 @@ export function applyJsxSetText({ code, entry, text }: any) {
 
   return { ok: false, error: 'applyJsxSetText: cannot find text content range' };
 }
-
-
-
