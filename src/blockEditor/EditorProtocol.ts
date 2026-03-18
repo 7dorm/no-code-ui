@@ -4,6 +4,7 @@ export const MRPAK_MSG = {
   SELECT: 'MRPAK_SELECT',
   HOVER: 'MRPAK_HOVER',
   APPLY: 'MRPAK_APPLY',
+  SAVE: 'MRPAK_SAVE',
   TREE: 'MRPAK_TREE',
   STYLE_SNAPSHOT: 'MRPAK_STYLE_SNAPSHOT',
   TEXT_SNAPSHOT: 'MRPAK_TEXT_SNAPSHOT',
@@ -37,4 +38,3 @@ export function isMrpakMessage(data: any) {
     data.type.startsWith('MRPAK_')
   );
 }
-

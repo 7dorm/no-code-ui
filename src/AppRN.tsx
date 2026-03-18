@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import RenderFile from './RenderFile';
-import FileTree, { type FileSelection } from './FileTree';
+import FileTree, { type FileSelection, type ComponentDragPayload, type FileDragPayload } from './FileTree';
 import { openDirectoryDialog, setRootDirectory, isFileSystemAPIAvailable } from './shared/api/filesystem-api';
 import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
 import { createProject } from './features/file-operations/lib/file-operations';
@@ -30,6 +30,8 @@ function AppRN() {
   const leftPanelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [createProjectDialogVisible, setCreateProjectDialogVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);;
+  const [externalComponentDrag, setExternalComponentDrag] = useState<ComponentDragPayload | null>(null);
+  const [externalFileDrag, setExternalFileDrag] = useState<FileDragPayload | null>(null);
 
   // Обработчики для сворачивания левой панели
   const handleLeftPanelMouseEnter = () => {
@@ -54,6 +56,21 @@ function AppRN() {
       if (leftPanelTimeoutRef.current) {
         clearTimeout(leftPanelTimeoutRef.current);
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = (event as any)?.reason;
+      const message = String(reason?.message || reason || '').toLowerCase();
+      if (message.includes('canceled') || message.includes('cancelled') || message.includes('aborterror')) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    return () => {
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
     };
   }, []);
 
@@ -355,6 +372,20 @@ function AppRN() {
               rootPath={projectPath!}
               onSelectFile={handleSelectFile}
               selectedPath={selectedFile?.selectionKey || ''}
+              onStartComponentDrag={(payload) => {
+                setExternalFileDrag(null);
+                setExternalComponentDrag(payload);
+              }}
+              onEndComponentDrag={() => setExternalComponentDrag(null)}
+              onStartFileDrag={(payload) => {
+                setExternalComponentDrag(null);
+                setExternalFileDrag(payload);
+              }}
+              onEndFileDrag={() => setExternalFileDrag(null)}
+              onUnsupportedComponentDrag={(message) => {
+                setExternalComponentDrag(null);
+                setError(message);
+              }}
             />
           </View>
         </View>
@@ -378,6 +409,8 @@ function AppRN() {
               canvasHeight={canvasHeight}
               canvasDevice={previewDevice}
               aggressivePreviewMode={aggressivePreviewMode}
+              externalComponentDrag={externalComponentDrag}
+              externalFileDrag={externalFileDrag}
               onProjectFilesChanged={() => setFileTreeVersion((v) => v + 1)}
               onOpenFile={handleSelectFile}
             />

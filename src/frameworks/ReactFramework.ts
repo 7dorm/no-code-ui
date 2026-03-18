@@ -1,4 +1,4 @@
-import { Framework, type CommitPatchesResult } from './Framework';
+﻿import { Framework, type CommitPatchesResult } from './Framework';
 import { instrumentJsx } from '../blockEditor/JsxInstrumenter';
 import { instrumentJsxWithAst } from '../blockEditor/AstJsxInstrumenter';
 import { isJavaScriptFile } from '../blockEditor/AstUtils';
@@ -15,7 +15,7 @@ import {
   replaceStyleReferenceInJsx 
 } from '../blockEditor/PatchEngine';
 import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages } from '../features/file-renderer/lib/react-processor';
-import { readFile, writeFile } from '../shared/api/electron-api';
+import { readFile, readFileBase64, writeFile } from '../shared/api/electron-api';
 import { resolvePath, resolvePathSync } from '../features/file-renderer/lib/path-resolver';
 import { injectBlockEditorScript } from '../features/file-renderer/lib/block-editor-script';
 import { toReactStyleObjectText } from '../blockEditor/styleUtils';
@@ -70,6 +70,10 @@ function buildSafeStubImportReplacement(fullStatement: string) {
     return `const ${importSpec.replace('* as ', '').trim()} = {};`;
   }
   return createSafeStubBinding(importSpec);
+}
+
+function isCoreReactImport(importPath: string): boolean {
+  return /^(react|react-dom|react-native)(\/|$)/.test(String(importPath || '').trim());
 }
 
 const IMPORTED_COMPONENT_BOUNDARY_HELPER = `
@@ -178,6 +182,8 @@ export class ReactFramework extends Framework {
    */
   async loadDependency(basePath: string, importPath: string) {
     try {
+      const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.svg'];
+      const isImagePath = (p: string) => imageExts.some((ext) => String(p || '').toLowerCase().endsWith(ext));
       // Разрешаем путь к зависимому файлу (асинхронно для поддержки @ путей)
       let resolvedPath = await this.resolvePathMemo(basePath, importPath);
       
@@ -190,6 +196,14 @@ export class ReactFramework extends Framework {
           resolvedPath + '.ts',
           resolvedPath + '.tsx',
           resolvedPath + '.css',
+          resolvedPath + '.png',
+          resolvedPath + '.jpg',
+          resolvedPath + '.jpeg',
+          resolvedPath + '.gif',
+          resolvedPath + '.webp',
+          resolvedPath + '.avif',
+          resolvedPath + '.bmp',
+          resolvedPath + '.svg',
           resolvedPath + '/index.js',
           resolvedPath + '/index.jsx',
           resolvedPath + '/index.ts',
@@ -198,9 +212,17 @@ export class ReactFramework extends Framework {
         
         for (const tryPath of tryPaths) {
           try {
-            const result = await readFile(tryPath);
-            if (result.success) {
-              return { success: true, content: result.content, path: tryPath };
+            if (isImagePath(tryPath)) {
+              const imgResult = await readFileBase64(tryPath);
+              if (imgResult.success) {
+                const dataUrl = `data:${imgResult.mimeType};base64,${imgResult.base64}`;
+                return { success: true, content: dataUrl, path: tryPath };
+              }
+            } else {
+              const result = await readFile(tryPath);
+              if (result.success) {
+                return { success: true, content: result.content, path: tryPath };
+              }
             }
           } catch (e) {
             // Пробуем следующий путь
@@ -208,9 +230,17 @@ export class ReactFramework extends Framework {
         }
       } else {
         // Прямой путь с расширением
-        const result = await readFile(resolvedPath);
-        if (result.success) {
-          return { success: true, content: result.content, path: resolvedPath };
+        if (isImagePath(resolvedPath)) {
+          const imgResult = await readFileBase64(resolvedPath);
+          if (imgResult.success) {
+            const dataUrl = `data:${imgResult.mimeType};base64,${imgResult.base64}`;
+            return { success: true, content: dataUrl, path: resolvedPath };
+          }
+        } else {
+          const result = await readFile(resolvedPath);
+          if (result.success) {
+            return { success: true, content: result.content, path: resolvedPath };
+          }
         }
       }
       
@@ -252,8 +282,8 @@ export class ReactFramework extends Framework {
       }
       
       // Извлекаем имя файла из разрешенного пути для более гибкого поиска
-      const fileName = resolvedPath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx)$/, '');
-      const pathWithoutExt = resolvedPath.replace(/\.(js|jsx|ts|tsx)$/, '');
+      const fileName = resolvedPath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
+      const pathWithoutExt = resolvedPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       const lastPart = resolvedPath.split('/').slice(-2).join('/'); // Последние 2 части пути
       
       // Ищем по всем значениям в pathMap (абсолютным путям)
@@ -411,7 +441,7 @@ export class ReactFramework extends Framework {
         pathMap[syncResolved] = depResult.path;
       }
       // Также сохраняем путь без расширения
-      const syncResolvedNoExt = syncResolved.replace(/\.(js|jsx|ts|tsx)$/, '');
+      const syncResolvedNoExt = syncResolved.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       if (syncResolvedNoExt !== syncResolved && syncResolvedNoExt !== depResult.path && !pathMap[syncResolvedNoExt]) {
         pathMap[syncResolvedNoExt] = depResult.path;
       }
@@ -422,7 +452,7 @@ export class ReactFramework extends Framework {
         if (last2Parts !== syncResolved && last2Parts !== depResult.path && !pathMap[last2Parts]) {
           pathMap[last2Parts] = depResult.path;
         }
-        const last2PartsNoExt = last2Parts.replace(/\.(js|jsx|ts|tsx)$/, '');
+        const last2PartsNoExt = last2Parts.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
         if (last2PartsNoExt !== last2Parts && last2PartsNoExt !== depResult.path && !pathMap[last2PartsNoExt]) {
           pathMap[last2PartsNoExt] = depResult.path;
         }
@@ -430,7 +460,7 @@ export class ReactFramework extends Framework {
     }
     
     // Также сохраняем путь без расширения для фактического пути файла
-    const depPathNoExt = depResult.path.replace(/\.(js|jsx|ts|tsx)$/, '');
+    const depPathNoExt = depResult.path.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
     if (depPathNoExt !== depResult.path && !pathMap[depPathNoExt]) {
       pathMap[depPathNoExt] = depResult.path;
     }
@@ -442,7 +472,7 @@ export class ReactFramework extends Framework {
       if (depLast2Parts !== depResult.path && !pathMap[depLast2Parts]) {
         pathMap[depLast2Parts] = depResult.path;
       }
-      const depLast2PartsNoExt = depLast2Parts.replace(/\.(js|jsx|ts|tsx)$/, '');
+      const depLast2PartsNoExt = depLast2Parts.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       if (depLast2PartsNoExt !== depLast2Parts && depLast2PartsNoExt !== depResult.path && !pathMap[depLast2PartsNoExt]) {
         pathMap[depLast2PartsNoExt] = depResult.path;
       }
@@ -462,8 +492,7 @@ export class ReactFramework extends Framework {
     const depBasePath = depResult.path; // Используем фактический путь файла как базовый
     for (const depImp of depImports) {
       // Пропускаем только внешние библиотеки (npm пакеты)
-      if ((depImp.path.startsWith('react') && !depImp.path.startsWith('react/') && !depImp.path.startsWith('@')) || 
-          depImp.path.startsWith('react-native') || 
+      if (isCoreReactImport(depImp.path) || 
           depImp.path.startsWith('http')) {
         console.log(`[LoadAllDependencies] Skipping external library in ${depFileName}: ${depImp.path}`);
         continue;
@@ -528,10 +557,7 @@ export class ReactFramework extends Framework {
         continue;
       }
       // Пропускаем только внешние библиотеки (npm пакеты)
-      if (imp.path.startsWith('react') && !imp.path.startsWith('react/') && 
-          !imp.path.startsWith('react-dom') && 
-          !imp.path.startsWith('react-native') && 
-          !imp.path.startsWith('http')) {
+      if (isCoreReactImport(imp.path) || imp.path.startsWith('http')) {
         console.log(`[ProcessReactCode] Skipping external library: ${imp.path} from ${fileName}`);
         continue;
       }
@@ -593,7 +619,35 @@ export class ReactFramework extends Framework {
     const uniqueAbsolutePaths = new Set(Object.values(pathMap));
     const isStyleDependencyPath = (modulePath: string) =>
       /\.(css|scss|less)($|\?)/i.test(String(modulePath || ''));
+    const isImageModulePath = (modulePath: string) =>
+      /\.(png|jpe?g|gif|webp|avif|bmp|svg)($|\?)/i.test(String(modulePath || ''));
     const processedDeps = new Set();
+    const styleDependencies: Array<{ path: string; content: string }> = [];
+
+    // Собираем все CSS/SCSS/LESS зависимости, чтобы заинжектить их в preview.
+    for (const absolutePath of uniqueAbsolutePaths) {
+      if (!isStyleDependencyPath(String(absolutePath))) {
+        continue;
+      }
+
+      const content = dependencies[absolutePath] || (() => {
+        for (const [relPath, absPath] of Object.entries(pathMap)) {
+          if (absPath === absolutePath) {
+            return dependencies[relPath];
+          }
+        }
+        return null;
+      })();
+
+      if (typeof content !== 'string' || !content.trim()) {
+        continue;
+      }
+
+      styleDependencies.push({
+        path: String(absolutePath),
+        content
+      });
+    }
     
     // Собираем информацию о зависимостях каждого модуля для сортировки
     const moduleDependencies = new Map();
@@ -713,6 +767,80 @@ export class ReactFramework extends Framework {
       const currentDepResolvedPath = dependencyModules[importPath] || importPath;
       const currentDepActualPath = actualPathMap[currentDepResolvedPath] || currentDepResolvedPath;
       const currentDepBasePath = currentDepActualPath.substring(0, currentDepActualPath.lastIndexOf('/'));
+
+      const moduleAbsolutePath = dependencyModules[importPath] || importPath;
+      const allRelativePaths = Object.entries(pathMap)
+        .filter(([relPath, absPath]) => absPath === moduleAbsolutePath)
+        .map(([relPath]) => relPath);
+      const allPossiblePaths = new Set(allRelativePaths);
+      allPossiblePaths.add(moduleAbsolutePath);
+
+      const pathWithoutExt = moduleAbsolutePath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
+      allPossiblePaths.add(pathWithoutExt);
+
+      const pathParts = moduleAbsolutePath.split('/');
+      if (pathParts.length >= 2) {
+        const last2Parts = pathParts.slice(-2).join('/');
+        allPossiblePaths.add(last2Parts);
+        const last2PartsNoExt = last2Parts.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
+        allPossiblePaths.add(last2PartsNoExt);
+      }
+
+      const fileName = pathParts[pathParts.length - 1];
+      if (fileName) {
+        allPossiblePaths.add(fileName);
+        const fileNameNoExt = fileName.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
+        allPossiblePaths.add(fileNameNoExt);
+      }
+
+      for (const relPath of allRelativePaths) {
+        allPossiblePaths.add(relPath);
+        const relPathNoExt = relPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
+        allPossiblePaths.add(relPathNoExt);
+        if (relPath.startsWith('./')) {
+          allPossiblePaths.add(relPath.substring(2));
+        }
+        if (relPath.startsWith('../')) {
+          const relParts = relPath.split('/');
+          if (relParts.length >= 2) {
+            const relLast2 = relParts.slice(-2).join('/');
+            allPossiblePaths.add(relLast2);
+            const relLast2NoExt = relLast2.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
+            allPossiblePaths.add(relLast2NoExt);
+          }
+        }
+      }
+
+      if (isImageModulePath(moduleAbsolutePath)) {
+        let dataUrl = String(content || '');
+        if (!dataUrl.startsWith('data:')) {
+          const imgResult = await readFileBase64(currentDepActualPath);
+          if (imgResult.success) {
+            dataUrl = `data:${imgResult.mimeType};base64,${imgResult.base64}`;
+          }
+        }
+        const imageExport = JSON.stringify(dataUrl);
+        modulesCode += `
+        // Image module: ${importPath} (absolute: ${moduleAbsolutePath})
+        (function() {
+          window.__modules__ = window.__modules__ || {};
+          const moduleExports = { __esModule: true, default: ${imageExport} };
+          window.__modules__['${moduleAbsolutePath}'] = moduleExports;
+          window.__modules__['${importPath}'] = moduleExports;
+          const allPaths = ${JSON.stringify(allRelativePaths)};
+          allPaths.forEach(path => {
+            window.__modules__[path] = moduleExports;
+          });
+          const allPossiblePaths = ${JSON.stringify(Array.from(allPossiblePaths))};
+          allPossiblePaths.forEach(path => {
+            if (path && path.trim()) {
+              window.__modules__[path] = moduleExports;
+            }
+          });
+        })();
+      `;
+        continue;
+      }
       
       // Отладочная информация
       console.log('ReactFramework: Processing dependency:', {
@@ -782,8 +910,7 @@ export class ReactFramework extends Framework {
           
           // Пропускаем только внешние библиотеки (npm пакеты)
           // Теперь обрабатываем локальные импорты, включая @ пути
-          if ((depImportPath.startsWith('react') && !depImportPath.startsWith('react/') && !depImportPath.startsWith('@')) || 
-              depImportPath.startsWith('react-native') || 
+          if (isCoreReactImport(depImportPath) || 
               depImportPath.startsWith('http')) {
             console.log(`[ProcessDependency] Skipping external import in ${currentDepFileName}: ${depImportPath}`);
             return ''; // Удаляем импорт
@@ -795,12 +922,12 @@ export class ReactFramework extends Framework {
           
           // Разрешаем путь синхронно для генерации всех возможных вариантов ключей
           const resolvedPathSync = this.resolvePathSyncMemo(currentDepActualPath, depImportPath);
-          const resolvedPathNoExt = resolvedPathSync.replace(/\.(js|jsx|ts|tsx)$/, '');
+          const resolvedPathNoExt = resolvedPathSync.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
           const resolvedParts = resolvedPathSync.split('/');
           const resolvedLast2 = resolvedParts.length >= 2 ? resolvedParts.slice(-2).join('/') : '';
-          const resolvedLast2NoExt = resolvedLast2.replace(/\.(js|jsx|ts|tsx)$/, '');
+          const resolvedLast2NoExt = resolvedLast2.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
           const resolvedFileName = resolvedParts[resolvedParts.length - 1] || '';
-          const resolvedFileNameNoExt = resolvedFileName.replace(/\.(js|jsx|ts|tsx)$/, '');
+          const resolvedFileNameNoExt = resolvedFileName.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
           
           // Создаем список всех возможных ключей для поиска модуля
           const possibleKeys = [
@@ -984,68 +1111,6 @@ export class ReactFramework extends Framework {
         hasDefaultExport = true;
       }
       
-      // Получаем абсолютный путь для этого модуля (importPath уже равен absolutePath из цикла)
-      const moduleAbsolutePath = dependencyModules[importPath] || importPath;
-      
-      // Находим все относительные пути, которые указывают на этот абсолютный путь
-      const allRelativePaths = Object.entries(pathMap)
-        .filter(([relPath, absPath]) => absPath === moduleAbsolutePath)
-        .map(([relPath]) => relPath);
-      
-      // Также находим все возможные варианты путей, которые могут быть использованы из разных контекстов
-      // Это включает пути, которые могут быть разрешены относительно разных базовых путей
-      const allPossiblePaths = new Set(allRelativePaths);
-      
-      // Добавляем абсолютный путь
-      allPossiblePaths.add(moduleAbsolutePath);
-      
-      // Добавляем путь без расширения
-      const pathWithoutExt = moduleAbsolutePath.replace(/\.(js|jsx|ts|tsx)$/, '');
-      allPossiblePaths.add(pathWithoutExt);
-      
-      // Добавляем последние 2 части пути (например, styles/commonStyles)
-      const pathParts = moduleAbsolutePath.split('/');
-      if (pathParts.length >= 2) {
-        const last2Parts = pathParts.slice(-2).join('/');
-        allPossiblePaths.add(last2Parts);
-        const last2PartsNoExt = last2Parts.replace(/\.(js|jsx|ts|tsx)$/, '');
-        allPossiblePaths.add(last2PartsNoExt);
-      }
-      
-      // Добавляем имя файла
-      const fileName = pathParts[pathParts.length - 1];
-      if (fileName) {
-        allPossiblePaths.add(fileName);
-        const fileNameNoExt = fileName.replace(/\.(js|jsx|ts|tsx)$/, '');
-        allPossiblePaths.add(fileNameNoExt);
-      }
-      
-      // Для каждого относительного пути из pathMap, который указывает на этот модуль,
-      // генерируем возможные варианты, которые могут быть использованы из других контекстов
-      for (const relPath of allRelativePaths) {
-        // Добавляем сам относительный путь
-        allPossiblePaths.add(relPath);
-        
-        // Добавляем путь без расширения
-        const relPathNoExt = relPath.replace(/\.(js|jsx|ts|tsx)$/, '');
-        allPossiblePaths.add(relPathNoExt);
-        
-        // Если путь начинается с ./, добавляем вариант без ./
-        if (relPath.startsWith('./')) {
-          allPossiblePaths.add(relPath.substring(2));
-        }
-        
-        // Если путь начинается с ../, добавляем последние части
-        if (relPath.startsWith('../')) {
-          const relParts = relPath.split('/');
-          if (relParts.length >= 2) {
-            const relLast2 = relParts.slice(-2).join('/');
-            allPossiblePaths.add(relLast2);
-            const relLast2NoExt = relLast2.replace(/\.(js|jsx|ts|tsx)$/, '');
-            allPossiblePaths.add(relLast2NoExt);
-          }
-        }
-      }
       
       console.log(`[ProcessDependency] All possible paths for module ${moduleAbsolutePath}:`, Array.from(allPossiblePaths));
       
@@ -1114,7 +1179,7 @@ export class ReactFramework extends Framework {
           });
           
           // Дополнительно регистрируем по имени файла без расширения для лучшей совместимости
-          const fileName = '${moduleAbsolutePath}'.split('/').pop().replace(/\.(js|jsx|ts|tsx)$/, '');
+          const fileName = '${moduleAbsolutePath}'.split('/').pop().replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
           if (fileName) {
             window.__modules__[fileName] = moduleExports;
           }
@@ -1122,11 +1187,11 @@ export class ReactFramework extends Framework {
           // Также регистрируем по всем вариантам путей, которые могут быть использованы из разных контекстов
           const resolvedVariants = [
             '${moduleAbsolutePath}',
-            '${moduleAbsolutePath.replace(/\.(js|jsx|ts|tsx)$/, '')}',
+            '${moduleAbsolutePath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '')}',
             '${moduleAbsolutePath.split('/').slice(-2).join('/')}',
-            '${moduleAbsolutePath.split('/').slice(-2).join('/').replace(/\.(js|jsx|ts|tsx)$/, '')}',
+            '${moduleAbsolutePath.split('/').slice(-2).join('/').replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '')}',
             '${moduleAbsolutePath.split('/').pop()}',
-            '${moduleAbsolutePath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx)$/, '')}'
+            '${moduleAbsolutePath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '')}'
           ];
           resolvedVariants.forEach(variant => {
             if (variant && variant.trim()) {
@@ -1250,12 +1315,7 @@ export class ReactFramework extends Framework {
     for (const imp of imports) {
       // Специальная обработка для react-native импортов
       if (safeVisualMode) {
-        if (
-          imp.path.startsWith('react') ||
-          imp.path.startsWith('react-dom') ||
-          imp.path.startsWith('react-native') ||
-          imp.path.startsWith('http')
-        ) {
+        if (isCoreReactImport(imp.path) || imp.path.startsWith('http')) {
           continue;
         }
         importReplacements[imp.fullStatement] = buildSafeStubImportReplacement(imp.fullStatement);
@@ -1284,7 +1344,7 @@ export class ReactFramework extends Framework {
       }
       
       // Пропускаем другие внешние библиотеки
-      if (imp.path.startsWith('react') || imp.path.startsWith('@') || imp.path.startsWith('http')) {
+      if (isCoreReactImport(imp.path) || imp.path.startsWith('@') || imp.path.startsWith('http')) {
         continue;
       }
       
@@ -1431,16 +1491,16 @@ export class ReactFramework extends Framework {
       allModulePaths.add(relPath);
       allModulePaths.add(absPath);
       // Также добавляем варианты без расширения и последние части пути
-      const absPathNoExt = absPath.replace(/\.(js|jsx|ts|tsx)$/, '');
+      const absPathNoExt = absPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       allModulePaths.add(absPathNoExt);
       const parts = absPath.split('/');
       if (parts.length >= 2) {
         allModulePaths.add(parts.slice(-2).join('/'));
-        allModulePaths.add(parts.slice(-2).join('/').replace(/\.(js|jsx|ts|tsx)$/, ''));
+        allModulePaths.add(parts.slice(-2).join('/').replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, ''));
       }
       if (parts.length > 0) {
         allModulePaths.add(parts[parts.length - 1]);
-        allModulePaths.add(parts[parts.length - 1].replace(/\.(js|jsx|ts|tsx)$/, ''));
+        allModulePaths.add(parts[parts.length - 1].replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, ''));
       }
     }
     
@@ -1450,11 +1510,11 @@ export class ReactFramework extends Framework {
       const pathParts = moduleAbsolutePath.split('/');
       if (pathParts.length >= 2) {
         allModulePaths.add(pathParts.slice(-2).join('/'));
-        allModulePaths.add(pathParts.slice(-2).join('/').replace(/\.(js|jsx|ts|tsx)$/, ''));
+        allModulePaths.add(pathParts.slice(-2).join('/').replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, ''));
       }
       if (pathParts.length > 0) {
         allModulePaths.add(pathParts[pathParts.length - 1]);
-        allModulePaths.add(pathParts[pathParts.length - 1].replace(/\.(js|jsx|ts|tsx)$/, ''));
+        allModulePaths.add(pathParts[pathParts.length - 1].replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, ''));
       }
     }
     
@@ -1464,8 +1524,38 @@ export class ReactFramework extends Framework {
       return `window.__modules__['${escapedPath}'] = window.__modules__['${escapedPath}'] || null;`;
     }).join('\n        ');
     
+    const styleInjectionCode = styleDependencies.map((styleDep) => {
+      const pathLiteral = JSON.stringify(styleDep.path);
+      const contentLiteral = JSON.stringify(styleDep.content);
+      return `
+        (() => {
+          const stylePath = ${pathLiteral};
+          const styleContent = ${contentLiteral};
+          const attrName = 'data-mrpak-style-path';
+
+          const existingStyle = Array.from(document.querySelectorAll('style[' + attrName + ']'))
+            .find((node) => node.getAttribute(attrName) === stylePath);
+
+          if (existingStyle) {
+            existingStyle.textContent = styleContent;
+            return;
+          }
+
+          const styleEl = document.createElement('style');
+          styleEl.setAttribute(attrName, stylePath);
+          styleEl.textContent = styleContent;
+          document.head.appendChild(styleEl);
+        })();
+      `;
+    }).join('\n        ');
+
     // Обертываем modulesCode, чтобы сначала предварительно зарегистрировать модули
     const wrappedModulesCode = `
+        // Инжектим CSS-зависимости, импортированные компонентом.
+        ${styleInjectionCode}
+
+        console.log('Injected ${styleDependencies.length} style module(s) into <head>.');
+
         // Предварительная регистрация всех модулей (создаем пустые слоты)
         ${preRegisterCode}
         
@@ -2478,3 +2568,4 @@ export class ReactFramework extends Framework {
     return `<${tagName}${styleAttr}${onClickAttr}>${body}</${tagName}>`;
   }
 }
+

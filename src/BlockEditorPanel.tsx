@@ -55,6 +55,7 @@ export type BlockEditorPanelProps = {
     blockId: any;
     text: any;
   }) => void;
+  onCommitStagedChanges?: () => void;
   framework: HtmlFramework | ReactFramework | null;
   onUndo: () => void;
   onRedo: () => void;
@@ -64,6 +65,20 @@ export type BlockEditorPanelProps = {
   selectedBlockIds?: string[];
   onExtractSelection?: () => void;
   onOpenFile?: (path: string) => void;
+  styleLibraryEntries?: Array<{
+    id: string;
+    name: string;
+    path: string;
+    sourceFileName?: string;
+    className?: string;
+    cssText?: string;
+    stylePatch?: Record<string, any>;
+  }>;
+  onImportStyleTemplate?: (templateId: string) => void;
+  onImportStyleFromPicker?: () => void;
+  onApplyStyleLibraryEntry?: (entryId: string) => void;
+  onAddProjectDependency?: (packageName: string, version?: string) => Promise<boolean> | boolean;
+  onInsertComponentFromLibrary?: (componentName: string, importPath: string, importKind?: 'default' | 'named') => void;
 };
 
 type BlockEditorSidebarControllerProps = Omit<BlockEditorPanelProps, 'html' | 'onMessage' | 'outgoingMessage'>;
@@ -83,6 +98,7 @@ export function useBlockEditorSidebarController({
   onDeleteBlock,
   onReparentBlock,
   onSetText,
+  onCommitStagedChanges,
   framework,
   onUndo,
   onRedo,
@@ -92,6 +108,12 @@ export function useBlockEditorSidebarController({
   selectedBlockIds = [],
   onExtractSelection,
   onOpenFile,
+  styleLibraryEntries = [],
+  onImportStyleTemplate,
+  onImportStyleFromPicker,
+  onApplyStyleLibraryEntry,
+  onAddProjectDependency,
+  onInsertComponentFromLibrary,
 }: BlockEditorSidebarControllerProps) {
   const [left, setLeft] = useState<number | null>(null);
   const [top, setTop] = useState<number | null>(null);
@@ -101,6 +123,8 @@ export function useBlockEditorSidebarController({
   const [topMode, setTopMode] = useState<'value' | 'auto'>('value');
   const [widthMode, setWidthMode] = useState<'value' | 'auto' | 'min-content' | 'max-content' | 'fit-content'>('value');
   const [heightMode, setHeightMode] = useState<'value' | 'auto'>('value');
+  const [widthUnit, setWidthUnit] = useState<'px' | '%'>('px');
+  const [heightUnit, setHeightUnit] = useState<'px' | '%'>('px');
 
   // Обработчики для отправки патчей позиционирования
   const handleLeftChange = (value: number | null) => {
@@ -140,7 +164,7 @@ export function useBlockEditorSidebarController({
     setWidthMode('value');
     if (selectedBlock?.id && value !== null) {
       onApplyPatch(selectedBlock.id, { 
-        width: toDimensionValue(value),
+        width: toDimensionValue(value, widthUnit),
       });
     }
   };
@@ -150,7 +174,7 @@ export function useBlockEditorSidebarController({
     setHeightMode('value');
     if (selectedBlock?.id && value !== null) {
       onApplyPatch(selectedBlock.id, { 
-        height: toDimensionValue(value),
+        height: toDimensionValue(value, heightUnit),
       });
     }
   };
@@ -209,6 +233,31 @@ export function useBlockEditorSidebarController({
   };
   const [bg, setBg] = useState('');
   const [color, setColor] = useState('');
+  const [borderRadiusValue, setBorderRadiusValue] = useState<number | null>(null);
+  const [borderWidthValue, setBorderWidthValue] = useState<number | null>(null);
+  const [borderColorValue, setBorderColorValue] = useState('');
+  const [boxShadowValue, setBoxShadowValue] = useState('');
+  const [fontFamilyValue, setFontFamilyValue] = useState('');
+  const [fontSizeValue, setFontSizeValue] = useState<number | null>(null);
+  const [fontWeightValue, setFontWeightValue] = useState('');
+  const [outlineValue, setOutlineValue] = useState('');
+  const [outlineColorValue, setOutlineColorValue] = useState('');
+  const [opacityValue, setOpacityValue] = useState<number | null>(null);
+  const [marginValue, setMarginValue] = useState('');
+  const [paddingValue, setPaddingValue] = useState('');
+  const [transformValue, setTransformValue] = useState('');
+  const [displayValue, setDisplayValue] = useState('');
+  const [justifyContentValue, setJustifyContentValue] = useState('');
+  const [alignItemsValue, setAlignItemsValue] = useState('');
+  const [gapValue, setGapValue] = useState('');
+  const [flexDirectionValue, setFlexDirectionValue] = useState('');
+  const [flexWrapValue, setFlexWrapValue] = useState('');
+  const [backgroundSizeValue, setBackgroundSizeValue] = useState('');
+  const [lineHeightValue, setLineHeightValue] = useState('');
+  const [letterSpacingValue, setLetterSpacingValue] = useState('');
+  const [textAlignValue, setTextAlignValue] = useState('');
+  const [textTransformValue, setTextTransformValue] = useState('');
+  const [flexValue, setFlexValue] = useState('');
   const [editingLayerId, setEditingLayerId] = useState(null);
   const [editingLayerName, setEditingLayerName] = useState('');
   const [styleMode, setStyleMode] = useState('kv'); // 'kv' | 'text'
@@ -237,7 +286,10 @@ export function useBlockEditorSidebarController({
   };
   const supportsCssSpecialValues = fileType !== 'react-native';
   const canUseAutoOffsets = supportsCssSpecialValues && moveMode !== 'relative';
-  const toDimensionValue = (value: number) => (fileType === 'html' ? `${value}px` : value);
+  const toDimensionValue = (value: number, unit: 'px' | '%') => {
+    if (unit === '%') return `${value}%`;
+    return fileType === 'html' ? `${value}px` : value;
+  };
 
   const getSpecialModePatch = (field: 'left' | 'top' | 'width' | 'height', mode: string) => {
     if (!selectedBlock?.id) return null;
@@ -272,6 +324,18 @@ export function useBlockEditorSidebarController({
     onApplyPatch(selectedBlock.id, patch);
   };
 
+  const handleWidthUnitChange = (newUnit: 'px' | '%') => {
+    setWidthUnit(newUnit);
+    if (!selectedBlock?.id || width === null || !Number.isFinite(width)) return;
+    onApplyPatch(selectedBlock.id, { width: toDimensionValue(width, newUnit) });
+  };
+
+  const handleHeightUnitChange = (newUnit: 'px' | '%') => {
+    setHeightUnit(newUnit);
+    if (!selectedBlock?.id || height === null || !Number.isFinite(height)) return;
+    onApplyPatch(selectedBlock.id, { height: toDimensionValue(height, newUnit) });
+  };
+
   const handlePositionPreset = (horizontal: 'left' | 'center' | 'right', vertical: 'top' | 'center' | 'bottom') => {
     if (!selectedBlock?.id || !onSendCommand) return;
     onSendCommand({
@@ -294,6 +358,31 @@ export function useBlockEditorSidebarController({
     setHeightMode('value');
     setBg('');
     setColor('');
+    setBorderRadiusValue(null);
+    setBorderWidthValue(null);
+    setBorderColorValue('');
+    setBoxShadowValue('');
+    setFontFamilyValue('');
+    setFontSizeValue(null);
+    setFontWeightValue('');
+    setOutlineValue('');
+    setOutlineColorValue('');
+    setOpacityValue(null);
+    setMarginValue('');
+    setPaddingValue('');
+    setTransformValue('');
+    setDisplayValue('');
+    setJustifyContentValue('');
+    setAlignItemsValue('');
+    setGapValue('');
+    setFlexDirectionValue('');
+    setFlexWrapValue('');
+    setBackgroundSizeValue('');
+    setLineHeightValue('');
+    setLetterSpacingValue('');
+    setTextAlignValue('');
+    setTextTransformValue('');
+    setFlexValue('');
     setStyleRows([{ key: '', value: '' }]);
     setStyleText('');
     // Baseline: берём только inline style (computed используем только для просмотра).
@@ -310,6 +399,36 @@ export function useBlockEditorSidebarController({
       }
       return '';
     };
+    const parseOptionalNumber = (value: string) => {
+      if (!value) return null;
+      const num = parseFloat(value);
+      return Number.isFinite(num) ? num : null;
+    };
+    setBorderRadiusValue(parseOptionalNumber(getRawStyleValue('border-radius', 'borderRadius')));
+    setBorderWidthValue(parseOptionalNumber(getRawStyleValue('border-width', 'borderWidth')));
+    setBorderColorValue(getRawStyleValue('border-color', 'borderColor'));
+    setBoxShadowValue(getRawStyleValue('box-shadow', 'boxShadow'));
+    setFontFamilyValue(getRawStyleValue('font-family', 'fontFamily'));
+    setFontSizeValue(parseOptionalNumber(getRawStyleValue('font-size', 'fontSize')));
+    setFontWeightValue(getRawStyleValue('font-weight', 'fontWeight'));
+    setOutlineValue(getRawStyleValue('outline'));
+    setOutlineColorValue(getRawStyleValue('outline-color', 'outlineColor'));
+    setOpacityValue(parseOptionalNumber(getRawStyleValue('opacity')));
+    setMarginValue(getRawStyleValue('margin'));
+    setPaddingValue(getRawStyleValue('padding'));
+    setTransformValue(getRawStyleValue('transform'));
+    setDisplayValue(getRawStyleValue('display'));
+    setJustifyContentValue(getRawStyleValue('justify-content', 'justifyContent'));
+    setAlignItemsValue(getRawStyleValue('align-items', 'alignItems'));
+    setGapValue(getRawStyleValue('gap'));
+    setFlexDirectionValue(getRawStyleValue('flex-direction', 'flexDirection'));
+    setFlexWrapValue(getRawStyleValue('flex-wrap', 'flexWrap'));
+    setBackgroundSizeValue(getRawStyleValue('background-size', 'backgroundSize'));
+    setLineHeightValue(getRawStyleValue('line-height', 'lineHeight'));
+    setLetterSpacingValue(getRawStyleValue('letter-spacing', 'letterSpacing'));
+    setTextAlignValue(getRawStyleValue('text-align', 'textAlign'));
+    setTextTransformValue(getRawStyleValue('text-transform', 'textTransform'));
+    setFlexValue(getRawStyleValue('flex'));
     const norm: Record<string, string | number | boolean> = {};
     for (const [k, v] of Object.entries(raw)) {
       const nk = normalizeStyleKey({ fileType, key: k });
@@ -415,6 +534,8 @@ export function useBlockEditorSidebarController({
       : getRawStyleValue('top');
     const widthRaw = getRawStyleValue('width');
     const heightRaw = getRawStyleValue('height');
+    setWidthUnit(widthRaw.includes('%') ? '%' : 'px');
+    setHeightUnit(heightRaw.includes('%') ? '%' : 'px');
     setLeftMode(currentXRaw === 'auto' && canUseAutoOffsets ? 'auto' : 'value');
     setTopMode(currentYRaw === 'auto' && canUseAutoOffsets ? 'auto' : 'value');
     setWidthMode(
@@ -451,11 +572,23 @@ export function useBlockEditorSidebarController({
 
   const patch = useMemo(() => {
     const p: Record<string, any> = {};
+    const setStyleString = (htmlKey: string, reactKey: string, value: string) => {
+      if (!value) return;
+      p[fileType === 'html' ? htmlKey : reactKey] = value;
+    };
 
     const setPx = (key: any, val: any) => {
       if (val == null || !Number.isFinite(val)) return;
       if (key === 'left' || key === 'top') {
         p[key] = formatMoveValue(val);
+        return;
+      }
+      if (key === 'width') {
+        p[key] = toDimensionValue(val, widthUnit);
+        return;
+      }
+      if (key === 'height') {
+        p[key] = toDimensionValue(val, heightUnit);
         return;
       }
       if (fileType === 'html') p[key] = `${val}px`;
@@ -481,6 +614,60 @@ export function useBlockEditorSidebarController({
       if (fileType === 'html') p.color = color;
       else p.color = color;
     }
+    if (borderRadiusValue !== null) {
+      p[fileType === 'html' ? 'border-radius' : 'borderRadius'] =
+        fileType === 'html' ? `${borderRadiusValue}px` : borderRadiusValue;
+    }
+    if (borderWidthValue !== null) {
+      p[fileType === 'html' ? 'border-width' : 'borderWidth'] =
+        fileType === 'html' ? `${borderWidthValue}px` : borderWidthValue;
+    }
+    if (borderColorValue) {
+      p[fileType === 'html' ? 'border-color' : 'borderColor'] = borderColorValue;
+    }
+    if (boxShadowValue) {
+      p[fileType === 'html' ? 'box-shadow' : 'boxShadow'] = boxShadowValue;
+    }
+    if (fontFamilyValue) {
+      p[fileType === 'html' ? 'font-family' : 'fontFamily'] = fontFamilyValue;
+    }
+    if (fontSizeValue !== null) {
+      p[fileType === 'html' ? 'font-size' : 'fontSize'] =
+        fileType === 'html' ? `${fontSizeValue}px` : fontSizeValue;
+    }
+    if (fontWeightValue) {
+      p[fileType === 'html' ? 'font-weight' : 'fontWeight'] = fontWeightValue;
+    }
+    if (outlineValue) {
+      p.outline = outlineValue;
+    }
+    if (outlineColorValue) {
+      p[fileType === 'html' ? 'outline-color' : 'outlineColor'] = outlineColorValue;
+    }
+    if (opacityValue !== null) {
+      p.opacity = opacityValue;
+    }
+    if (marginValue) {
+      p.margin = marginValue;
+    }
+    if (paddingValue) {
+      p.padding = paddingValue;
+    }
+    if (transformValue) {
+      p.transform = transformValue;
+    }
+    setStyleString('display', 'display', displayValue);
+    setStyleString('justify-content', 'justifyContent', justifyContentValue);
+    setStyleString('align-items', 'alignItems', alignItemsValue);
+    setStyleString('gap', 'gap', gapValue);
+    setStyleString('flex-direction', 'flexDirection', flexDirectionValue);
+    setStyleString('flex-wrap', 'flexWrap', flexWrapValue);
+    setStyleString('background-size', 'backgroundSize', backgroundSizeValue);
+    setStyleString('line-height', 'lineHeight', lineHeightValue);
+    setStyleString('letter-spacing', 'letterSpacing', letterSpacingValue);
+    setStyleString('text-align', 'textAlign', textAlignValue);
+    setStyleString('text-transform', 'textTransform', textTransformValue);
+    setStyleString('flex', 'flex', flexValue);
 
     if (leftMode !== 'value' || topMode !== 'value' || left != null || top != null) {
       p.position = moveMode === 'grid8' ? 'absolute' : moveMode;
@@ -491,9 +678,9 @@ export function useBlockEditorSidebarController({
     }
 
     return p;
-  }, [fileType, left, top, width, height, bg, color, moveMode, moveUnit, leftMode, topMode, widthMode, heightMode, canUseAutoOffsets, supportsCssSpecialValues]);
+  }, [fileType, left, top, width, height, bg, color, borderRadiusValue, borderWidthValue, borderColorValue, boxShadowValue, fontFamilyValue, fontSizeValue, fontWeightValue, outlineValue, outlineColorValue, opacityValue, marginValue, paddingValue, transformValue, displayValue, justifyContentValue, alignItemsValue, gapValue, flexDirectionValue, flexWrapValue, backgroundSizeValue, lineHeightValue, letterSpacingValue, textAlignValue, textTransformValue, flexValue, moveMode, moveUnit, widthUnit, heightUnit, leftMode, topMode, widthMode, heightMode, canUseAutoOffsets, supportsCssSpecialValues]);
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!canApply) return;
     const fullPatch = { ...patch, ...diffAgainstBaseline(buildCurrentStylePatch()) };
     if (Object.keys(fullPatch).length === 0) return;
@@ -511,7 +698,10 @@ export function useBlockEditorSidebarController({
       });
     }
 
-    onApplyPatch(selectedBlock.id, fullPatch);
+    await Promise.resolve(onApplyPatch(selectedBlock.id, fullPatch));
+    if (typeof onCommitStagedChanges === 'function') {
+      onCommitStagedChanges();
+    }
   };
 
   const buildCurrentStylePatch = () => {
@@ -936,6 +1126,8 @@ export function useBlockEditorSidebarController({
     topMode,
     widthMode,
     heightMode,
+    widthUnit,
+    heightUnit,
     handleLeftChange,
     handleTopChange,
     handleWidthChange,
@@ -944,6 +1136,8 @@ export function useBlockEditorSidebarController({
     handleTopModeChange,
     handleWidthModeChange,
     handleHeightModeChange,
+    handleWidthUnitChange,
+    handleHeightUnitChange,
     NumberField,
     textValue,
     setTextValue,
@@ -967,6 +1161,62 @@ export function useBlockEditorSidebarController({
     setBg,
     color,
     setColor,
+    borderRadiusValue,
+    setBorderRadiusValue,
+    borderWidthValue,
+    setBorderWidthValue,
+    borderColorValue,
+    setBorderColorValue,
+    boxShadowValue,
+    setBoxShadowValue,
+    fontFamilyValue,
+    setFontFamilyValue,
+    fontSizeValue,
+    setFontSizeValue,
+    fontWeightValue,
+    setFontWeightValue,
+    outlineValue,
+    setOutlineValue,
+    outlineColorValue,
+    setOutlineColorValue,
+    opacityValue,
+    setOpacityValue,
+    marginValue,
+    setMarginValue,
+    paddingValue,
+    setPaddingValue,
+    transformValue,
+    setTransformValue,
+    displayValue,
+    setDisplayValue,
+    justifyContentValue,
+    setJustifyContentValue,
+    alignItemsValue,
+    setAlignItemsValue,
+    gapValue,
+    setGapValue,
+    flexDirectionValue,
+    setFlexDirectionValue,
+    flexWrapValue,
+    setFlexWrapValue,
+    backgroundSizeValue,
+    setBackgroundSizeValue,
+    lineHeightValue,
+    setLineHeightValue,
+    letterSpacingValue,
+    setLetterSpacingValue,
+    textAlignValue,
+    setTextAlignValue,
+    textTransformValue,
+    setTextTransformValue,
+    flexValue,
+    setFlexValue,
+    styleLibraryEntries,
+    onImportStyleTemplate,
+    onImportStyleFromPicker,
+    onApplyStyleLibraryEntry,
+    onAddProjectDependency,
+    onInsertComponentFromLibrary,
     canApply,
     handleApply,
   };

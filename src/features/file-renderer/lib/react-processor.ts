@@ -10,10 +10,14 @@ type ExtractedImport = {
   line: number;
 };
 
-type DetectedComponent = {
+export type DetectedComponent = {
   name: string;
   type: string;
   priority: number;
+  exportType?: 'default' | 'named' | 'none';
+  hasProps?: boolean;
+  propsCount?: number;
+  supportsStyleOnlyArg?: boolean;
   isAnonymous?: boolean;
   isInferred?: boolean;
 };
@@ -285,6 +289,10 @@ function isComponentLikeNode(node: t.Node | null | undefined): boolean {
   return false;
 }
 
+function isCoreReactImport(importPath: string): boolean {
+  return /^(react|react-dom|react-native)(\/|$)/.test(String(importPath || '').trim());
+}
+
 function fallbackExtractImports(code: string, sourceFile = 'unknown') {
   const imports: ExtractedImport[] = [];
   const importRegex = /import\s+.*?\s+from\s+['"](.*?)['"];?/g;
@@ -293,9 +301,7 @@ function fallbackExtractImports(code: string, sourceFile = 'unknown') {
   while ((match = importRegex.exec(code)) !== null) {
     const importPath = match[1];
     if (
-      importPath.startsWith('react') ||
-      importPath.startsWith('react-dom') ||
-      importPath.startsWith('react-native') ||
+      isCoreReactImport(importPath) ||
       importPath.startsWith('node_modules') ||
       importPath.startsWith('http://') ||
       importPath.startsWith('https://')
@@ -322,6 +328,14 @@ function fallbackExtractImports(code: string, sourceFile = 'unknown') {
 }
 
 export function extractImports(code: string, sourceFile = 'unknown'): ExtractedImport[] {
+  const normalizedSourceFile = String(sourceFile || '').toLowerCase();
+  if (/\.(css|scss|less)($|\?)/i.test(normalizedSourceFile)) {
+    return [];
+  }
+  if (/\.(png|jpe?g|gif|webp|avif|bmp|svg)($|\?)/i.test(normalizedSourceFile)) {
+    return [];
+  }
+
   try {
     const ast = parseModule(code);
     const imports: ExtractedImport[] = [];
@@ -344,9 +358,7 @@ export function extractImports(code: string, sourceFile = 'unknown'): ExtractedI
 
       if (
         isTypeOnly ||
-        importPath.startsWith('react') ||
-        importPath.startsWith('react-dom') ||
-        importPath.startsWith('react-native') ||
+        isCoreReactImport(importPath) ||
         importPath.startsWith('node_modules') ||
         importPath.startsWith('http://') ||
         importPath.startsWith('https://')
@@ -526,9 +538,7 @@ function collectLocalComponentImports(ast: t.File) {
 
     if (
       isTypeOnly ||
-      importPath.startsWith('react') ||
-      importPath.startsWith('react-dom') ||
-      importPath.startsWith('react-native') ||
+      isCoreReactImport(importPath) ||
       importPath.startsWith('node_modules') ||
       importPath.startsWith('http://') ||
       importPath.startsWith('https://')
@@ -630,17 +640,110 @@ export function detectComponents(code: string): DetectedComponent[] {
   const components: DetectedComponent[] = [];
   const seen = new Set<string>();
   let priority = 0;
+  const defaultExportNames = new Set<string>();
+  const namedExportNames = new Set<string>();
+
+  const getPropsCountForComponentNode = (node: t.Node | null | undefined): number => {
+    const unwrapped = unwrapNode(node);
+    if (!unwrapped) return 0;
+
+    if (t.isFunctionDeclaration(unwrapped) || t.isFunctionExpression(unwrapped) || t.isArrowFunctionExpression(unwrapped)) {
+      return unwrapped.params.length;
+    }
+
+    if (t.isClassDeclaration(unwrapped) || t.isClassExpression(unwrapped)) {
+      const constructorMethod = unwrapped.body.body.find(
+        (member) => t.isClassMethod(member) && member.kind === 'constructor'
+      ) as t.ClassMethod | undefined;
+      return constructorMethod?.params?.length || 0;
+    }
+
+    if (t.isCallExpression(unwrapped)) {
+      const firstArg = unwrapped.arguments[0];
+      if (t.isFunctionExpression(firstArg) || t.isArrowFunctionExpression(firstArg)) {
+        return firstArg.params.length;
+      }
+    }
+
+    return 0;
+  };
+
+  const getComponentFunctionNode = (
+    node: t.Node | null | undefined
+  ): t.FunctionDeclaration | t.FunctionExpression | t.ArrowFunctionExpression | null => {
+    const unwrapped = unwrapNode(node);
+    if (!unwrapped) return null;
+    if (t.isFunctionDeclaration(unwrapped) || t.isFunctionExpression(unwrapped) || t.isArrowFunctionExpression(unwrapped)) {
+      return unwrapped;
+    }
+    if (t.isCallExpression(unwrapped)) {
+      const firstArg = unwrapNode(unwrapped.arguments[0] as any);
+      if (t.isFunctionExpression(firstArg) || t.isArrowFunctionExpression(firstArg)) {
+        return firstArg;
+      }
+    }
+    return null;
+  };
+
+  const supportsStyleOnlyArgForNode = (node: t.Node | null | undefined): boolean => {
+    const unwrapped = unwrapNode(node);
+    if (!unwrapped) return true;
+
+    if (t.isClassDeclaration(unwrapped) || t.isClassExpression(unwrapped)) {
+      const constructorMethod = unwrapped.body.body.find(
+        (member) => t.isClassMethod(member) && member.kind === 'constructor'
+      ) as t.ClassMethod | undefined;
+      const params = constructorMethod?.params || [];
+      return params.length === 0;
+    }
+
+    const fn = getComponentFunctionNode(unwrapped);
+    if (!fn) return false;
+    if (fn.params.length === 0) return true;
+    if (fn.params.length > 1) return false;
+
+    let firstParam: t.Node | null = unwrapNode(fn.params[0] as any);
+    if (t.isAssignmentPattern(firstParam)) {
+      firstParam = unwrapNode(firstParam.left);
+    }
+    if (!firstParam) return false;
+
+    if (!t.isObjectPattern(firstParam)) {
+      return false;
+    }
+
+    for (const prop of firstParam.properties) {
+      if (t.isRestElement(prop)) {
+        return false;
+      }
+      if (!t.isObjectProperty(prop)) {
+        return false;
+      }
+      const keyNode = prop.computed ? null : prop.key;
+      const keyName = t.isIdentifier(keyNode) ? keyNode.name : t.isStringLiteral(keyNode) ? keyNode.value : '';
+      if (keyName !== 'style') {
+        return false;
+      }
+    }
+    return true;
+  };
 
   const addComponent = (name: string | null | undefined, type: string, extra: Partial<DetectedComponent> = {}) => {
     if (!name || !isPascalCase(name) || seen.has(name)) {
       return;
     }
 
+    const explicitExportType = extra.exportType;
+    const exportType =
+      explicitExportType ||
+      (defaultExportNames.has(name) ? 'default' : namedExportNames.has(name) ? 'named' : 'none');
+
     seen.add(name);
     components.push({
       name,
       type,
       priority: priority++,
+      exportType,
       ...extra,
     });
   };
@@ -648,21 +751,74 @@ export function detectComponents(code: string): DetectedComponent[] {
   try {
     const ast = parseModule(code);
 
+    ast.program.body.forEach((statement) => {
+      if (t.isExportDefaultDeclaration(statement)) {
+        const declaration = unwrapNode(statement.declaration);
+        if ((t.isFunctionDeclaration(declaration) || t.isClassDeclaration(declaration)) && declaration.id?.name) {
+          defaultExportNames.add(declaration.id.name);
+        } else if (t.isIdentifier(declaration)) {
+          defaultExportNames.add(declaration.name);
+        }
+        return;
+      }
+
+      if (!t.isExportNamedDeclaration(statement)) return;
+
+      if (statement.declaration) {
+        if ((t.isFunctionDeclaration(statement.declaration) || t.isClassDeclaration(statement.declaration)) && statement.declaration.id?.name) {
+          namedExportNames.add(statement.declaration.id.name);
+          return;
+        }
+        if (t.isVariableDeclaration(statement.declaration)) {
+          statement.declaration.declarations.forEach((declaration) => {
+            if (t.isIdentifier(declaration.id)) {
+              namedExportNames.add(declaration.id.name);
+            }
+          });
+        }
+        return;
+      }
+
+      if (!statement.source) {
+        statement.specifiers.forEach((specifier) => {
+          if (!t.isExportSpecifier(specifier)) return;
+          if (t.isIdentifier(specifier.local)) {
+            namedExportNames.add(specifier.local.name);
+          }
+        });
+      }
+    });
+
     const inspectTopLevelStatement = (statement: t.Statement | t.Declaration) => {
       if (t.isFunctionDeclaration(statement) && isPascalCase(statement.id?.name) && hasRenderableReturn(statement)) {
-        addComponent(statement.id?.name, 'function-component');
+        const propsCount = getPropsCountForComponentNode(statement);
+        addComponent(statement.id?.name, 'function-component', {
+          hasProps: propsCount > 0,
+          propsCount,
+          supportsStyleOnlyArg: supportsStyleOnlyArgForNode(statement),
+        });
         return;
       }
 
       if (t.isClassDeclaration(statement) && isPascalCase(statement.id?.name) && isClassComponent(statement)) {
-        addComponent(statement.id?.name, 'class-component');
+        const propsCount = getPropsCountForComponentNode(statement);
+        addComponent(statement.id?.name, 'class-component', {
+          hasProps: propsCount > 0,
+          propsCount,
+          supportsStyleOnlyArg: supportsStyleOnlyArgForNode(statement),
+        });
         return;
       }
 
       if (t.isVariableDeclaration(statement)) {
         statement.declarations.forEach((declaration) => {
           if (t.isIdentifier(declaration.id) && isPascalCase(declaration.id.name) && isComponentLikeNode(declaration.init)) {
-            addComponent(declaration.id.name, 'variable-component');
+            const propsCount = getPropsCountForComponentNode(declaration.init);
+            addComponent(declaration.id.name, 'variable-component', {
+              hasProps: propsCount > 0,
+              propsCount,
+              supportsStyleOnlyArg: supportsStyleOnlyArgForNode(declaration.init),
+            });
           }
         });
       }

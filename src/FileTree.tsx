@@ -14,6 +14,20 @@ export type FileSelection = {
   selectionKey?: string;
 };
 
+export type ComponentDragPayload = {
+  sourceFilePath: string;
+  componentName: string;
+  importKind: 'default' | 'named';
+  hasProps: boolean;
+  propsCount: number;
+  supportsStyleOnlyArg?: boolean;
+};
+
+export type FileDragPayload = {
+  sourceFilePath: string;
+  kind: 'image';
+};
+
 interface FileTreeItem {
   path: string;
   name: string;
@@ -21,12 +35,20 @@ interface FileTreeItem {
   isFile: boolean;
   children?: FileTreeItem[];
   componentName?: string | null;
+  componentHasProps?: boolean;
+  componentPropsCount?: number;
+  componentSupportsStyleOnlyArg?: boolean;
+  componentImportKind?: 'default' | 'named' | 'none';
   parentFilePath?: string;
   kind?: 'directory' | 'file' | 'component';
 }
 
 function isComponentSelectableFile(item: FileTreeItem) {
   return item.isFile && /\.(jsx|tsx)$/i.test(item.name);
+}
+
+function isImageFileName(name: string) {
+  return /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(String(name || ''));
 }
 
 function buildComponentSelectionKey(filePath: string, componentName: string) {
@@ -54,10 +76,15 @@ async function annotateRenderableComponents(items: FileTreeItem[]): Promise<File
 
         const components = detectComponents(result.content).filter((component) => Boolean(component?.name));
         if (components.length === 1) {
+          const component = components[0];
           return {
             ...item,
             kind: 'file',
-            componentName: components[0].name,
+            componentName: component.name,
+            componentHasProps: Boolean(component.hasProps),
+            componentPropsCount: Number(component.propsCount || 0),
+            componentSupportsStyleOnlyArg: Boolean(component.supportsStyleOnlyArg),
+            componentImportKind: component.exportType || 'none',
           };
         }
 
@@ -72,6 +99,10 @@ async function annotateRenderableComponents(items: FileTreeItem[]): Promise<File
               isFile: false,
               kind: 'component',
               componentName: component.name,
+              componentHasProps: Boolean(component.hasProps),
+              componentPropsCount: Number(component.propsCount || 0),
+              componentSupportsStyleOnlyArg: Boolean(component.supportsStyleOnlyArg),
+              componentImportKind: component.exportType || 'none',
               parentFilePath: item.path,
             })),
           };
@@ -240,7 +271,7 @@ function ContextMenu({ visible, x, y, onClose, onDelete, onRename }: ContextMenu
 
 // CreateFileDialog вынесен в shared/ui/dialogs/create-file-dialog
 
-function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPaths, onToggleExpand, onCreateFile, onCreateFolder, onDelete, onRename }: {
+function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPaths, onToggleExpand, onCreateFile, onCreateFolder, onDelete, onRename, onStartComponentDrag, onEndComponentDrag, onStartFileDrag, onEndFileDrag, onUnsupportedComponentDrag }: {
   item: FileTreeItem;
   level?: number;
   onSelectFile?: (selection: FileSelection | null) => void;
@@ -251,6 +282,11 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
   onCreateFolder?: (path: string) => void;
   onDelete?: (path: string) => void;
   onRename?: (path: string) => void;
+  onStartComponentDrag?: (payload: ComponentDragPayload) => void;
+  onEndComponentDrag?: () => void;
+  onStartFileDrag?: (payload: FileDragPayload) => void;
+  onEndFileDrag?: () => void;
+  onUnsupportedComponentDrag?: (message: string) => void;
 }) {
   const isExpanded = expandedPaths.has(item.path);
   const isSelected = selectedPath === item.path;
@@ -259,6 +295,28 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const itemRef = useRef(null);
   const containerRef = useRef(null);
+  const componentDragPayload: ComponentDragPayload | null = (() => {
+    const componentName = String(item.componentName || '').trim();
+    const sourceFilePath = String(item.parentFilePath || item.path || '').trim();
+    if (!componentName || !sourceFilePath) return null;
+    const isComponentNode = item.kind === 'component';
+    const isSingleComponentFile =
+      item.kind === 'file' && item.isFile && /\.(jsx|tsx)$/i.test(item.name) && !item.children?.length;
+    if (!isComponentNode && !isSingleComponentFile) return null;
+    const importKind = item.componentImportKind === 'named' ? 'named' : 'default';
+    return {
+      sourceFilePath,
+      componentName,
+      importKind,
+      hasProps: Boolean(item.componentHasProps),
+      propsCount: Number(item.componentPropsCount || 0),
+      supportsStyleOnlyArg: Boolean(item.componentSupportsStyleOnlyArg),
+    };
+  })();
+  const fileDragPayload: FileDragPayload | null =
+    item.isFile && isImageFileName(item.name)
+      ? { sourceFilePath: String(item.path || ''), kind: 'image' }
+      : null;
 
   const handlePress = () => {
     if (item.kind === 'component' && item.parentFilePath) {
@@ -349,6 +407,90 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
     return icons[ext as keyof typeof icons] || '📄';
   };
 
+  const handleDragStart = (event: any) => {
+    if (!componentDragPayload && !fileDragPayload) return;
+    if (componentDragPayload) {
+      if (componentDragPayload.hasProps && !componentDragPayload.supportsStyleOnlyArg) {
+        event?.preventDefault?.();
+        onUnsupportedComponentDrag?.(
+          `Компонент "${componentDragPayload.componentName}" принимает аргументы кроме "style". Сейчас поддерживаются только компоненты без аргументов или только со style.`
+        );
+        return;
+      }
+      try {
+        if (event?.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'copy';
+          event.dataTransfer.setData(
+            'text/plain',
+            `mrpak-component:${componentDragPayload.sourceFilePath}:${componentDragPayload.componentName}`
+          );
+        }
+      } catch {}
+      onStartComponentDrag?.(componentDragPayload);
+      return;
+    }
+
+    if (fileDragPayload) {
+      try {
+        if (event?.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'copy';
+          event.dataTransfer.setData('text/plain', `mrpak-file:${fileDragPayload.sourceFilePath}`);
+        }
+      } catch {}
+      onStartFileDrag?.(fileDragPayload);
+      return;
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (componentDragPayload) {
+      onEndComponentDrag?.();
+      return;
+    }
+    if (fileDragPayload) {
+      onEndFileDrag?.();
+      return;
+    }
+  };
+
+  const actionButtons = (
+    <View style={styles.actionButtons}>
+      {item.isDirectory && (
+        <>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={(e: any) => {
+            e.stopPropagation();
+            onCreateFile && onCreateFile(item.path);
+          }}
+        >
+          <Text style={styles.addButtonText}>+</Text>
+        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addFolderButton}
+            onPress={(e: any) => {
+              e.stopPropagation();
+              onCreateFolder && onCreateFolder(item.path);
+            }}
+          >
+            <Text style={styles.addFolderButtonText}>📁</Text>
+          </TouchableOpacity>
+        </>
+      )}
+      {item.kind !== 'component' && (
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={(e: any) => {
+            e.stopPropagation();
+            onDelete && onDelete(item.path);
+          }}
+        >
+          <Text style={styles.deleteButtonText}>🗑️</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <View>
       <div
@@ -359,6 +501,9 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
           position: 'relative',
         }}
         ref={containerRef}
+        draggable={Boolean(componentDragPayload || fileDragPayload)}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
       >
         <TouchableOpacity
           style={[
@@ -380,41 +525,7 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
             <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
           )}
         </TouchableOpacity>
-        <View style={styles.actionButtons}>
-          {item.isDirectory && (
-            <>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={(e: any) => {
-                e.stopPropagation();
-                onCreateFile && onCreateFile(item.path);
-              }}
-            >
-              <Text style={styles.addButtonText}>+</Text>
-            </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.addFolderButton}
-                onPress={(e: any) => {
-                  e.stopPropagation();
-                  onCreateFolder && onCreateFolder(item.path);
-                }}
-              >
-                <Text style={styles.addFolderButtonText}>📁</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          {item.kind !== 'component' && (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={(e: any) => {
-                e.stopPropagation();
-                onDelete && onDelete(item.path);
-              }}
-            >
-              <Text style={styles.deleteButtonText}>🗑️</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {actionButtons}
       </div>
       {item.kind !== 'component' && (
         <ContextMenu
@@ -434,7 +545,25 @@ function FileTreeItem({ item, level = 0, onSelectFile, selectedPath, expandedPat
   );
 }
 
-function FileTree({ rootPath, onSelectFile, selectedPath } : { rootPath: string; onSelectFile: (selection: FileSelection | null) => void; selectedPath: string }) {
+function FileTree({
+  rootPath,
+  onSelectFile,
+  selectedPath,
+  onStartComponentDrag,
+  onEndComponentDrag,
+  onStartFileDrag,
+  onEndFileDrag,
+  onUnsupportedComponentDrag,
+}: {
+  rootPath: string;
+  onSelectFile: (selection: FileSelection | null) => void;
+  selectedPath: string;
+  onStartComponentDrag?: (payload: ComponentDragPayload) => void;
+  onEndComponentDrag?: () => void;
+  onStartFileDrag?: (payload: FileDragPayload) => void;
+  onEndFileDrag?: () => void;
+  onUnsupportedComponentDrag?: (message: string) => void;
+}) {
   const [tree, setTree] = useState<FileTreeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -811,6 +940,11 @@ export default ${componentName};`;
             onCreateFolder={handleCreateFolder}
             onDelete={handleDelete}
             onRename={handleRename}
+            onStartComponentDrag={onStartComponentDrag}
+            onEndComponentDrag={onEndComponentDrag}
+            onStartFileDrag={onStartFileDrag}
+            onEndFileDrag={onEndFileDrag}
+            onUnsupportedComponentDrag={onUnsupportedComponentDrag}
           />
           {(item.isDirectory || children.length > 0) && isExpanded && children.length > 0 && (
             <View>
