@@ -1176,6 +1176,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             });
           };
 
+          const shouldKeepCurrentSelectionForGesture = (ev) => {
+            return !!(selected && (ev && (ev.shiftKey || ev.altKey)));
+          };
+
           const getDirectChildBlockAtPoint = (parentEl, x, y) => {
             if (!parentEl) return null;
             let hovered = null;
@@ -1329,6 +1333,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
             if (drag || dragging) return;
+            if (shouldKeepCurrentSelectionForGesture(ev)) return;
             let t = ev.target;
             if (t && t.nodeType === 3) {
               t = t.parentElement;
@@ -1450,6 +1455,14 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return; // Р’ preview СЂРµР¶РёРјРµ РЅРµ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РєР»РёРєРё РґР»СЏ РІС‹Р±РѕСЂР°
             if (externalDrag) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              return;
+            }
+            if (shouldKeepCurrentSelectionForGesture(ev)) {
               try {
                 ev.preventDefault();
                 ev.stopPropagation();

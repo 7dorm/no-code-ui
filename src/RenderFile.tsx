@@ -25,6 +25,11 @@ import { parseStyleText } from './blockEditor/styleUtils';
 import { extractJsxToComponent } from './blockEditor/extractJsxToComponent';
 import landingSoftCssTemplate from './style-library/templates/landing-soft.css?raw';
 import dashboardCleanCssTemplate from './style-library/templates/dashboard-clean.css?raw';
+import reactIconsFaUrl from 'react-icons/fa?url';
+import reactIconsMdUrl from 'react-icons/md?url';
+import reactIconsHiUrl from 'react-icons/hi?url';
+import reactIconsHi2Url from 'react-icons/hi2?url';
+import reactIconsIo5Url from 'react-icons/io5?url';
 
 type StylePatch = Record<string, any>;
 
@@ -231,6 +236,14 @@ const STYLE_TEMPLATES: Array<{ id: string; fileName: string; title: string; cssT
   { id: 'landing-soft', fileName: 'landing-soft.css', title: 'Landing Soft', cssText: landingSoftCssTemplate },
   { id: 'dashboard-clean', fileName: 'dashboard-clean.css', title: 'Dashboard Clean', cssText: dashboardCleanCssTemplate },
 ];
+
+const LOCAL_EXTERNAL_MODULE_URLS: Record<string, string> = {
+  'react-icons/fa': reactIconsFaUrl,
+  'react-icons/md': reactIconsMdUrl,
+  'react-icons/hi': reactIconsHiUrl,
+  'react-icons/hi2': reactIconsHi2Url,
+  'react-icons/io5': reactIconsIo5Url,
+};
 
 function kebabToCamel(value: string): string {
   return String(value || '').replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
@@ -2435,6 +2448,50 @@ function RenderFile({
             }
 
             if (!updateResult.ok) {
+              const entry = blockMapForFile ? blockMapForFile[mappedBlockId] : null;
+              const framework = createFramework(fileType as string, filePath);
+              if (framework) {
+                const commitResult = await framework.commitPatches({
+                  originalCode: String(fileContent ?? ''),
+                  stagedPatches: {},
+                  stagedOps: [
+                    {
+                      type: 'delete',
+                      blockId: mappedBlockId,
+                      fileType,
+                      filePath,
+                      mapEntry: entry || null,
+                    },
+                  ],
+                  blockMapForFile: blockMapForFile || {},
+                  externalStylesMap,
+                  filePath,
+                  resolvePath: resolvePathForFramework,
+                  readFile: readFile as any,
+                  writeFile: writeFile as any,
+                });
+
+                if (commitResult.ok && commitResult.code) {
+                  const newContent = commitResult.code;
+                  updateMonacoEditorWithScroll(newContent);
+                  updateStagedOps((prev) => [
+                    ...prev,
+                    {
+                      type: 'delete',
+                      blockId: mappedBlockId,
+                      fileType,
+                      filePath,
+                      mapEntry: entry || null,
+                    },
+                  ]);
+                  updateHasStagedChanges(true);
+                  addToHistory({
+                    type: 'delete',
+                    blockId: mappedBlockId,
+                  });
+                  return;
+                }
+              }
               throw new Error(updateResult.error || 'Element not found or no changes applied');
             }
 
@@ -4604,6 +4661,21 @@ function RenderFile({
 
   // Р РµРєСѓСЂСЃРёРІРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ Р·Р°РіСЂСѓР·РєРё РІСЃРµС… Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
   const isCoreReactImport = (importPath: string) => /^(react|react-dom|react-native)(\/|$)/.test(String(importPath || '').trim());
+  const isHttpImport = (importPath: string) => /^https?:\/\//i.test(String(importPath || '').trim());
+  const isProjectAliasImport = (importPath: string) => String(importPath || '').trim().startsWith('@/');
+  const isBarePackageImport = (importPath: string) => {
+    const normalized = String(importPath || '').trim();
+    return !!normalized &&
+      !normalized.startsWith('.') &&
+      !normalized.startsWith('/') &&
+      !isProjectAliasImport(normalized) &&
+      !isHttpImport(normalized) &&
+      !isCoreReactImport(normalized);
+  };
+  const createExternalModuleUrl = (importPath: string) => {
+    const normalized = String(importPath || '').trim().replace(/^\/*/, '');
+    return LOCAL_EXTERNAL_MODULE_URLS[normalized] || `https://esm.sh/${normalized}?bundle`;
+  };
 
   const loadAllDependencies = async (
     importPath: string,
@@ -4750,7 +4822,8 @@ function RenderFile({
       // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
       // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
       if (isCoreReactImport(depImp.path) ||
-          depImp.path.startsWith('http')) {
+          isHttpImport(depImp.path) ||
+          isBarePackageImport(depImp.path)) {
         console.log(`[LoadAllDependencies] Skipping external library in ${depFileName}: ${depImp.path}`);
         continue;
       }
@@ -4796,13 +4869,20 @@ function RenderFile({
     const actualPathMap: Record<string, string> = {}; // РњР°РїРїРёРЅРі: СЂР°Р·СЂРµС€РµРЅРЅС‹Р№ РїСѓС‚СЊ -> С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р°
     const directCssBlocks: string[] = [];
     const directCssSeenPaths = new Set<string>();
+    const externalPackageImports = new Set<string>();
 
     // Р—Р°РіСЂСѓР¶Р°РµРј РІСЃРµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё СЂРµРєСѓСЂСЃРёРІРЅРѕ
     for (const imp of imports) {
       // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
       // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
-      if (isCoreReactImport(imp.path) || imp.path.startsWith('http')) {
+      if (isCoreReactImport(imp.path) || isHttpImport(imp.path)) {
         console.log(`[ProcessReactCode] Skipping external library: ${imp.path} from ${fileName}`);
+        continue;
+      }
+
+      if (isBarePackageImport(imp.path)) {
+        externalPackageImports.add(imp.path);
+        console.log(`[ProcessReactCode] Registering bare package import for external loading: ${imp.path} from ${fileName}`);
         continue;
       }
 
@@ -4965,13 +5045,21 @@ function RenderFile({
 
       for (const imp of depImports) {
         // РџСЂРѕРїСѓСЃРєР°РµРј РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё
+        if (isBarePackageImport(imp.path)) {
+          externalPackageImports.add(imp.path);
+          continue;
+        }
         if (!imp.path.startsWith('.') && !imp.path.startsWith('/') && !imp.path.startsWith('@')) {
           continue;
         }
 
         // РќР°С…РѕРґРёРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
         const depResolvedPath = pathMap[imp.path] || dependencyModules[imp.path];
-        if (depResolvedPath && uniqueAbsolutePaths.has(depResolvedPath)) {
+        if (
+          depResolvedPath &&
+          uniqueAbsolutePaths.has(depResolvedPath) &&
+          !isCssModulePath(String(depResolvedPath))
+        ) {
           depSet.add(depResolvedPath);
         }
       }
@@ -5198,7 +5286,7 @@ function RenderFile({
           // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
           // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
           if (isCoreReactImport(depImportPath) ||
-              depImportPath.startsWith('http')) {
+              isHttpImport(depImportPath)) {
             console.log(`[ProcessDependency] Skipping external import in ${currentDepFileName}: ${depImportPath}`);
             return ''; // РЈРґР°Р»СЏРµРј РёРјРїРѕСЂС‚
           }
@@ -5756,8 +5844,7 @@ function RenderFile({
     // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РёРјРїРѕСЂС‚С‹ РІ РѕСЃРЅРѕРІРЅРѕРј С„Р°Р№Р»Рµ
     for (const imp of imports) {
       // РџСЂРѕРїСѓСЃРєР°РµРј РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё
-      if (isCoreReactImport(imp.path) ||
-          imp.path.startsWith('@') || imp.path.startsWith('http')) {
+      if (isCoreReactImport(imp.path) || isHttpImport(imp.path)) {
         continue;
       }
 
@@ -5917,6 +6004,22 @@ function RenderFile({
       const escapedPath = path.replace(/'/g, "\\'");
       return `window.__modules__['${escapedPath}'] = window.__modules__['${escapedPath}'] || null;`;
     }).join('\n        ');
+    const externalModulesCode = Array.from(externalPackageImports).sort().map((path: string) => {
+      const escapedPath = path.replace(/'/g, "\\'");
+      const externalUrl = createExternalModuleUrl(path);
+      return `
+        try {
+          const moduleNs = await import(${JSON.stringify(externalUrl)});
+          const normalizedModuleNs = window.__normalizeExternalModule__
+            ? window.__normalizeExternalModule__('${escapedPath}', moduleNs)
+            : moduleNs;
+          window.__modules__['${escapedPath}'] = normalizedModuleNs;
+          console.log('[ExternalModule] Loaded ${escapedPath} from ${externalUrl}');
+        } catch (error) {
+          console.error('[ExternalModule] Failed to load ${escapedPath} from ${externalUrl}', error);
+          throw new Error('Module not found: ${escapedPath}');
+        }`;
+    }).join('\n');
 
     // РћР±РµСЂС‚С‹РІР°РµРј modulesCode, С‡С‚РѕР±С‹ СЃРЅР°С‡Р°Р»Р° РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ РјРѕРґСѓР»Рё
     const wrappedModulesCode = `
@@ -5935,6 +6038,7 @@ function RenderFile({
     return {
       code: processedCode,
       modulesCode: wrappedModulesCode,
+      externalModulesCode,
       stylesCode: collectedCss,
       dependencyPaths: dependencyPaths, // Р’РѕР·РІСЂР°С‰Р°РµРј РїСѓС‚Рё Р·Р°РІРёСЃРёРјС‹С… С„Р°Р№Р»РѕРІ
       defaultExportInfo: defaultExportInfo // РЎРѕС…СЂР°РЅСЏРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ default export
@@ -5964,6 +6068,7 @@ function RenderFile({
     const processed = await processReactCode(instOriginal.code, basePath);
     const processedCodeBeforeInst = processed.code; // СѓР¶Рµ СЃРѕРґРµСЂР¶РёС‚ data-no-code-ui-id (РёР»Рё legacy data-mrpak-id)
     const modulesCode = processed.modulesCode || '';
+    const externalModulesCode = processed.externalModulesCode || '';
     const stylesCode = processed.stylesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
     const defaultExportInfo = processed.defaultExportInfo || null;
@@ -6090,7 +6195,56 @@ function RenderFile({
         Loading component from selected file...
     </div>
     <div id="root"></div>
+    <script type="module">
+        window.__externalModulesReady__ = (async () => {
+            window.__modules__ = window.__modules__ || {};
+            const adaptExternalReactNode = (node) => {
+                if (node == null || typeof node === 'boolean' || typeof node === 'string' || typeof node === 'number') {
+                    return node;
+                }
+                if (Array.isArray(node)) {
+                    return node.map((child) => adaptExternalReactNode(child));
+                }
+                if (typeof node === 'object' && node.$$typeof && node.type) {
+                    const props = { ...(node.props || {}) };
+                    const children = Object.prototype.hasOwnProperty.call(props, 'children') ? props.children : undefined;
+                    if (Object.prototype.hasOwnProperty.call(props, 'children')) {
+                        delete props.children;
+                    }
+                    const normalizedChildren = children === undefined ? [] : (Array.isArray(children) ? children : [children]).map((child) => adaptExternalReactNode(child));
+                    return React.createElement(node.type, props, ...normalizedChildren);
+                }
+                return node;
+            };
+            const adaptExternalReactComponent = (Component) => {
+                if (typeof Component !== 'function') return Component;
+                const WrappedComponent = function MrpakExternalComponentAdapter(props) {
+                    return adaptExternalReactNode(Component(props));
+                };
+                try {
+                    Object.defineProperty(WrappedComponent, 'name', {
+                        value: Component.displayName || Component.name || 'MrpakExternalComponentAdapter'
+                    });
+                } catch {}
+                WrappedComponent.displayName = Component.displayName || Component.name || 'MrpakExternalComponentAdapter';
+                return WrappedComponent;
+            };
+            window.__normalizeExternalModule__ = (importPath, moduleNs) => {
+                if (!String(importPath || '').startsWith('react-icons/')) {
+                    return moduleNs;
+                }
+                const normalizedEntries = Object.entries(moduleNs || {}).map(([key, value]) => {
+                    if (key === 'default') return [key, value];
+                    return [key, adaptExternalReactComponent(value)];
+                });
+                return Object.fromEntries(normalizedEntries);
+            };
+            ${externalModulesCode || 'return window.__modules__;'}
+            return window.__modules__;
+        })();
+    </script>
     <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
+        (async () => {
         // React РґРѕСЃС‚СѓРїРµРЅ РіР»РѕР±Р°Р»СЊРЅРѕ С‡РµСЂРµР· CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         
@@ -6105,6 +6259,7 @@ function RenderFile({
           }
           __mrpakOriginalConsoleError(...args);
         };
+        await (window.__externalModulesReady__ || Promise.resolve());
         console.log('Before loading modules, window.__modules__ initialized');
         
         // Р—Р°РіСЂСѓР¶Р°РµРј РјРѕРґСѓР»Рё Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
@@ -6264,6 +6419,13 @@ function RenderFile({
             document.getElementById('root').innerHTML = '<div class="error"><strong>Runtime error:</strong><br>' + error.message + '</div>';
             console.error('React execution error:', error);
         }
+        })().catch((error) => {
+            console.error('React bootstrap error:', error);
+            const root = document.getElementById('root');
+            if (root) {
+                root.innerHTML = '<div class="error"><strong>Runtime error:</strong><br>' + (error && error.message ? error.message : String(error)) + '</div>';
+            }
+        });
     </script>
 </body>
 </html>
@@ -7109,6 +7271,8 @@ function RenderFile({
         const targetId = String(selectedBlock?.id || '').trim();
         const safeName = String(componentName || '').trim();
         const safeImportPath = String(importPath || '').trim();
+        const dependencyPackageName =
+          safeImportPath.startsWith('react-icons/') ? 'react-icons' : safeImportPath.split('/').slice(0, safeImportPath.startsWith('@') ? 2 : 1).join('/');
         if (!targetId) {
           setError('Select a block in canvas first.');
           return;
@@ -7120,6 +7284,10 @@ function RenderFile({
         if (!stageInsertBlockRef.current) {
           setError('Insert handler is not ready yet.');
           return;
+        }
+
+        if (dependencyPackageName) {
+          await handleAddProjectDependency(dependencyPackageName, 'latest');
         }
 
         await stageInsertBlockRef.current({
@@ -7163,7 +7331,7 @@ function RenderFile({
         setError(`Icon insert failed: ${message}`);
       }
     },
-    [fileContent, selectedBlock?.id, updateMonacoEditorWithScroll, updateStagedComponentImports, updateHasStagedChanges]
+    [fileContent, handleAddProjectDependency, selectedBlock?.id, updateMonacoEditorWithScroll, updateStagedComponentImports, updateHasStagedChanges]
   );
 
   const blockEditorSidebarProps = useBlockEditorSidebarController({
@@ -8248,4 +8416,5 @@ const styles = StyleSheet.create({
 });
 
 export default RenderFile;
+
 
