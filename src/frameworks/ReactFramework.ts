@@ -1,4 +1,4 @@
-﻿import { Framework, type CommitPatchesResult } from './Framework';
+import { Framework, type CommitPatchesResult } from './Framework';
 import { instrumentJsx } from '../blockEditor/JsxInstrumenter';
 import { instrumentJsxWithAst } from '../blockEditor/AstJsxInstrumenter';
 import { isJavaScriptFile } from '../blockEditor/AstUtils';
@@ -14,10 +14,10 @@ import {
   applyExternalStylePatch, 
   replaceStyleReferenceInJsx 
 } from '../blockEditor/PatchEngine';
-import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages } from '../features/file-renderer/lib/react-processor';
+import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages } from '../features/editor/lib/react-processor';
 import { readFile, readFileBase64, writeFile } from '../shared/api/electron-api';
-import { resolvePath, resolvePathSync } from '../features/file-renderer/lib/path-resolver';
-import { injectBlockEditorScript } from '../features/file-renderer/lib/block-editor-script';
+import { resolvePath, resolvePathSync } from '../features/editor/lib/path-resolver';
+import { injectBlockEditorScript } from '../features/editor/lib/block-editor-script';
 import { toReactStyleObjectText } from '../blockEditor/styleUtils';
 import reactIconsFaUrl from 'react-icons/fa?url';
 import reactIconsMdUrl from 'react-icons/md?url';

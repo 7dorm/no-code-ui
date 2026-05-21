@@ -5,112 +5,80 @@ import { createFramework, isFrameworkSupported } from '../../../frameworks/Frame
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
 import { readFile } from '../../../shared/api/electron-api';
 import { extractJsxToComponent } from '../../../blockEditor/extractJsxToComponent';
+import { useEditorStore } from '../../../store/editorStore';
 import type {
   BlockMap,
-  LayersTree,
-  StagedComponentImport,
   StagedOp,
   StylePatch,
 } from '../types';
 import { ensureComponentImportInCode } from '../utils';
 
 type UseBlockOperationsParams = {
-  blockMap: BlockMap;
-  blockMapForFile: BlockMap;
-  layersTree: LayersTree | null;
-  styleSnapshots: Record<string, { inlineStyle: string; computedStyle?: any }>;
-  stagedPatchesRef: React.MutableRefObject<Record<string, StylePatch>>;
-  stagedOpsRef: React.MutableRefObject<StagedOp[]>;
-  stagedComponentImportsRef: React.MutableRefObject<StagedComponentImport[]>;
-  hasStagedChangesRef: React.MutableRefObject<boolean>;
+  filePath: string;
   astManagerRef: React.MutableRefObject<AstBidirectionalManager | null>;
   isUpdatingFromConstructorRef: React.MutableRefObject<boolean>;
   monacoEditorRef: React.MutableRefObject<any>;
-  fileType: string | null;
-  filePath: string;
-  fileContent: string | null;
-  projectRoot: string | null;
-  externalStylesMap: Record<string, { path: string; type: string }>;
   resolvePathForFramework: (inputPath: string, basePath?: string) => string;
   writeFile: (targetPath: string, content: string, options?: any) => Promise<any>;
   updateMonacoEditorWithScroll: (newContent: any) => void;
-  updateStagedPatches: (
-    updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>
-  ) => void;
-  updateStagedOps: (updater: ((prev: StagedOp[]) => StagedOp[]) | StagedOp[]) => void;
-  updateStagedComponentImports: (
-    updater: ((prev: StagedComponentImport[]) => StagedComponentImport[]) | StagedComponentImport[]
-  ) => void;
-  updateHasStagedChanges: (value: boolean) => void;
   addToHistory: (operation: any) => void;
   addToHistoryDebounced: (operation: any, isIntermediate?: boolean) => void;
   clearHistory: () => void;
-  sendIframeCommand: (cmd: any) => void;
-  textSnapshots: Record<string, string>;
   lastInsertOperationRef: React.MutableRefObject<any>;
   lastDeleteOperationRef: React.MutableRefObject<any>;
   lastReparentOperationRef: React.MutableRefObject<any>;
-  setChangesLog: React.Dispatch<React.SetStateAction<Array<{ ts: number; filePath: string; blockId: any; patch: any }>>>;
-  setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setUnsavedContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setIsModified: React.Dispatch<React.SetStateAction<boolean>>;
+  setUnsavedContent: (content: string | null) => void;
+  setIsModified: (modified: boolean) => void;
   setRenderVersion: React.Dispatch<React.SetStateAction<number>>;
-  setShowSaveIndicator: React.Dispatch<React.SetStateAction<boolean>>;
-  selectedBlock: { id: string; meta?: any } | null;
-  selectedBlockIds: string[];
-  setSelectedBlock: React.Dispatch<React.SetStateAction<{ id: string; meta?: any } | null>>;
-  setSelectedBlockIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setLivePosition: React.Dispatch<React.SetStateAction<{ left: number | null; top: number | null; width: number | null; height: number | null }>>;
+  setShowSaveIndicator: (show: boolean) => void;
   onProjectFilesChanged?: () => void;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setError: (error: string | null) => void;
 };
 
 export function useBlockOperations({
-  blockMap,
-  blockMapForFile,
-  layersTree,
-  styleSnapshots,
-  stagedPatchesRef,
-  stagedOpsRef,
-  stagedComponentImportsRef,
-  hasStagedChangesRef,
+  filePath,
   astManagerRef,
   isUpdatingFromConstructorRef,
   monacoEditorRef,
-  fileType,
-  filePath,
-  fileContent,
-  projectRoot,
-  externalStylesMap,
   resolvePathForFramework,
   writeFile,
   updateMonacoEditorWithScroll,
-  updateStagedPatches,
-  updateStagedOps,
-  updateStagedComponentImports,
-  updateHasStagedChanges,
   addToHistory,
   addToHistoryDebounced,
   clearHistory,
-  sendIframeCommand,
-  textSnapshots,
   lastInsertOperationRef,
   lastDeleteOperationRef,
   lastReparentOperationRef,
-  setChangesLog,
-  setFileContent,
   setUnsavedContent,
   setIsModified,
   setRenderVersion,
   setShowSaveIndicator,
-  selectedBlock,
-  selectedBlockIds,
-  setSelectedBlock,
-  setSelectedBlockIds,
-  setLivePosition,
   onProjectFilesChanged,
   setError,
 }: UseBlockOperationsParams) {
+  const {
+    fileType,
+    fileContent,
+    setFileContent,
+    projectRoot,
+    externalStylesMap,
+    blockMapForFile,
+    layersTree,
+    styleSnapshots,
+    textSnapshots,
+    selectedBlock,
+    setSelectedBlock,
+    selectedBlockIds,
+    setSelectedBlockIds,
+    setLivePosition,
+    sendIframeCommand,
+    updateStagedPatches,
+    updateStagedOps,
+    updateStagedComponentImports,
+    setHasStagedChanges,
+    setChangesLog,
+  } = useEditorStore();
+
   const derivePreviousStylePatch = useCallback((blockId: string, patch: StylePatch) => {
     const inlineStyle = String(styleSnapshots?.[blockId]?.inlineStyle || '');
     if (!inlineStyle || !patch || typeof patch !== 'object') return null;
@@ -171,7 +139,7 @@ export function useBlockOperations({
           ...prev,
           [mappedBlockId]: { ...(prev?.[mappedBlockId] || {}), ...patch },
         }));
-        updateHasStagedChanges(true);
+        setHasStagedChanges(true);
         updateMonacoEditorWithScroll(newContent);
         return;
       }
@@ -214,7 +182,7 @@ export function useBlockOperations({
         ...prev,
         [mappedBlockId]: { ...(prev?.[mappedBlockId] || {}), ...patch },
       }));
-      updateHasStagedChanges(true);
+      setHasStagedChanges(true);
       setChangesLog((prev) => [
         { ts: Date.now() + Math.random(), filePath, blockId: mappedBlockId, patch },
         ...prev,
@@ -244,24 +212,26 @@ export function useBlockOperations({
     resolveToMappedBlockId,
     setChangesLog,
     setError,
-    updateHasStagedChanges,
+    setHasStagedChanges,
     updateMonacoEditorWithScroll,
     updateStagedPatches,
     writeFile,
   ]);
 
   const commitStagedPatches = useCallback(async () => {
-    const currentStagedPatches = stagedPatchesRef.current || {};
-    const currentStagedOps = stagedOpsRef.current || [];
-    const currentStagedComponentImports = stagedComponentImportsRef.current || [];
-    const currentHasStagedChanges = hasStagedChangesRef.current;
+    const state = useEditorStore.getState();
+    const currentStagedPatches = state.stagedPatches;
+    const currentStagedOps = state.stagedOps;
+    const currentStagedComponentImports = state.stagedComponentImports;
+    const currentHasStagedChanges = state.hasStagedChanges;
+    
     const entries = Object.entries(currentStagedPatches).filter(([id, p]) => id && p && Object.keys(p).length > 0);
     const ops = Array.isArray(currentStagedOps) ? currentStagedOps : [];
     const imports = Array.isArray(currentStagedComponentImports) ? currentStagedComponentImports : [];
 
     try {
       if (!currentHasStagedChanges && entries.length === 0 && ops.length === 0 && imports.length === 0) {
-        updateHasStagedChanges(false);
+        setHasStagedChanges(false);
         return;
       }
       if (!isFrameworkSupported(fileType as string)) return;
@@ -300,7 +270,7 @@ export function useBlockOperations({
       updateStagedPatches({});
       updateStagedOps([]);
       updateStagedComponentImports([]);
-      updateHasStagedChanges(false);
+      setHasStagedChanges(false);
       clearHistory();
       setShowSaveIndicator(true);
       setTimeout(() => setShowSaveIndicator(false), 2000);
@@ -309,24 +279,19 @@ export function useBlockOperations({
       setError(`Failed to apply changes: ${message}`);
     }
   }, [
-    blockMap,
     blockMapForFile,
     clearHistory,
     externalStylesMap,
     fileContent,
     filePath,
     fileType,
-    hasStagedChangesRef,
     resolvePathForFramework,
     setChangesLog,
     setError,
     setFileContent,
+    setHasStagedChanges,
     setRenderVersion,
     setShowSaveIndicator,
-    stagedComponentImportsRef,
-    stagedOpsRef,
-    stagedPatchesRef,
-    updateHasStagedChanges,
     updateStagedComponentImports,
     updateStagedOps,
     updateStagedPatches,
@@ -375,7 +340,7 @@ export function useBlockOperations({
             ...prev,
             { type: 'delete', blockId: mappedBlockId, fileType, filePath } as any,
           ]);
-          updateHasStagedChanges(true);
+          setHasStagedChanges(true);
           addToHistory({ type: 'delete', blockId: mappedBlockId, parentId: '', snippet: '', fileType, filePath });
         } catch (e) {
           const errorMessage = e instanceof Error ? e.message : String(e);
@@ -390,7 +355,7 @@ export function useBlockOperations({
       ...prev,
       { type: 'delete', blockId: mappedBlockId, fileType, filePath } as any,
     ]);
-    updateHasStagedChanges(true);
+    setHasStagedChanges(true);
     addToHistory({
       type: 'delete',
       blockId: mappedBlockId,
@@ -410,7 +375,7 @@ export function useBlockOperations({
     resolveToMappedBlockId,
     sendIframeCommand,
     setError,
-    updateHasStagedChanges,
+    setHasStagedChanges,
     updateMonacoEditorWithScroll,
     updateStagedOps,
   ]);
@@ -440,7 +405,7 @@ export function useBlockOperations({
         filePath,
       } as any,
     ]);
-    updateHasStagedChanges(true);
+    setHasStagedChanges(true);
     addToHistory({
       type: 'insert',
       blockId: newId,
@@ -467,7 +432,7 @@ export function useBlockOperations({
     makeTempMrpakId,
     resolveToMappedBlockId,
     sendIframeCommand,
-    updateHasStagedChanges,
+    setHasStagedChanges,
     updateStagedOps,
   ]);
 
@@ -484,7 +449,7 @@ export function useBlockOperations({
       ...prev,
       { type: 'reparent', sourceId, targetParentId, targetBeforeId, fileType, filePath } as any,
     ]);
-    updateHasStagedChanges(true);
+    setHasStagedChanges(true);
     addToHistory({
       type: 'reparent',
       blockId: sourceId,
@@ -502,7 +467,7 @@ export function useBlockOperations({
     lastReparentOperationRef,
     layersTree?.nodes,
     sendIframeCommand,
-    updateHasStagedChanges,
+    setHasStagedChanges,
     updateStagedOps,
   ]);
 
@@ -514,7 +479,7 @@ export function useBlockOperations({
       ...prev,
       { type: 'setText', blockId: mappedBlockId, text: String(text ?? ''), fileType, filePath } as any,
     ]);
-    updateHasStagedChanges(true);
+    setHasStagedChanges(true);
     addToHistory({
       type: 'setText',
       blockId: mappedBlockId,
@@ -529,7 +494,7 @@ export function useBlockOperations({
     resolveToMappedBlockId,
     sendIframeCommand,
     textSnapshots,
-    updateHasStagedChanges,
+    setHasStagedChanges,
     updateStagedOps,
   ]);
 

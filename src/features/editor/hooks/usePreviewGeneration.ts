@@ -1,20 +1,15 @@
 import { useEffect } from 'react';
 import { createFramework } from '../../../frameworks/FrameworkFactory';
+import { useEditorStore } from '../../../store/editorStore';
 
 type UsePreviewGenerationParams = {
-  fileType: string | null;
   filePath: string;
-  fileContent: string | null;
   previewSourceCode: string;
-  viewMode: 'preview' | 'split' | 'changes';
-  projectRoot: string | null;
   selectedComponentName?: string | null;
   aggressivePreviewMode?: boolean;
   setIsProcessingReact: React.Dispatch<React.SetStateAction<boolean>>;
   setReactHTML: React.Dispatch<React.SetStateAction<string>>;
   setDependencyPaths: React.Dispatch<React.SetStateAction<string[]>>;
-  setBlockMap: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  setBlockMapForFile: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   setPreviewOpenError: React.Dispatch<React.SetStateAction<string | null>>;
   setIsProcessingReactNative: React.Dispatch<React.SetStateAction<boolean>>;
   setReactNativeHTML: React.Dispatch<React.SetStateAction<string>>;
@@ -24,19 +19,13 @@ type UsePreviewGenerationParams = {
 };
 
 export function usePreviewGeneration({
-  fileType,
   filePath,
-  fileContent,
   previewSourceCode,
-  viewMode,
-  projectRoot,
   selectedComponentName,
   aggressivePreviewMode = false,
   setIsProcessingReact,
   setReactHTML,
   setDependencyPaths,
-  setBlockMap,
-  setBlockMapForFile,
   setPreviewOpenError,
   setIsProcessingReactNative,
   setReactNativeHTML,
@@ -44,6 +33,15 @@ export function usePreviewGeneration({
   setProcessedHTML,
   setHtmlDependencyPaths,
 }: UsePreviewGenerationParams) {
+  const {
+    fileType,
+    fileContent,
+    viewMode,
+    projectRoot,
+    setBlockMap,
+    setBlockMapForFile,
+  } = useEditorStore();
+
   useEffect(() => {
     if (fileType === 'react' && previewSourceCode && filePath) {
       const generateHTML = async () => {
@@ -141,4 +139,3 @@ export function usePreviewGeneration({
     }
   }, [fileType, fileContent, filePath, viewMode, setBlockMap, setBlockMapForFile, setHtmlDependencyPaths, setIsProcessingHTML, setProcessedHTML]);
 }
-

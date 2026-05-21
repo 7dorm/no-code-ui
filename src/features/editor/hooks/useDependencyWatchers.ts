@@ -1,23 +1,22 @@
 import { useEffect } from 'react';
 import { onFileChanged, readFile, unwatchFile, watchFile } from '../../../shared/api/electron-api';
+import { useEditorStore } from '../../../store/editorStore';
 
 type UseDependencyWatchersParams = {
   filePath: string;
-  fileType: string | null;
   dependencyPaths: string[];
   htmlDependencyPaths: string[];
   loadFile: (targetFilePath: string) => Promise<void> | void;
-  setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
 export function useDependencyWatchers({
   filePath,
-  fileType,
   dependencyPaths,
   htmlDependencyPaths,
   loadFile,
-  setFileContent,
 }: UseDependencyWatchersParams) {
+  const { fileType, setFileContent } = useEditorStore();
+
   useEffect(() => {
     if (!filePath || dependencyPaths.length === 0) return;
 
@@ -73,4 +72,3 @@ export function useDependencyWatchers({
     };
   }, [htmlDependencyPaths, filePath, fileType, setFileContent]);
 }
-

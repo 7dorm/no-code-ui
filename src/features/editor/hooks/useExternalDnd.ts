@@ -1,25 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
+import { useEditorStore } from '../../../store/editorStore';
 import type { ExternalComponentDragPayload, ExternalFileDragPayload } from '../types';
 import { getRelativeAssetImportPath, getRelativeImportPath } from '../utils';
 
 type UseExternalDndParams = {
-  viewMode: 'preview' | 'split' | 'changes';
-  fileType: string | null;
   filePath: string;
   externalComponentDrag?: ExternalComponentDragPayload | null;
   externalFileDrag?: ExternalFileDragPayload | null;
-  sendIframeCommand: (cmd: any) => void;
 };
 
 export function useExternalDnd({
-  viewMode,
-  fileType,
   filePath,
   externalComponentDrag,
   externalFileDrag,
-  sendIframeCommand,
 }: UseExternalDndParams) {
+  const { viewMode, fileType, sendIframeCommand } = useEditorStore();
   const externalComponentDragActiveRef = useRef<boolean>(false);
   const externalFileDragActiveRef = useRef<boolean>(false);
 
@@ -96,4 +92,3 @@ export function useExternalDnd({
     externalFileDragActiveRef.current = true;
   }, [externalComponentDrag, externalFileDrag, filePath, fileType, sendIframeCommand, viewMode]);
 }
-

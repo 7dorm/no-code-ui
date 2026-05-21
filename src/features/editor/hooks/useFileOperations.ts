@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useEditorStore } from '../../../store/editorStore';
 import { readFile, writeFile as writeFileRaw } from '../../../shared/api/electron-api';
 import { getFileType } from '../../../shared/lib/file-type-detector';
 import { parseStyleImports } from '../../../blockEditor/PatchEngine';
@@ -6,41 +7,37 @@ import { formatContentForWrite } from '../utils';
 
 type UseFileOperationsParams = {
   filePath: string;
-  fileType: string | null;
   monacoEditorRef: React.MutableRefObject<any>;
   unsavedContent: string | null;
-  fileContent: string | null;
   isUpdatingFromFileRef: React.MutableRefObject<boolean>;
   autoSaveTimeoutRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setSelectedBlock: React.Dispatch<React.SetStateAction<{ id: string; meta?: any } | null>>;
-  setSelectedBlockIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setUnsavedContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setIsModified: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowSaveIndicator: React.Dispatch<React.SetStateAction<boolean>>;
-  setExternalStylesMap: React.Dispatch<React.SetStateAction<Record<string, { path: string; type: string }>>>;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  setUnsavedContent: (content: string | null) => void;
+  setShowSaveIndicator: (show: boolean) => void;
 };
 
 export function useFileOperations({
   filePath,
-  fileType,
   monacoEditorRef,
   unsavedContent,
-  fileContent,
   isUpdatingFromFileRef,
   autoSaveTimeoutRef,
   setLoading,
   setError,
-  setFileContent,
-  setSelectedBlock,
-  setSelectedBlockIds,
   setUnsavedContent,
-  setIsModified,
   setShowSaveIndicator,
-  setExternalStylesMap,
 }: UseFileOperationsParams) {
+  const {
+    fileContent,
+    setFileContent,
+    fileType,
+    setIsModified,
+    setSelectedBlock,
+    setSelectedBlockIds,
+    setExternalStylesMap,
+  } = useEditorStore();
+
   const writeFile = useCallback(async (targetPath: string, content: string, options: any = { backup: true }) => {
     const formatted = formatContentForWrite(targetPath, content);
     return writeFileRaw(targetPath, formatted, options);

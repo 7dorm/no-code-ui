@@ -3,7 +3,8 @@ import { readDirectory, readFile } from '../../../shared/api/electron-api';
 import { openFileDialog } from '../../../shared/api/filesystem-api';
 import { createFolder } from '../../file-operations/lib/file-operations';
 import { createFramework, isFrameworkSupported } from '../../../frameworks/FrameworkFactory';
-import type { BlockMap, StyleLibraryEntry } from '../types';
+import { useEditorStore } from '../../../store/editorStore';
+import type { StyleLibraryEntry } from '../types';
 import {
   ensureCssImportInCode,
   extractImportedCssPathsFromCode,
@@ -16,39 +17,36 @@ import {
 
 type UseStyleLibraryParams = {
   filePath: string;
-  fileType: string | null;
-  fileContent: string | null;
   monacoEditorRef: React.MutableRefObject<any>;
-  blockMapForFile: BlockMap;
-  selectedBlock: { id: string; meta?: any } | null;
   applyAndCommitPatch: (blockId: any, patch: any) => Promise<void>;
   resolveToMappedBlockId: (rawId: any) => string | null;
   writeFile: (targetPath: string, content: string, options?: any) => Promise<any>;
   updateMonacoEditorWithScroll: (newContent: any) => void;
-  setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
   setUnsavedContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setIsModified: React.Dispatch<React.SetStateAction<boolean>>;
   setRenderVersion: React.Dispatch<React.SetStateAction<number>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
 export function useStyleLibrary({
   filePath,
-  fileType,
-  fileContent,
   monacoEditorRef,
-  blockMapForFile,
-  selectedBlock,
   applyAndCommitPatch,
   resolveToMappedBlockId,
   writeFile,
   updateMonacoEditorWithScroll,
-  setFileContent,
   setUnsavedContent,
-  setIsModified,
   setRenderVersion,
   setError,
 }: UseStyleLibraryParams) {
+  const {
+    fileType,
+    fileContent,
+    setFileContent,
+    blockMapForFile,
+    selectedBlock,
+    setIsModified,
+  } = useEditorStore();
+
   const [styleLibraryEntries, setStyleLibraryEntries] = useState<StyleLibraryEntry[]>([]);
 
   const getCurrentFileDir = useCallback(() => {

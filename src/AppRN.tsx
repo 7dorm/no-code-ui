@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import RenderFile from './RenderFile';
+import { EditorWorkspace } from './features/editor/components/EditorWorkspace';
 import FileTree, { type FileSelection, type ComponentDragPayload, type FileDragPayload } from './FileTree';
 import { openDirectoryDialog, setRootDirectory, isFileSystemAPIAvailable } from './shared/api/filesystem-api';
 import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
 import { createProject } from './features/file-operations/lib/file-operations';
+import { useEditorStore } from './store/editorStore';
 
 function AppRN() {
   const isInternalSourceFile = (path: string | null | undefined) => {
@@ -12,14 +13,17 @@ function AppRN() {
     return /(^|\/)src\/.+\.(jsx?|tsx?)$/i.test(normalized) && !/(^|\/)tests\//i.test(normalized);
   };
 
-  const [viewMode, setViewMode] = useState<'preview' | 'split' | 'changes'>('preview');
-  const [showSplitSidebar, setShowSplitSidebar] = useState(true);
-  const [showSplitPreview, setShowSplitPreview] = useState(true);
-  const [showSplitCode, setShowSplitCode] = useState(true);
-  const [aggressivePreviewMode, setAggressivePreviewMode] = useState(false);
-  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
-  const [canvasWidth, setCanvasWidth] = useState<number>(1280);
-  const [canvasHeight, setCanvasHeight] = useState<number>(800);
+  const { 
+    viewMode, setViewMode,
+    showSplitSidebar, setShowSplitSidebar,
+    showSplitPreview, setShowSplitPreview,
+    showSplitCode, setShowSplitCode,
+    aggressivePreviewMode, setAggressivePreviewMode,
+    canvasDevice, setCanvasDevice,
+    canvasWidth, setCanvasWidth,
+    canvasHeight, setCanvasHeight
+  } = useEditorStore();
+  
   const [canvasWidthInput, setCanvasWidthInput] = useState<string>('1280');
   const [canvasHeightInput, setCanvasHeightInput] = useState<string>('800');
   const [projectPath, setProjectPath] = useState<string | null>(null);
@@ -182,7 +186,7 @@ function AppRN() {
   };
 
   const applyCanvasPreset = (mode: 'desktop' | 'mobile') => {
-    setPreviewDevice(mode);
+    setCanvasDevice(mode);
     if (mode === 'desktop') {
       setCanvasWidth(1280);
       setCanvasHeight(800);
@@ -264,16 +268,16 @@ function AppRN() {
               <View style={styles.canvasControls}>
                 <View style={styles.deviceSwitch}>
                   <TouchableOpacity
-                    style={[styles.modeButton, previewDevice === 'desktop' && styles.modeButtonActive]}
+                    style={[styles.modeButton, canvasDevice === 'desktop' && styles.modeButtonActive]}
                     onPress={() => applyCanvasPreset('desktop')}
                   >
-                    <Text style={[styles.modeButtonText, previewDevice === 'desktop' && styles.modeButtonTextActive]}>ПК</Text>
+                    <Text style={[styles.modeButtonText, canvasDevice === 'desktop' && styles.modeButtonTextActive]}>ПК</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modeButton, previewDevice === 'mobile' && styles.modeButtonActive]}
+                    style={[styles.modeButton, canvasDevice === 'mobile' && styles.modeButtonActive]}
                     onPress={() => applyCanvasPreset('mobile')}
                   >
-                    <Text style={[styles.modeButtonText, previewDevice === 'mobile' && styles.modeButtonTextActive]}>Моб</Text>
+                    <Text style={[styles.modeButtonText, canvasDevice === 'mobile' && styles.modeButtonTextActive]}>Моб</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.canvasInputs}>
@@ -396,7 +400,7 @@ function AppRN() {
         {/* Правая панель: рендеринг файла */}
         <View style={styles.content}>
           {selectedFile?.filePath ? (
-            <RenderFile
+            <EditorWorkspace
               filePath={selectedFile.filePath}
               selectedComponentName={selectedFile.componentName || null}
               projectPath={projectPath}
@@ -407,7 +411,7 @@ function AppRN() {
               showSplitCode={showSplitCode}
               canvasWidth={canvasWidth}
               canvasHeight={canvasHeight}
-              canvasDevice={previewDevice}
+              canvasDevice={canvasDevice}
               aggressivePreviewMode={aggressivePreviewMode}
               externalComponentDrag={externalComponentDrag}
               externalFileDrag={externalFileDrag}

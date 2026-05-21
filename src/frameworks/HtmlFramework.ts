@@ -3,7 +3,7 @@ import { instrumentHtml } from '../blockEditor/HtmlInstrumenter';
 import { applyHtmlOp } from '../blockEditor/PatchEngine/applyHtmlInsertDelete';
 import { applyStylePatch } from '../blockEditor/PatchEngine';
 import { readFile, readFileBase64 } from '../shared/api/electron-api';
-import { resolvePath } from '../features/file-renderer/lib/path-resolver';
+import { resolvePath } from '../features/editor/lib/path-resolver';
 import { toHtmlStyleAttr } from '../blockEditor/styleUtils';
 
 /**

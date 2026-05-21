@@ -6,7 +6,7 @@ import { CreateFileDialog } from './shared/ui/dialogs/create-file-dialog';
 import { CreateFolderDialog } from './shared/ui/dialogs/create-folder-dialog';
 import { loadDirectory, renameItem, deleteItem, deleteDir, createFile, createFolder } from './features/file-operations/lib/file-operations';
 import { readDirectory, deleteFile, deleteDirectory, readFile } from './shared/api/filesystem-api';
-import { detectComponents } from './features/file-renderer/lib/react-processor';
+import { detectComponents } from './features/editor/lib/react-processor';
 
 export type FileSelection = {
   filePath: string;

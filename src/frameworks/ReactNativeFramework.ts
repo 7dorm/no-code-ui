@@ -6,8 +6,8 @@ import { ReactFramework } from './ReactFramework';
 import { instrumentJsx } from '../blockEditor/JsxInstrumenter';
 import { instrumentJsxWithAst } from '../blockEditor/AstJsxInstrumenter';
 import { isJavaScriptFile } from '../blockEditor/AstUtils';
-import { detectComponents } from '../features/file-renderer/lib/react-processor';
-import { generateBlockEditorScript } from '../features/file-renderer/lib/block-editor-script';
+import { detectComponents } from '../features/editor/lib/react-processor';
+import { generateBlockEditorScript } from '../features/editor/lib/block-editor-script';
 import { toReactStyleObjectText } from '../blockEditor/styleUtils';
 
 /**

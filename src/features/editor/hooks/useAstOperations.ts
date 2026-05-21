@@ -1,30 +1,27 @@
 import { useEffect } from 'react';
 import { loadLayerNames } from '../../../blockEditor/LayerNamesStore';
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
+import { useEditorStore } from '../../../store/editorStore';
 import { findProjectRoot } from '../lib/path-resolver';
-import type { LayerNames } from '../types';
 
 type UseAstOperationsParams = {
-  viewMode: 'preview' | 'split' | 'changes';
   filePath: string;
-  projectPath: string | null;
-  fileType: string | null;
-  fileContent: string | null;
-  setProjectRoot: React.Dispatch<React.SetStateAction<string | null>>;
-  setLayerNames: React.Dispatch<React.SetStateAction<LayerNames>>;
   astManagerRef: React.MutableRefObject<AstBidirectionalManager | null>;
 };
 
 export function useAstOperations({
-  viewMode,
   filePath,
-  projectPath,
-  fileType,
-  fileContent,
-  setProjectRoot,
-  setLayerNames,
   astManagerRef,
 }: UseAstOperationsParams) {
+  const {
+    viewMode,
+    fileType,
+    fileContent,
+    projectRoot,
+    setProjectRoot,
+    setLayerNames,
+  } = useEditorStore();
+
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -32,7 +29,7 @@ export function useAstOperations({
         return;
       }
       try {
-        let root = projectPath;
+        let root = projectRoot;
 
         if (!root && filePath) {
           const normalizedPath = filePath.replace(/\\/g, '/');
@@ -77,5 +74,5 @@ export function useAstOperations({
     return () => {
       cancelled = true;
     };
-  }, [viewMode, filePath, projectPath, fileType, fileContent, setProjectRoot, setLayerNames, astManagerRef]);
+  }, [viewMode, filePath, projectRoot, fileType, fileContent, setProjectRoot, setLayerNames, astManagerRef]);
 }

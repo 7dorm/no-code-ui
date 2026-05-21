@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { isMrpakMessage, MRPAK_MSG } from '../../../blockEditor/EditorProtocol';
-import type { LayersTree, LivePosition, StagedComponentImport } from '../types';
+import { useEditorStore } from '../../../store/editorStore';
+import type { LivePosition } from '../types';
 import {
   collectImportLocalNames,
   enrichLayersTree,
@@ -11,75 +12,59 @@ import {
 } from '../utils';
 
 type UseEditorMessageParams = {
-  hasStagedChangesRef: React.MutableRefObject<boolean>;
   commitStagedPatches: () => Promise<void> | void;
-  viewMode: 'preview' | 'split' | 'changes';
-  isModified: boolean;
   monacoEditorRef: React.MutableRefObject<any>;
   unsavedContent: string | null;
-  fileContent: string | null;
   saveFileRef: React.MutableRefObject<((contentToSave?: string | null) => Promise<void>) | null>;
-  setSelectedBlockIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setSelectedBlock: React.Dispatch<React.SetStateAction<{ id: string; meta?: any } | null>>;
-  setLivePosition: React.Dispatch<React.SetStateAction<LivePosition>>;
   filePath: string;
   dependencyPaths: string[];
-  setLayersTree: React.Dispatch<React.SetStateAction<LayersTree | null>>;
-  setStyleSnapshots: React.Dispatch<React.SetStateAction<Record<string, { inlineStyle: string; computedStyle?: any }>>>;
-  setTextSnapshots: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  stageReparentBlockRef: React.MutableRefObject<((params: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => void) | null>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  stageInsertBlockRef: React.MutableRefObject<((params: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => any) | null>;
-  updateStagedComponentImports: (updater: ((prev: StagedComponentImport[]) => StagedComponentImport[]) | StagedComponentImport[]) => void;
-  updateHasStagedChanges: (value: boolean) => void;
-  setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
+  setError: (error: string | null) => void;
+  stageInsertBlock: (params: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => any;
+  stageReparentBlock: (params: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => void;
   setRenderVersion: React.Dispatch<React.SetStateAction<number>>;
-  stagedComponentImportsRef: React.MutableRefObject<StagedComponentImport[]>;
-  fileType: string | null;
-  selectedBlockId?: string | null;
-  projectRoot: string | null;
   applyBlockPatch: (blockId: any, patch: any, isIntermediate?: boolean) => Promise<void>;
-  setExternalDropTargetState: React.Dispatch<React.SetStateAction<{ source: string; sourceId: string | null; targetId: string | null } | null>>;
 };
 
 export function useEditorMessage({
-  hasStagedChangesRef,
   commitStagedPatches,
-  viewMode,
-  isModified,
   monacoEditorRef,
   unsavedContent,
-  fileContent,
   saveFileRef,
-  setSelectedBlockIds,
-  setSelectedBlock,
-  setLivePosition,
   filePath,
   dependencyPaths,
-  setLayersTree,
-  setStyleSnapshots,
-  setTextSnapshots,
-  stageReparentBlockRef,
   setError,
-  stageInsertBlockRef,
-  updateStagedComponentImports,
-  updateHasStagedChanges,
-  setFileContent,
+  stageInsertBlock,
+  stageReparentBlock,
   setRenderVersion,
-  stagedComponentImportsRef,
-  fileType,
-  selectedBlockId,
-  projectRoot,
   applyBlockPatch,
-  setExternalDropTargetState,
 }: UseEditorMessageParams) {
+  const {
+    viewMode,
+    isModified,
+    fileContent,
+    setFileContent,
+    setSelectedBlockIds,
+    setSelectedBlock,
+    setLivePosition,
+    setLayersTree,
+    setStyleSnapshots,
+    setTextSnapshots,
+    updateStagedComponentImports,
+    setHasStagedChanges,
+    fileType,
+    selectedBlock,
+    projectRoot,
+    setExternalDropTargetState,
+  } = useEditorStore();
+
   const handleEditorMessage = useCallback(
     async (event: any) => {
       const data = event?.nativeEvent?.data;
       if (!isMrpakMessage(data)) return;
 
       if (data.type === MRPAK_MSG.SAVE) {
-        if (hasStagedChangesRef.current) {
+        const state = useEditorStore.getState();
+        if (state.hasStagedChanges) {
           void commitStagedPatches();
           return;
         }
@@ -108,16 +93,8 @@ export function useEditorMessage({
         const ids = Array.isArray(data.ids)
           ? Array.from(new Set(data.ids.map((id: any) => String(id || '').trim()).filter(Boolean)))
           : (data.id ? [String(data.id)] : []);
-        setSelectedBlockIds((prev) => {
-          if (prev.length === ids.length && prev.every((id, idx) => id === ids[idx])) {
-            return prev;
-          }
-          return ids;
-        });
-        setSelectedBlock((prev) => {
-          if (prev?.id === data.id) return prev;
-          return { id: data.id, meta: data.meta };
-        });
+        setSelectedBlockIds(ids);
+        setSelectedBlock({ id: data.id, meta: data.meta });
         setLivePosition({ left: null, top: null, width: null, height: null });
         return;
       }
@@ -125,25 +102,18 @@ export function useEditorMessage({
       if (data.type === MRPAK_MSG.TREE) {
         if (data.tree) {
           const nextTree = enrichLayersTree(data.tree, filePath, dependencyPaths);
-          setLayersTree((prev) => {
-            try {
-              if (prev && JSON.stringify(prev) === JSON.stringify(nextTree)) {
-                return prev;
-              }
-            } catch {}
-            return nextTree;
-          });
+          setLayersTree(nextTree);
         }
         return;
       }
 
       if (data.type === MRPAK_MSG.STYLE_SNAPSHOT) {
         if (data.id) {
-          setStyleSnapshots((prev) => ({
-            ...(prev || {}),
+          setStyleSnapshots({
+            ...useEditorStore.getState().styleSnapshots,
             [data.id]: (() => {
               const nextSnap = { inlineStyle: data.inlineStyle || '', computedStyle: data.computedStyle || null };
-              const prevSnap = prev?.[data.id];
+              const prevSnap = useEditorStore.getState().styleSnapshots?.[data.id];
               if (
                 prevSnap &&
                 prevSnap.inlineStyle === nextSnap.inlineStyle &&
@@ -153,17 +123,19 @@ export function useEditorMessage({
               }
               return nextSnap;
             })(),
-          }));
+          });
         }
         return;
       }
 
       if (data.type === MRPAK_MSG.TEXT_SNAPSHOT) {
         if (data.id) {
-          setTextSnapshots((prev) => ({
-            ...(prev || {}),
-            [data.id]: prev?.[data.id] === (data.text ?? '') ? prev[data.id] : (data.text ?? ''),
-          }));
+          setTextSnapshots({
+            ...useEditorStore.getState().textSnapshots,
+            [data.id]: useEditorStore.getState().textSnapshots?.[data.id] === (data.text ?? '')
+              ? useEditorStore.getState().textSnapshots?.[data.id] || ''
+              : (data.text ?? ''),
+          });
         }
         return;
       }
@@ -175,9 +147,7 @@ export function useEditorMessage({
         if (!id) return;
 
         if (patch.__reparentTo) {
-          if (stageReparentBlockRef.current) {
-            stageReparentBlockRef.current({ sourceId: id, targetParentId: patch.__reparentTo });
-          }
+          stageReparentBlock({ sourceId: id, targetParentId: patch.__reparentTo });
           return;
         }
 
@@ -203,25 +173,24 @@ export function useEditorMessage({
               return;
             }
             const snippet = supportsStyleOnlyArg ? `<${componentName} style={{}} />` : `<${componentName} />`;
-            if (stageInsertBlockRef.current) {
-              await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet, skipIframeInsert: true });
-              updateStagedComponentImports((prev) => {
-                const exists = prev.some(
-                  (item) =>
-                    item.localName === componentName &&
-                    item.importPath === importPath &&
-                    item.importKind === importKind
-                );
-                if (exists) return prev;
-                return [...prev, { localName: componentName, importPath, importKind }];
-              });
-              updateHasStagedChanges(true);
-              const liveCode = monacoEditorRef?.current?.getValue?.();
-              if (typeof liveCode === 'string' && liveCode.length > 0) {
-                setFileContent(liveCode);
-              }
-              setRenderVersion((v) => v + 1);
+            
+            await stageInsertBlock({ targetId: id, mode: 'child', snippet, skipIframeInsert: true });
+            updateStagedComponentImports((prev) => {
+              const exists = prev.some(
+                (item) =>
+                  item.localName === componentName &&
+                  item.importPath === importPath &&
+                  item.importKind === importKind
+              );
+              if (exists) return prev;
+              return [...prev, { localName: componentName, importPath, importKind }];
+            });
+            setHasStagedChanges(true);
+            const liveCode = monacoEditorRef?.current?.getValue?.();
+            if (typeof liveCode === 'string' && liveCode.length > 0) {
+              setFileContent(liveCode);
             }
+            setRenderVersion((v) => v + 1);
             return;
           }
 
@@ -235,7 +204,7 @@ export function useEditorMessage({
 
             const baseName = toSafeIdentifier(stripFileExtension(getPathBasename(sourceFilePath)));
             const usedNames = collectImportLocalNames(fileContent || '');
-            (stagedComponentImportsRef.current || []).forEach((item) => {
+            useEditorStore.getState().stagedComponentImports.forEach((item) => {
               if (item?.localName) usedNames.add(item.localName);
             });
             const localName = ensureUniqueImportName(baseName, usedNames);
@@ -244,25 +213,23 @@ export function useEditorMessage({
                 ? `<Image source={${localName}} />`
                 : `<img src={${localName}} alt=\"\" />`;
 
-            if (stageInsertBlockRef.current) {
-              await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet, skipIframeInsert: true });
-              updateStagedComponentImports((prev) => {
-                const exists = prev.some(
-                  (item) =>
-                    item.localName === localName &&
-                    item.importPath === importPath &&
-                    item.importKind === 'default'
-                );
-                if (exists) return prev;
-                return [...prev, { localName, importPath, importKind: 'default' }];
-              });
-              updateHasStagedChanges(true);
-              const liveCode = monacoEditorRef?.current?.getValue?.();
-              if (typeof liveCode === 'string' && liveCode.length > 0) {
-                setFileContent(liveCode);
-              }
-              setRenderVersion((v) => v + 1);
+            await stageInsertBlock({ targetId: id, mode: 'child', snippet, skipIframeInsert: true });
+            updateStagedComponentImports((prev) => {
+              const exists = prev.some(
+                (item) =>
+                  item.localName === localName &&
+                  item.importPath === importPath &&
+                  item.importKind === 'default'
+              );
+              if (exists) return prev;
+              return [...prev, { localName, importPath, importKind: 'default' }];
+            });
+            setHasStagedChanges(true);
+            const liveCode = monacoEditorRef?.current?.getValue?.();
+            if (typeof liveCode === 'string' && liveCode.length > 0) {
+              setFileContent(liveCode);
             }
+            setRenderVersion((v) => v + 1);
             return;
           }
 
@@ -273,34 +240,43 @@ export function useEditorMessage({
             tag = fileType === 'react-native' ? 'View' : 'div';
           }
           const snippet = `<${tag}></${tag}>`;
-          if (stageInsertBlockRef.current) {
-            await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet });
-          }
+          await stageInsertBlock({ targetId: id, mode: 'child', snippet });
           return;
         }
 
-        if (isIntermediate && selectedBlockId === id) {
-          setLivePosition((prev) => {
-            const newPos = { ...prev };
-            const patchLeft = patch.marginLeft !== undefined ? patch.marginLeft : patch.left;
-            const patchTop = patch.marginTop !== undefined ? patch.marginTop : patch.top;
-            if (patchLeft !== undefined) {
-              const leftVal = typeof patchLeft === 'string' ? parseFloat(patchLeft.replace('px', '')) : patchLeft;
-              if (!isNaN(leftVal)) newPos.left = leftVal;
-            }
-            if (patchTop !== undefined) {
-              const topVal = typeof patchTop === 'string' ? parseFloat(patchTop.replace('px', '')) : patchTop;
-              if (!isNaN(topVal)) newPos.top = topVal;
-            }
-            if (patch.width !== undefined) {
-              const widthVal = typeof patch.width === 'string' ? parseFloat(patch.width.replace('px', '')) : patch.width;
-              if (!isNaN(widthVal)) newPos.width = widthVal;
-            }
-            if (patch.height !== undefined) {
-              const heightVal = typeof patch.height === 'string' ? parseFloat(patch.height.replace('px', '')) : patch.height;
-              if (!isNaN(heightVal)) newPos.height = heightVal;
-            }
-            return newPos;
+        if (isIntermediate && selectedBlock?.id === id) {
+          setLivePosition({
+            ...useEditorStore.getState().livePosition,
+            left: (() => {
+              const patchLeft = patch.marginLeft !== undefined ? patch.marginLeft : patch.left;
+              if (patchLeft !== undefined) {
+                const val = typeof patchLeft === 'string' ? parseFloat(patchLeft.replace('px', '')) : patchLeft;
+                return !isNaN(val) ? val : useEditorStore.getState().livePosition.left;
+              }
+              return useEditorStore.getState().livePosition.left;
+            })(),
+            top: (() => {
+              const patchTop = patch.marginTop !== undefined ? patch.marginTop : patch.top;
+              if (patchTop !== undefined) {
+                const val = typeof patchTop === 'string' ? parseFloat(patchTop.replace('px', '')) : patchTop;
+                return !isNaN(val) ? val : useEditorStore.getState().livePosition.top;
+              }
+              return useEditorStore.getState().livePosition.top;
+            })(),
+            width: (() => {
+              if (patch.width !== undefined) {
+                const val = typeof patch.width === 'string' ? parseFloat(patch.width.replace('px', '')) : patch.width;
+                return !isNaN(val) ? val : useEditorStore.getState().livePosition.width;
+              }
+              return useEditorStore.getState().livePosition.width;
+            })(),
+            height: (() => {
+              if (patch.height !== undefined) {
+                const val = typeof patch.height === 'string' ? parseFloat(patch.height.replace('px', '')) : patch.height;
+                return !isNaN(val) ? val : useEditorStore.getState().livePosition.height;
+              }
+              return useEditorStore.getState().livePosition.height;
+            })(),
           });
         }
 
@@ -328,12 +304,11 @@ export function useEditorMessage({
       fileContent,
       filePath,
       fileType,
-      hasStagedChangesRef,
       isModified,
       monacoEditorRef,
       projectRoot,
       saveFileRef,
-      selectedBlockId,
+      selectedBlock,
       setError,
       setExternalDropTargetState,
       setFileContent,
@@ -344,11 +319,10 @@ export function useEditorMessage({
       setSelectedBlockIds,
       setStyleSnapshots,
       setTextSnapshots,
-      stageInsertBlockRef,
-      stageReparentBlockRef,
-      stagedComponentImportsRef,
+      stageInsertBlock,
+      stageReparentBlock,
       unsavedContent,
-      updateHasStagedChanges,
+      setHasStagedChanges,
       updateStagedComponentImports,
       viewMode,
     ]

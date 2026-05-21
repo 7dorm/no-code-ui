@@ -1,7 +1,9 @@
 if (typeof process === 'undefined') {
-  window.process.env = {};
-  window.process.nextTick = (fn: () => void) => setTimeout(fn, 0);
-  window.process.cwd = () => '/';
+  (window as any).process = {
+    env: {},
+    nextTick: (fn: () => void) => setTimeout(fn, 0),
+    cwd: () => '/'
+  };
 }
 
 import {StrictMode} from 'react';

@@ -1,46 +1,38 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
+import { useEditorStore } from '../../../store/editorStore';
 import type {
   HistoryOperation,
   ReparentHistoryOperation,
   SetTextHistoryOperation,
   StagedOp,
-  StylePatch,
 } from '../types';
 
 type UseHistoryParams = {
-  fileType: string | null;
   filePath: string;
-  sendIframeCommand: (cmd: any) => void;
-  updateStagedPatches: (
-    updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>
-  ) => void;
-  updateStagedOps: (updater: ((prev: StagedOp[]) => StagedOp[]) | StagedOp[]) => void;
-  updateHasStagedChanges: (value: boolean) => void;
-  stagedPatchesRef: React.MutableRefObject<Record<string, StylePatch>>;
-  stagedOpsRef: React.MutableRefObject<StagedOp[]>;
 };
 
-export function useHistory({
-  fileType,
-  filePath,
-  sendIframeCommand,
-  updateStagedPatches,
-  updateStagedOps,
-  updateHasStagedChanges,
-  stagedPatchesRef,
-  stagedOpsRef,
-}: UseHistoryParams) {
-  const [undoStack, setUndoStack] = useState<HistoryOperation[]>([]);
-  const [redoStack, setRedoStack] = useState<HistoryOperation[]>([]);
+export function useHistory({ filePath }: UseHistoryParams) {
+  const {
+    fileType,
+    sendIframeCommand,
+    updateStagedPatches,
+    updateStagedOps,
+    setHasStagedChanges,
+    undoStack,
+    setUndoStack,
+    redoStack,
+    setRedoStack,
+  } = useEditorStore();
+
   const undoHistoryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingHistoryOperationRef = useRef<HistoryOperation | null>(null);
 
   const addToHistory = useCallback((operation: HistoryOperation | SetTextHistoryOperation | ReparentHistoryOperation) => {
-    setUndoStack((prev) => [...prev, operation]);
+    setUndoStack([...undoStack, operation]);
     setRedoStack([]);
     console.log('📝 [History] Added operation:', operation.type);
-  }, []);
+  }, [undoStack, setUndoStack, setRedoStack]);
 
   const addToHistoryDebounced = useCallback((operation: HistoryOperation, isIntermediate: boolean = false) => {
     if (isIntermediate) {
@@ -77,8 +69,9 @@ export function useHistory({
     const operation = undoStack[undoStack.length - 1];
     console.log('↩️ [Undo] rollback operation:', operation.type, operation);
 
-    setRedoStack((prev) => [...prev, operation]);
-    setUndoStack((prev) => prev.slice(0, -1));
+    setRedoStack([...redoStack, operation]);
+    const nextUndoStack = undoStack.slice(0, -1);
+    setUndoStack(nextUndoStack);
 
     switch (operation.type) {
       case 'patch': {
@@ -159,22 +152,24 @@ export function useHistory({
     }
 
     setTimeout(() => {
+      const state = useEditorStore.getState();
       const hasChanges =
-        undoStack.length > 0 ||
-        Object.keys(stagedPatchesRef.current || {}).length > 0 ||
-        (stagedOpsRef.current || []).length > 0;
-      updateHasStagedChanges(hasChanges);
+        state.undoStack.length > 0 ||
+        Object.keys(state.stagedPatches).length > 0 ||
+        state.stagedOps.length > 0;
+      setHasStagedChanges(hasChanges);
     }, 0);
   }, [
     undoStack,
+    redoStack,
     fileType,
     filePath,
     sendIframeCommand,
     updateStagedPatches,
     updateStagedOps,
-    updateHasStagedChanges,
-    stagedPatchesRef,
-    stagedOpsRef,
+    setHasStagedChanges,
+    setUndoStack,
+    setRedoStack,
   ]);
 
   const redo = useCallback(() => {
@@ -184,8 +179,8 @@ export function useHistory({
     }
 
     const operation: HistoryOperation = redoStack[redoStack.length - 1];
-    setUndoStack((prev) => [...prev, operation]);
-    setRedoStack((prev) => prev.slice(0, -1));
+    setUndoStack([...undoStack, operation]);
+    setRedoStack(redoStack.slice(0, -1));
 
     switch (operation.type) {
       case 'patch': {
@@ -281,8 +276,19 @@ export function useHistory({
         console.warn('↪️ [Redo] unknown op:', (operation as any).type);
     }
 
-    updateHasStagedChanges(true);
-  }, [redoStack, fileType, filePath, sendIframeCommand, updateStagedPatches, updateStagedOps, updateHasStagedChanges]);
+    setHasStagedChanges(true);
+  }, [
+    undoStack,
+    redoStack,
+    fileType,
+    filePath,
+    sendIframeCommand,
+    updateStagedPatches,
+    updateStagedOps,
+    setHasStagedChanges,
+    setUndoStack,
+    setRedoStack,
+  ]);
 
   const clearHistory = useCallback(() => {
     setUndoStack([]);
@@ -292,7 +298,7 @@ export function useHistory({
       undoHistoryTimeoutRef.current = null;
     }
     pendingHistoryOperationRef.current = null;
-  }, []);
+  }, [setUndoStack, setRedoStack]);
 
   return {
     undoStack,

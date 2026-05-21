@@ -1,28 +1,24 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
-import type { BlockMap } from '../types';
-
-type SelectedBlock = { id: string; meta?: any } | null;
+import { useEditorStore } from '../../../store/editorStore';
 
 type UseMonacoEditorParams = {
   monacoEditorRef: React.MutableRefObject<any>;
   isUpdatingFromFileRef: React.MutableRefObject<boolean>;
-  blockMap: BlockMap;
-  blockMapForFile: BlockMap;
-  selectedBlock: SelectedBlock;
-  setSelectedBlock: React.Dispatch<React.SetStateAction<SelectedBlock>>;
-  sendIframeCommand: (cmd: any) => void;
 };
 
 export function useMonacoEditor({
   monacoEditorRef,
   isUpdatingFromFileRef,
-  blockMap,
-  blockMapForFile,
-  selectedBlock,
-  setSelectedBlock,
-  sendIframeCommand,
 }: UseMonacoEditorParams) {
+  const {
+    blockMap,
+    blockMapForFile,
+    selectedBlock,
+    setSelectedBlock,
+    sendIframeCommand,
+  } = useEditorStore();
+
   const suppressCodeSelectionSyncRef = useRef<boolean>(false);
   const monacoSelectionDecorationsRef = useRef<string[]>([]);
 
@@ -175,15 +171,12 @@ export function useMonacoEditor({
       if (!bestMatch) return;
       if (selectedBlock?.id === bestMatch.id) return;
 
-      setSelectedBlock((prev) => {
-        if (prev?.id === bestMatch!.id) return prev;
-        return { id: bestMatch!.id, meta: prev?.meta };
-      });
+      setSelectedBlock({ id: bestMatch.id, meta: selectedBlock?.meta });
       sendIframeCommand({ type: MRPAK_CMD.SELECT, id: bestMatch.id });
     } catch (e) {
       console.warn('[handleMonacoCtrlClick] sync failed:', e);
     }
-  }, [blockMapForFile, monacoEditorRef, selectedBlock?.id, sendIframeCommand, setSelectedBlock]);
+  }, [blockMapForFile, monacoEditorRef, selectedBlock, setSelectedBlock, sendIframeCommand]);
 
   useEffect(() => {
     if (!selectedBlock?.id) {
