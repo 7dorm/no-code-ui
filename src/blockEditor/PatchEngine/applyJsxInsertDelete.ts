@@ -1,9 +1,9 @@
-﻿function isTagChar(ch: any) {
+function isTagChar(ch: any) {
   return /[A-Za-z0-9_$.-]/.test(ch);
 }
 
 /**
- * РќР°С…РѕРґРёС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰СѓСЋ Р·Р°РєСЂС‹РІР°СЋС‰СѓСЋ СЃРєРѕР±РєСѓ, СѓС‡РёС‚С‹РІР°СЏ СЃС‚СЂРѕРєРё Рё РєРѕРјРјРµРЅС‚Р°СЂРёРё
+ * Находит соответствующую закрывающую скобку, учитывая строки и комментарии
  */
 function findMatchingBrace(src: any, from: any, openCh: any, closeCh: any) {
   let i = from;
@@ -74,17 +74,17 @@ function findMatchingBrace(src: any, from: any, openCh: any, closeCh: any) {
 }
 
 /**
- * РќР°С…РѕРґРёС‚ РєРѕРјРїРѕРЅРµРЅС‚ (function, arrow function, class), СЃРѕРґРµСЂР¶Р°С‰РёР№ Р·Р°РґР°РЅРЅСѓСЋ РїРѕР·РёС†РёСЋ РІ РєРѕРґРµ
- * @param {string} code - РёСЃС…РѕРґРЅС‹Р№ РєРѕРґ
- * @param {number} position - РїРѕР·РёС†РёСЏ РІ РєРѕРґРµ
- * @returns {Object|null} { type: 'function'|'arrow'|'class', name: string, bodyStart: number, bodyEnd: number } РёР»Рё null
+ * Находит компонент (function, arrow function, class), содержащий заданную позицию в коде
+ * @param {string} code - исходный код
+ * @param {number} position - позиция в коде
+ * @returns {Object|null} { type: 'function'|'arrow'|'class', name: string, bodyStart: number, bodyEnd: number } или null
  */
 function findContainingComponent(code: any, position: any) {
   const src = String(code || '');
   if (position < 0 || position > src.length) return null;
 
-  // РС‰РµРј РЅР°Р·Р°Рґ РѕС‚ РїРѕР·РёС†РёРё, С‡С‚РѕР±С‹ РЅР°Р№С‚Рё РѕР±СЉСЏРІР»РµРЅРёРµ РєРѕРјРїРѕРЅРµРЅС‚Р°
-  // РџСЂРѕРІРµСЂСЏРµРј РЅРµСЃРєРѕР»СЊРєРѕ РїР°С‚С‚РµСЂРЅРѕРІ:
+  // Ищем назад от позиции, чтобы найти объявление компонента
+  // Проверяем несколько паттернов:
   // 1. function ComponentName() { ... }
   // 2. const ComponentName = () => { ... }
   // 3. const ComponentName = function() { ... }
@@ -101,7 +101,7 @@ function findContainingComponent(code: any, position: any) {
     const bodyStart = src.indexOf('{', funcStart + match[0].length - 1);
     if (bodyStart < 0) continue;
     
-    // РќР°С…РѕРґРёРј СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰СѓСЋ Р·Р°РєСЂС‹РІР°СЋС‰СѓСЋ СЃРєРѕР±РєСѓ СЃ СѓС‡РµС‚РѕРј СЃС‚СЂРѕРє Рё РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ
+    // Находим соответствующую закрывающую скобку с учетом строк и комментариев
     const bodyEnd = findMatchingBrace(src, bodyStart, '{', '}');
     if (bodyEnd < 0) continue;
     
@@ -183,7 +183,7 @@ function findContainingComponent(code: any, position: any) {
 }
 
 function findNextLt(src: any, from: any) {
-  // РіСЂСѓР±Рѕ РїСЂРѕРїСѓСЃРєР°РµРј СЃС‚СЂРѕРєРё/РєРѕРјРјРµРЅС‚С‹
+  // грубо пропускаем строки/комменты
   let i = from;
   let inS: any = null;
   let inLine = false;
@@ -253,12 +253,12 @@ function readTagName(src: any, ltIndex: any) {
 }
 
 function isSelfClosing(openTagText: any) {
-  // РїСЂРµРґРїРѕР»Р°РіР°РµРј, С‡С‚Рѕ openTagText Р·Р°РєР°РЅС‡РёРІР°РµС‚СЃСЏ РЅР° '>' РёР»Рё '/>'
+  // предполагаем, что openTagText заканчивается на '>' или '/>'
   return /\/>\s*$/.test(openTagText);
 }
 
 function findMatchingCloseTag(src: any, openEnd: any, tagName: any) {
-  // РС‰РµРј </tagName> СЃ СѓС‡С‘С‚РѕРј РІР»РѕР¶РµРЅРЅРѕСЃС‚Рё РѕРґРёРЅР°РєРѕРІС‹С… С‚РµРіРѕРІ
+  // Ищем </tagName> с учётом вложенности одинаковых тегов
   let depth = 1;
   let i = openEnd;
   while (i < src.length) {
@@ -272,12 +272,12 @@ function findMatchingCloseTag(src: any, openEnd: any, tagName: any) {
     if (info.closing) {
       depth--;
       if (depth === 0) {
-        // РЅР°Р№С‚Рё РєРѕРЅРµС† Р·Р°РєСЂС‹РІР°СЋС‰РµРіРѕ С‚РµРіР° '>'
+        // найти конец закрывающего тега '>'
         const gt = src.indexOf('>', lt);
         return gt >= 0 ? gt + 1 : -1;
       }
     } else {
-      // РѕС‚РєСЂС‹РІР°СЋС‰РёР№ С‚РµРі: РµСЃР»Рё РѕРЅ self-closing, depth РЅРµ РјРµРЅСЏРµРј
+      // открывающий тег: если он self-closing, depth не меняем
       const gt = src.indexOf('>', lt);
       if (gt < 0) return -1;
       const openTag = src.slice(lt, gt + 1);
@@ -312,11 +312,11 @@ export function applyJsxDelete({ code, entry }: any) {
 }
 
 /**
- * РР·РІР»РµРєР°РµС‚ РёРјСЏ РѕР±СЂР°Р±РѕС‚С‡РёРєР° РёР· СЃРЅРёРїРїРµС‚Р° (onClick РёР»Рё onPress)
+ * Извлекает имя обработчика из сниппета (onClick или onPress)
  */
 function extractHandlerName(snippet: any) {
   const snip = String(snippet || '');
-  // РС‰РµРј onClick={handlerName} РёР»Рё onPress={handlerName}
+  // Ищем onClick={handlerName} или onPress={handlerName}
   const onClickMatch = snip.match(/\bonClick\s*=\s*\{([A-Za-z_$][A-Za-z0-9_$]*)\}/);
   if (onClickMatch) return onClickMatch[1];
   
@@ -327,10 +327,10 @@ function extractHandlerName(snippet: any) {
 }
 
 /**
- * РќР°С…РѕРґРёС‚ РїРѕР·РёС†РёСЋ return РІ С‚РµР»Рµ РєРѕРјРїРѕРЅРµРЅС‚Р°
+ * Находит позицию return в теле компонента
  */
 function findReturnPosition(src: any, bodyStart: any, bodyEnd: any) {
-  // РС‰РµРј return РІ С‚РµР»Рµ РєРѕРјРїРѕРЅРµРЅС‚Р° (РЅРµ РІ СЃС‚СЂРѕРєР°С…/РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…)
+  // Ищем return в теле компонента (не в строках/комментариях)
   let i = bodyStart;
   let inS: any = null;
   let inLineComment = false;
@@ -384,7 +384,7 @@ function findReturnPosition(src: any, bodyStart: any, bodyEnd: any) {
       continue;
     }
     
-    // РџСЂРѕРІРµСЂСЏРµРј РЅР° return
+    // Проверяем на return
     if (src.slice(i, i + 6) === 'return' && 
         (i === bodyStart || /\s/.test(src[i - 1])) &&
         (i + 6 >= bodyEnd || /[\s(]/.test(src[i + 6]))) {
@@ -400,46 +400,46 @@ function findReturnPosition(src: any, bodyStart: any, bodyEnd: any) {
 export function applyJsxInsert({ code, entry, mode, snippet }: any) {
   const src = String(code ?? '');
   
-  // РџСЂРѕРІРµСЂСЏРµРј, РµСЃС‚СЊ Р»Рё РѕР±СЂР°Р±РѕС‚С‡РёРє СЃРѕР±С‹С‚РёР№ РІ СЃРЅРёРїРїРµС‚Рµ
+  // Проверяем, есть ли обработчик событий в сниппете
   const handlerName = extractHandlerName(snippet);
   let newCode = src;
   let handlerOffset = 0;
   let handlerInsertPos = -1;
   
-  // Р•СЃР»Рё РµСЃС‚СЊ РѕР±СЂР°Р±РѕС‚С‡РёРє, РЅСѓР¶РЅРѕ СЃРѕР·РґР°С‚СЊ С„СѓРЅРєС†РёСЋ РІ РєРѕРјРїРѕРЅРµРЅС‚Рµ
+  // Если есть обработчик, нужно создать функцию в компоненте
   if (handlerName) {
-    // РЎРЅР°С‡Р°Р»Р° РЅР°С…РѕРґРёРј РґРёР°РїР°Р·РѕРЅ СЌР»РµРјРµРЅС‚Р° РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ РїРѕР·РёС†РёРё РїРѕРёСЃРєР° РєРѕРјРїРѕРЅРµРЅС‚Р°
+    // Сначала находим диапазон элемента для определения позиции поиска компонента
     const initialRange = findJsxElementRange({ code: src, entry });
     if (initialRange) {
-      // РћРїСЂРµРґРµР»СЏРµРј РїРѕР·РёС†РёСЋ РґР»СЏ РїРѕРёСЃРєР° РєРѕРјРїРѕРЅРµРЅС‚Р° (РїРµСЂРµРґ РІСЃС‚Р°РІРєРѕР№)
+      // Определяем позицию для поиска компонента (перед вставкой)
       const searchPosition = mode === 'sibling' ? initialRange.end : initialRange.start;
       
-      // РќР°С…РѕРґРёРј РєРѕРјРїРѕРЅРµРЅС‚, СЃРѕРґРµСЂР¶Р°С‰РёР№ СЌС‚Сѓ РїРѕР·РёС†РёСЋ
+      // Находим компонент, содержащий эту позицию
       const component = findContainingComponent(src, searchPosition);
       
       if (component) {
-        // РџСЂРѕРІРµСЂСЏРµРј, РЅРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ Р»Рё СѓР¶Рµ С„СѓРЅРєС†РёСЏ СЃ С‚Р°РєРёРј РёРјРµРЅРµРј
+        // Проверяем, не существует ли уже функция с таким именем
         const handlerRegex = new RegExp(`(?:const|let|var|function)\\s+${handlerName}\\s*[=(]`);
         if (!handlerRegex.test(src.slice(component.bodyStart, component.bodyEnd))) {
-          // РС‰РµРј РїРѕР·РёС†РёСЋ return РІ С‚РµР»Рµ РєРѕРјРїРѕРЅРµРЅС‚Р°
+          // Ищем позицию return в теле компонента
           const returnPos = findReturnPosition(src, component.bodyStart, component.bodyEnd);
           
           let insertPos: any;
           let handlerCode: any;
           
           if (returnPos >= 0) {
-            // Р’СЃС‚Р°РІР»СЏРµРј РїРµСЂРµРґ return
+            // Вставляем перед return
             insertPos = returnPos;
-            handlerCode = `  const ${handlerName} = () => {\n    // TODO: СЂРµР°Р»РёР·РѕРІР°С‚СЊ РѕР±СЂР°Р±РѕС‚С‡РёРє\n  };\n\n`;
+            handlerCode = `  const ${handlerName} = () => {\n    // TODO: реализовать обработчик\n  };\n\n`;
           } else {
-            // Р’СЃС‚Р°РІР»СЏРµРј РІ РЅР°С‡Р°Р»Рѕ С‚РµР»Р° РєРѕРјРїРѕРЅРµРЅС‚Р°
+            // Вставляем в начало тела компонента
             insertPos = component.bodyStart;
-            handlerCode = `  const ${handlerName} = () => {\n    // TODO: СЂРµР°Р»РёР·РѕРІР°С‚СЊ РѕР±СЂР°Р±РѕС‚С‡РёРє\n  };\n\n  `;
+            handlerCode = `  const ${handlerName} = () => {\n    // TODO: реализовать обработчик\n  };\n\n  `;
           }
           
           handlerInsertPos = insertPos;
           
-          // Р’СЃС‚Р°РІР»СЏРµРј С„СѓРЅРєС†РёСЋ
+          // Вставляем функцию
           newCode = newCode.slice(0, insertPos) + handlerCode + newCode.slice(insertPos);
           handlerOffset = handlerCode.length;
         }
@@ -447,11 +447,11 @@ export function applyJsxInsert({ code, entry, mode, snippet }: any) {
     }
   }
   
-  // РџРµСЂРµСЃС‡РёС‚С‹РІР°РµРј РїРѕР·РёС†РёРё entry, РµСЃР»Рё С„СѓРЅРєС†РёСЏ Р±С‹Р»Р° РІСЃС‚Р°РІР»РµРЅР° РїРµСЂРµРґ РЅРёРјРё
+  // Пересчитываем позиции entry, если функция была вставлена перед ними
   let adjustedEntry = entry;
   if (handlerOffset > 0 && handlerInsertPos >= 0) {
     if (handlerInsertPos < entry.start) {
-      // Р¤СѓРЅРєС†РёСЏ РІСЃС‚Р°РІР»РµРЅР° РїРµСЂРµРґ СЌР»РµРјРµРЅС‚РѕРј - РЅСѓР¶РЅРѕ СЃРґРІРёРЅСѓС‚СЊ РїРѕР·РёС†РёРё
+      // Функция вставлена перед элементом - нужно сдвинуть позиции
       adjustedEntry = {
         ...entry,
         start: entry.start + handlerOffset,
@@ -460,16 +460,16 @@ export function applyJsxInsert({ code, entry, mode, snippet }: any) {
     }
   }
 
-  // РўРµРїРµСЂСЊ РёСЃРїРѕР»СЊР·СѓРµРј СЃРєРѕСЂСЂРµРєС‚РёСЂРѕРІР°РЅРЅС‹Рµ РїРѕР·РёС†РёРё РґР»СЏ РїРѕРёСЃРєР° РґРёР°РїР°Р·РѕРЅР° РІ РЅРѕРІРѕРј РєРѕРґРµ
+  // Теперь используем скорректированные позиции для поиска диапазона в новом коде
   let range = findJsxElementRange({ code: newCode, entry: adjustedEntry });
   if (!range) {
-    // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё СЌР»РµРјРµРЅС‚ СЃРѕ СЃРєРѕСЂСЂРµРєС‚РёСЂРѕРІР°РЅРЅС‹РјРё РїРѕР·РёС†РёСЏРјРё, РїСЂРѕР±СѓРµРј РёСЃС…РѕРґРЅС‹Рµ РїРѕР·РёС†РёРё
+    // Если не нашли элемент со скорректированными позициями, пробуем исходные позиции
     range = findJsxElementRange({ code: newCode, entry });
     if (!range) {
-      // Р•СЃР»Рё РІСЃРµ РµС‰Рµ РЅРµ РЅР°С€Р»Рё, РІРѕР·РІСЂР°С‰Р°РµРј РѕС€РёР±РєСѓ
+      // Если все еще не нашли, возвращаем ошибку
       return { ok: false, error: 'applyJsxInsert: cannot find element range after handler insertion' };
     }
-    // Р•СЃР»Рё РЅР°С€Р»Рё СЃ РёСЃС…РѕРґРЅС‹РјРё РїРѕР·РёС†РёСЏРјРё, РёСЃРїРѕР»СЊР·СѓРµРј РёС… (С„СѓРЅРєС†РёСЏ Р±С‹Р»Р° РІСЃС‚Р°РІР»РµРЅР° РїРѕСЃР»Рµ СЌР»РµРјРµРЅС‚Р°)
+    // Если нашли с исходными позициями, используем их (функция была вставлена после элемента)
     adjustedEntry = entry;
   }
 
@@ -487,7 +487,7 @@ export function applyJsxInsert({ code, entry, mode, snippet }: any) {
     return { ok: true, code: out, changed: true };
   }
 
-  // child: РІСЃС‚Р°РІР»СЏРµРј РїРµСЂРµРґ </Tag>
+  // child: вставляем перед </Tag>
   const closeTagStart = newCode.lastIndexOf(`</${adjustedEntry.tagName}`, range.end);
   if (closeTagStart < 0) return { ok: false, error: 'applyJsxInsert: closing tag not found' };
   const out = newCode.slice(0, closeTagStart) + insertText + newCode.slice(closeTagStart);
@@ -513,7 +513,7 @@ export function applyJsxReparent({ code, sourceEntry, targetEntry, targetBeforeE
   const extracted = src.slice(sourceRange.start, sourceRange.end);
   const removed = src.slice(0, sourceRange.start) + src.slice(sourceRange.end);
 
-  // С‚РѕС‡РєР° РІСЃС‚Р°РІРєРё: РїРµСЂРµРґ Р·Р°РєСЂС‹РІР°СЋС‰РёРј С‚РµРіРѕРј target РІ РћР РР“РРќРђР›Р•
+  // точка вставки: перед закрывающим тегом target в ОРИГИНАЛЕ
   let insertPosOriginal = -1;
   if (beforeRange) {
     insertPosOriginal = beforeRange.start;
@@ -526,7 +526,7 @@ export function applyJsxReparent({ code, sourceEntry, targetEntry, targetBeforeE
     insertPosOriginal = closeTagStart;
   }
 
-  // РєРѕСЂСЂРµРєС‚РёСЂСѓРµРј РїРѕР·РёС†РёСЋ РїРѕСЃР»Рµ СѓРґР°Р»РµРЅРёСЏ
+  // корректируем позицию после удаления
   const delta = sourceRange.end - sourceRange.start;
   const insertPos = sourceRange.start < insertPosOriginal ? insertPosOriginal - delta : insertPosOriginal;
 
@@ -536,8 +536,8 @@ export function applyJsxReparent({ code, sourceEntry, targetEntry, targetBeforeE
 }
 
 /**
- * РР·РјРµРЅСЏРµС‚ С‚РµРєСЃС‚РѕРІРѕРµ СЃРѕРґРµСЂР¶РёРјРѕРµ JSX СЌР»РµРјРµРЅС‚Р°
- * entry: { start, end } - РїРѕР·РёС†РёСЏ РѕС‚РєСЂС‹РІР°СЋС‰РµРіРѕ С‚РµРіР°
+ * Изменяет текстовое содержимое JSX элемента
+ * entry: { start, end } - позиция открывающего тега
  */
 export function applyJsxSetText({ code, entry, text }: any) {
   const source = String(code ?? '');
@@ -556,20 +556,20 @@ export function applyJsxSetText({ code, entry, text }: any) {
     return { ok: false, error: 'applyJsxSetText: entry is not an opening tag' };
   }
 
-  // РќР°С…РѕРґРёРј Р·Р°РєСЂС‹РІР°СЋС‰РёР№ С‚РµРі
+  // Находим закрывающий тег
   const tagMatch = openTag.match(/^<([A-Za-z][A-Za-z0-9]*)/);
   if (!tagMatch) {
     return { ok: false, error: 'applyJsxSetText: cannot parse tag name' };
   }
   const tagName = tagMatch[1];
 
-  // РС‰РµРј Р·Р°РєСЂС‹РІР°СЋС‰РёР№ С‚РµРі </tagName>
+  // Ищем закрывающий тег </tagName>
   if (openTag.trim().endsWith('/>')) {
-    // РЎР°РјРѕР·Р°РєСЂС‹РІР°СЋС‰РёР№СЃСЏ С‚РµРі - РЅРµ РјРѕР¶РµРј РёР·РјРµРЅРёС‚СЊ С‚РµРєСЃС‚
+    // Самозакрывающийся тег - не можем изменить текст
     return { ok: false, error: 'applyJsxSetText: self-closing tag has no text content' };
   }
 
-  // РС‰РµРј Р·Р°РєСЂС‹РІР°СЋС‰РёР№ С‚РµРі </tagName>
+  // Ищем закрывающий тег </tagName>
   let pos = end;
   let depth = 1;
   const closeTagPattern = new RegExp(`</${tagName}\\s*>`, 'g');
@@ -589,7 +589,7 @@ export function applyJsxSetText({ code, entry, text }: any) {
     } else {
       depth--;
       if (depth === 0) {
-        // РќР°С€Р»Рё Р·Р°РєСЂС‹РІР°СЋС‰РёР№ С‚РµРі
+        // Нашли закрывающий тег
         const textStart = end;
         const textEnd = nextClose;
         const newText = String(text ?? '').trim();

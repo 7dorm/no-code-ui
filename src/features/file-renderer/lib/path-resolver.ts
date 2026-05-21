@@ -1,4 +1,4 @@
-﻿import { readFile, readDirectory } from '../../../shared/api/electron-api';
+import { readFile, readDirectory } from '../../../shared/api/electron-api';
 
 function isBareModuleImport(relativePath) {
   const value = String(relativePath || '').trim();
@@ -161,7 +161,7 @@ async function resolveNodeModuleImport(basePath, relativePath) {
 }
 
 /**
- * РќР°С…РѕРґРёС‚ РєРѕСЂРµРЅСЊ РїСЂРѕРµРєС‚Р° (РґРёСЂРµРєС‚РѕСЂРёСЋ СЃ package.json)
+ * Находит корень проекта (директорию с package.json)
  */
 export async function findProjectRoot(filePath: string) {
   if (!filePath) return null;
@@ -204,28 +204,28 @@ export async function findProjectRoot(filePath: string) {
 }
 
 /**
- * Р Р°Р·СЂРµС€Р°РµС‚ РїСѓС‚СЊ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ Р±Р°Р·РѕРІРѕРіРѕ РїСѓС‚Рё, РІРєР»СЋС‡Р°СЏ РїРѕРґРґРµСЂР¶РєСѓ @ РїСѓС‚РµР№
+ * Разрешает путь относительно базового пути, включая поддержку @ путей
  */
 export async function resolvePath(basePath: string, relativePath: string) {
   if (isBareModuleImport(relativePath)) {
     return String(relativePath || '').replace(/\\/g, '/');
   }
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ @, СЂР°Р·СЂРµС€Р°РµРј РµРіРѕ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєРѕСЂРЅСЏ РїСЂРѕРµРєС‚Р°
+  // Если путь начинается с @, разрешаем его относительно корня проекта
   if (relativePath.startsWith('@/')) {
     const projectRoot = await findProjectRoot(basePath);
     if (projectRoot) {
-      // РЈР±РёСЂР°РµРј @/ Рё РґРѕР±Р°РІР»СЏРµРј Рє РєРѕСЂРЅСЋ РїСЂРѕРµРєС‚Р°
-      const pathWithoutAlias = relativePath.substring(2); // РЈР±РёСЂР°РµРј '@/'
-      // РџСЂРѕР±СѓРµРј СЃРЅР°С‡Р°Р»Р° src/, РїРѕС‚РѕРј РєРѕСЂРµРЅСЊ
+      // Убираем @/ и добавляем к корню проекта
+      const pathWithoutAlias = relativePath.substring(2); // Убираем '@/'
+      // Пробуем сначала src/, потом корень
       const tryPaths = [
         projectRoot + '/src/' + pathWithoutAlias,
         projectRoot + '/' + pathWithoutAlias
       ];
       
-      // РџСЂРѕРІРµСЂСЏРµРј, РєР°РєРѕР№ РїСѓС‚СЊ СЃСѓС‰РµСЃС‚РІСѓРµС‚
+      // Проверяем, какой путь существует
       for (const tryPath of tryPaths) {
         try {
-          // РџСЂРѕР±СѓРµРј СЃ СЂР°СЃС€РёСЂРµРЅРёСЏРјРё
+          // Пробуем с расширениями
           const extensions = ['', '.js', '.jsx', '.ts', '.tsx'];
           for (const ext of extensions) {
             const fullPath = tryPath + ext;
@@ -234,7 +234,7 @@ export async function resolvePath(basePath: string, relativePath: string) {
               return fullPath.replace(/\\/g, '/');
             }
           }
-          // РџСЂРѕР±СѓРµРј РєР°Рє РґРёСЂРµРєС‚РѕСЂРёСЋ СЃ index
+          // Пробуем как директорию с index
           const indexPaths = [
             tryPath + '/index.js',
             tryPath + '/index.jsx',
@@ -248,55 +248,55 @@ export async function resolvePath(basePath: string, relativePath: string) {
             }
           }
         } catch (e) {
-          // РџСЂРѕРґРѕР»Р¶Р°РµРј
+          // Продолжаем
         }
       }
       
-      // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё, РІРѕР·РІСЂР°С‰Р°РµРј РїСѓС‚СЊ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ src
+      // Если не нашли, возвращаем путь относительно src
       return (projectRoot + '/src/' + pathWithoutAlias).replace(/\\/g, '/');
     }
     
-    // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё РєРѕСЂРµРЅСЊ РїСЂРѕРµРєС‚Р°, РёСЃРїРѕР»СЊР·СѓРµРј Р±Р°Р·РѕРІС‹Р№ РїСѓС‚СЊ
+    // Если не нашли корень проекта, используем базовый путь
     const lastSlash = basePath.lastIndexOf('/');
     const lastBackslash = basePath.lastIndexOf('\\');
     const lastSeparator = Math.max(lastSlash, lastBackslash);
     const dir = lastSeparator >= 0 ? basePath.substring(0, lastSeparator + 1) : '';
     const pathWithoutAlias = relativePath.substring(2);
-    // РџСЂРѕР±СѓРµРј src/ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ С‚РµРєСѓС‰РµР№ РґРёСЂРµРєС‚РѕСЂРёРё
+    // Пробуем src/ относительно текущей директории
     return (dir + 'src/' + pathWithoutAlias).replace(/\\/g, '/');
   }
   
-  // РџРѕР»СѓС‡Р°РµРј РґРёСЂРµРєС‚РѕСЂРёСЋ РѕСЃРЅРѕРІРЅРѕРіРѕ С„Р°Р№Р»Р°
+  // Получаем директорию основного файла
   const lastSlash = basePath.lastIndexOf('/');
   const lastBackslash = basePath.lastIndexOf('\\');
   const lastSeparator = Math.max(lastSlash, lastBackslash);
   const dir = lastSeparator >= 0 ? basePath.substring(0, lastSeparator + 1) : '';
   
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ /, СЌС‚Рѕ Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєРѕСЂРЅСЏ РїСЂРѕРµРєС‚Р°
-  // Р’ СЌС‚РѕРј СЃР»СѓС‡Р°Рµ РёСЃРїРѕР»СЊР·СѓРµРј РїСѓС‚СЊ РєР°Рє РµСЃС‚СЊ (РЅРѕ СѓР±РёСЂР°РµРј РЅР°С‡Р°Р»СЊРЅС‹Р№ /)
+  // Если путь начинается с /, это абсолютный путь относительно корня проекта
+  // В этом случае используем путь как есть (но убираем начальный /)
   if (relativePath.startsWith('/')) {
     return relativePath.substring(1).replace(/\\/g, '/');
   }
   
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ ./, СѓР±РёСЂР°РµРј С‚РѕС‡РєСѓ
+  // Если путь начинается с ./, убираем точку
   if (relativePath.startsWith('./')) {
     return (dir + relativePath.substring(2)).replace(/\\/g, '/');
   }
   
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ ../, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј СЂРѕРґРёС‚РµР»СЊСЃРєРёРµ РґРёСЂРµРєС‚РѕСЂРёРё
+  // Если путь начинается с ../, обрабатываем родительские директории
   if (relativePath.startsWith('../')) {
     let currentDir = dir;
     let path = relativePath;
     
     while (path.startsWith('../')) {
-      // РџРѕРґРЅРёРјР°РµРјСЃСЏ РЅР° СѓСЂРѕРІРµРЅСЊ РІРІРµСЂС…
+      // Поднимаемся на уровень вверх
       const parentSlash = currentDir.substring(0, currentDir.length - 1).lastIndexOf('/');
       const parentBackslash = currentDir.substring(0, currentDir.length - 1).lastIndexOf('\\');
       const parentSeparator = Math.max(parentSlash, parentBackslash);
       if (parentSeparator >= 0) {
         currentDir = currentDir.substring(0, parentSeparator + 1);
       } else {
-        // РќРµ РјРѕР¶РµРј РїРѕРґРЅСЏС‚СЊСЃСЏ РІС‹С€Рµ РєРѕСЂРЅСЏ
+        // Не можем подняться выше корня
         break;
       }
       path = path.substring(3);
@@ -305,52 +305,52 @@ export async function resolvePath(basePath: string, relativePath: string) {
     return (currentDir + path).replace(/\\/g, '/');
   }
   
-  // РћС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ Р±РµР· РїСЂРµС„РёРєСЃР°
+  // Относительный путь без префикса
   return (dir + relativePath).replace(/\\/g, '/');
 }
 
 /**
- * РЎРёРЅС…СЂРѕРЅРЅР°СЏ РІРµСЂСЃРёСЏ resolvePath РґР»СЏ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№ (Р±РµР· @)
+ * Синхронная версия resolvePath для относительных путей (без @)
  */
 export function resolvePathSync(basePath: string, relativePath: string) {
   if (isBareModuleImport(relativePath)) {
     return String(relativePath || '').replace(/\\/g, '/');
   }
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ @, РЅРµ РјРѕР¶РµРј СЂР°Р·СЂРµС€РёС‚СЊ СЃРёРЅС…СЂРѕРЅРЅРѕ - РІРѕР·РІСЂР°С‰Р°РµРј РєР°Рє РµСЃС‚СЊ
+  // Если путь начинается с @, не можем разрешить синхронно - возвращаем как есть
   if (relativePath.startsWith('@/')) {
     return relativePath;
   }
   
-  // РџРѕР»СѓС‡Р°РµРј РґРёСЂРµРєС‚РѕСЂРёСЋ РѕСЃРЅРѕРІРЅРѕРіРѕ С„Р°Р№Р»Р°
+  // Получаем директорию основного файла
   const lastSlash = basePath.lastIndexOf('/');
   const lastBackslash = basePath.lastIndexOf('\\');
   const lastSeparator = Math.max(lastSlash, lastBackslash);
   const dir = lastSeparator >= 0 ? basePath.substring(0, lastSeparator + 1) : '';
   
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ /, СЌС‚Рѕ Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєРѕСЂРЅСЏ РїСЂРѕРµРєС‚Р°
+  // Если путь начинается с /, это абсолютный путь относительно корня проекта
   if (relativePath.startsWith('/')) {
     return relativePath.substring(1).replace(/\\/g, '/');
   }
   
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ ./, СѓР±РёСЂР°РµРј С‚РѕС‡РєСѓ
+  // Если путь начинается с ./, убираем точку
   if (relativePath.startsWith('./')) {
     return (dir + relativePath.substring(2)).replace(/\\/g, '/');
   }
   
-  // Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ ../, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј СЂРѕРґРёС‚РµР»СЊСЃРєРёРµ РґРёСЂРµРєС‚РѕСЂРёРё
+  // Если путь начинается с ../, обрабатываем родительские директории
   if (relativePath.startsWith('../')) {
     let currentDir = dir;
     let path = relativePath;
     
     while (path.startsWith('../')) {
-      // РџРѕРґРЅРёРјР°РµРјСЃСЏ РЅР° СѓСЂРѕРІРµРЅСЊ РІРІРµСЂС…
+      // Поднимаемся на уровень вверх
       const parentSlash = currentDir.substring(0, currentDir.length - 1).lastIndexOf('/');
       const parentBackslash = currentDir.substring(0, currentDir.length - 1).lastIndexOf('\\');
       const parentSeparator = Math.max(parentSlash, parentBackslash);
       if (parentSeparator >= 0) {
         currentDir = currentDir.substring(0, parentSeparator + 1);
       } else {
-        // РќРµ РјРѕР¶РµРј РїРѕРґРЅСЏС‚СЊСЃСЏ РІС‹С€Рµ РєРѕСЂРЅСЏ
+        // Не можем подняться выше корня
         break;
       }
       path = path.substring(3);
@@ -359,6 +359,6 @@ export function resolvePathSync(basePath: string, relativePath: string) {
     return (currentDir + path).replace(/\\/g, '/');
   }
   
-  // РћС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ Р±РµР· РїСЂРµС„РёРєСЃР°
+  // Относительный путь без префикса
   return (dir + relativePath).replace(/\\/g, '/');
 }

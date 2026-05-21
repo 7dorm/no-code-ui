@@ -120,26 +120,26 @@ function RenderFile({
   const [fileType, setFileType] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [unsavedContent, setUnsavedContent] = useState<string | null>(null); // РќРµСЃРѕС…СЂР°РЅРµРЅРЅС‹Рµ РёР·РјРµРЅРµРЅРёСЏ
-  const [isModified, setIsModified] = useState<boolean>(false); // Р¤Р»Р°Рі РёР·РјРµРЅРµРЅРёР№
-  const [showSaveIndicator, setShowSaveIndicator] = useState<boolean>(false); // РРЅРґРёРєР°С‚РѕСЂ СЃРѕС…СЂР°РЅРµРЅРёСЏ
+  const [unsavedContent, setUnsavedContent] = useState<string | null>(null); // Несохраненные изменения
+  const [isModified, setIsModified] = useState<boolean>(false); // Флаг изменений
+  const [showSaveIndicator, setShowSaveIndicator] = useState<boolean>(false); // РРЅРґРёРєР°С‚РѕСЂ сохранения
   const monacoEditorRef = useRef<any>(null);
-  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // РўР°Р№РјРµСЂ РґР»СЏ Р°РІС‚РѕСЃРѕС…СЂР°РЅРµРЅРёСЏ
-  const isUpdatingFromConstructorRef = useRef<boolean>(false); // Р¤Р»Р°Рі РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ СЂРµРєСѓСЂСЃРёРё РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РёР· РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂР°
-  const isUpdatingFromFileRef = useRef<boolean>(false); // Р¤Р»Р°Рі РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ СЂРµРєСѓСЂСЃРёРё РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РёР· С„Р°Р№Р»Р°
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Таймер для автосохранения
+  const isUpdatingFromConstructorRef = useRef<boolean>(false); // Флаг для предотвращения рекурсии при обновлении из конструктора
+  const isUpdatingFromFileRef = useRef<boolean>(false); // Флаг для предотвращения рекурсии при обновлении из файла
 
-  // РҐСѓРєРё РґР»СЏ React Рё React Native С„Р°Р№Р»РѕРІ (РІСЃРµРіРґР° РІС‹Р·С‹РІР°СЋС‚СЃСЏ)
+  // Хуки для React и React Native файлов (всегда вызываются)
   const [reactHTML, setReactHTML] = useState<string>('');
   const [isProcessingReact, setIsProcessingReact] = useState<boolean>(false);
   const [reactNativeHTML, setReactNativeHTML] = useState<string>('');
   const [isProcessingReactNative, setIsProcessingReactNative] = useState<boolean>(false);
   const [previewOpenError, setPreviewOpenError] = useState<string | null>(null);
-  const [renderVersion, setRenderVersion] = useState<number>(0); // СѓРІРµР»РёС‡РёРІР°РµРј, С‡С‚РѕР±С‹ С„РѕСЂСЃРёСЂРѕРІР°С‚СЊ РїРµСЂРµСЂРёСЃРѕРІРєСѓ WebView
+  const [renderVersion, setRenderVersion] = useState<number>(0); // увеличиваем, чтобы форсировать перерисовку WebView
 
-  // РџСѓС‚Рё Рє Р·Р°РІРёСЃРёРјС‹Рј С„Р°Р№Р»Р°Рј РґР»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ РёР·РјРµРЅРµРЅРёР№
+  // Пути к зависимым файлам для отслеживания изменений
   const [dependencyPaths, setDependencyPaths] = useState<string[]>([]);
 
-  // РҐСѓРєРё РґР»СЏ HTML С„Р°Р№Р»РѕРІ (РІСЃРµРіРґР° РІС‹Р·С‹РІР°СЋС‚СЃСЏ)
+  // Хуки для HTML файлов (всегда вызываются)
   const [processedHTML, setProcessedHTML] = useState<string>('');
   const [htmlDependencyPaths, setHtmlDependencyPaths] = useState<string[]>([]);
   const [isProcessingHTML, setIsProcessingHTML] = useState<boolean>(false);
@@ -181,9 +181,9 @@ function RenderFile({
     setPreviewOpenError(null);
   }, [filePath]);
 
-  // РЎРѕСЃС‚РѕСЏРЅРёРµ СЂРµРґР°РєС‚РѕСЂР° Р±Р»РѕРєРѕРІ
+  // Состояние редактора блоков
   const [blockMap, setBlockMap] = useState<BlockMap>({});
-  // blockMap РґР»СЏ РёСЃС…РѕРґРЅРѕРіРѕ С„Р°Р№Р»Р° (РґР»СЏ Р·Р°РїРёСЃРё РїР°С‚С‡РµР№ РІ РёСЃС…РѕРґРЅС‹Р№ РєРѕРґ, Р±РµР· Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ РѕР±СЂР°Р±РѕС‚Р°РЅРЅРѕРіРѕ РїСЂРµРІСЊСЋ)
+  // blockMap для исходного файла (для записи патчей в исходный код, без зависимости от обработанного превью)
   const [blockMapForFile, setBlockMapForFile] = useState<BlockMap>({});
   const [selectedBlock, setSelectedBlock] = useState<{ id: string; meta?: any } | null>(null); // { id, meta? }
   const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([]);
@@ -225,27 +225,27 @@ function RenderFile({
     setExternalStylesMap,
   });
 
-  // Р”РІРµ РєРѕРїРёРё AST РґР»СЏ bidirectional editing
-  // РњРµРЅРµРґР¶РµСЂ РґР»СЏ bidirectional editing С‡РµСЂРµР· РґРІР° AST
+  // Две копии AST для bidirectional editing
+  // Менеджер для bidirectional editing через два AST
   const astManagerRef = useRef<AstBidirectionalManager | null>(null);
 
-  // Р РµС„С‹ РґР»СЏ Р°РєС‚СѓР°Р»СЊРЅС‹С… Р·РЅР°С‡РµРЅРёР№ staged СЃРѕСЃС‚РѕСЏРЅРёР№ (С‡С‚РѕР±С‹ РёР·Р±РµРіР°С‚СЊ СѓСЃС‚Р°СЂРµРІС€РёС… Р·Р°РјС‹РєР°РЅРёР№)
+  // Рефы для актуальных значений staged состояний (чтобы избегать устаревших замыканий)
   const stagedPatchesRef = useRef<Record<string, StylePatch>>(stagedPatches);
   const stagedOpsRef = useRef<StagedOp[]>(stagedOps);
   const stagedComponentImportsRef = useRef<StagedComponentImport[]>(stagedComponentImports);
   const hasStagedChangesRef = useRef<boolean>(hasStagedChanges);
   const saveFileRef = useRef<((contentToSave?: string | null) => Promise<void>) | null>(null);
 
-  // Р—Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РёСЂРѕРІР°РЅРёСЏ РѕРїРµСЂР°С†РёР№
+  // Защита от дублирования операций
   const lastInsertOperationRef = useRef<InsertHistoryOperation | null>(null);
   const lastDeleteOperationRef = useRef<DeleteOperationDedup | null>(null);
   const lastReparentOperationRef = useRef<any>(null);
 
-  // РҐРµР»РїРµСЂС‹ РґР»СЏ СЃРёРЅС…СЂРѕРЅРЅРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ state + ref РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ
+  // Хелперы для синхронного обновления state + ref одновременно
   const updateStagedPatches = useCallback((updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>) => {
     setStagedPatches((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      stagedPatchesRef.current = next; // РЎРРќРҐР РћРќРќРћ РѕР±РЅРѕРІР»СЏРµРј ref
+      stagedPatchesRef.current = next; // РЎРРќРҐР РћРќРќРћ обновляем ref
       return next;
     });
   }, []);
@@ -253,7 +253,7 @@ function RenderFile({
   const updateStagedOps = useCallback((updater: ((prev: StagedOp[]) => StagedOp[]) | StagedOp[]) => {
     setStagedOps((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      stagedOpsRef.current = next; // РЎРРќРҐР РћРќРќРћ РѕР±РЅРѕРІР»СЏРµРј ref
+      stagedOpsRef.current = next; // РЎРРќРҐР РћРќРќРћ обновляем ref
       return next;
     });
   }, []);
@@ -275,19 +275,19 @@ function RenderFile({
 
   const updateHasStagedChanges = useCallback((value: boolean) => {
     setHasStagedChanges(value);
-    hasStagedChangesRef.current = value; // РЎРРќРҐР РћРќРќРћ РѕР±РЅРѕРІР»СЏРµРј ref
+    hasStagedChangesRef.current = value; // РЎРРќРҐР РћРќРќРћ обновляем ref
   }, []);
 
-  // Ref РґР»СЏ stageReparentBlock (РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ handleEditorMessage РґРѕ РѕРїСЂРµРґРµР»РµРЅРёСЏ С„СѓРЅРєС†РёРё)
+  // Ref для stageReparentBlock (используется в handleEditorMessage до определения функции)
   const stageReparentBlockRef = useRef<((params: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => void) | null>(null);
-  // Ref РґР»СЏ stageInsertBlock (РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ handleEditorMessage РґРѕ РѕРїСЂРµРґРµР»РµРЅРёСЏ С„СѓРЅРєС†РёРё)
+  // Ref для stageInsertBlock (используется в handleEditorMessage до определения функции)
   const stageInsertBlockRef = useRef<((params: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => any) | null>(null);
 
-  // getFileType Рё getMonacoLanguage РёРјРїРѕСЂС‚РёСЂРѕРІР°РЅС‹ РёР· shared/lib/file-type-detector.js
+  // getFileType и getMonacoLanguage импортированы из shared/lib/file-type-detector.js
 
-  // injectBlockEditorScript С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // injectBlockEditorScript теперь импортируется из модуля
 
-  // РљРѕРјР°РЅРґС‹ РґР»СЏ iframe - РѕРїСЂРµРґРµР»СЏРµРј СЂР°РЅРѕ, С‚Р°Рє РєР°Рє РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ undo/redo
+  // Команды для iframe - определяем рано, так как используется в undo/redo
   const sendIframeCommand = useCallback((cmd: any) => {
     setIframeCommand({ ...cmd, ts: Date.now() });
   }, []);
@@ -456,7 +456,7 @@ function RenderFile({
     [projectRoot, filePath]
   );
 
-  // РЎРѕР·РґР°РµРј framework СЌРєР·РµРјРїР»СЏСЂ РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ РєРѕРјРїРѕРЅРµРЅС‚Рµ
+  // Создаем framework экземпляр для использования в компоненте
   const framework = useMemo(() => {
     if (!fileType || !filePath || !isFrameworkSupported(fileType)) {
       return null;
@@ -466,7 +466,7 @@ function RenderFile({
   stageInsertBlockRef.current = stageInsertBlock;
   stageReparentBlockRef.current = stageReparentBlock;
 
-  // РћР±СЂР°Р±РѕС‚РєР° РёР·РјРµРЅРµРЅРёР№ РІ СЂРµРґР°РєС‚РѕСЂРµ СЃ Р°РІС‚РѕСЃРѕС…СЂР°РЅРµРЅРёРµРј
+  // Обработка изменений в редакторе с автосохранением
   useEffect(() => {
     saveFileRef.current = saveFile;
   }, [saveFile]);
@@ -498,7 +498,7 @@ function RenderFile({
     astManagerRef,
   });
 
-  // РџРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј С‚РёРї С„Р°Р№Р»Р° РїРѕСЃР»Рµ Р·Р°РіСЂСѓР·РєРё СЃРѕРґРµСЂР¶РёРјРѕРіРѕ
+  // Переопределяем тип файла после загрузки содержимого
   useEffect(() => {
     if (fileContent && filePath) {
       const refinedType = getFileType(filePath, fileContent);
@@ -507,7 +507,7 @@ function RenderFile({
         setFileType(refinedType);
       }
     }
-  }, [fileContent, filePath]); // fileType РЅРµ РІРєР»СЋС‡Р°РµРј РІ deps, С‡С‚РѕР±С‹ РёР·Р±РµР¶Р°С‚СЊ С†РёРєР»РѕРІ
+  }, [fileContent, filePath]); // fileType не включаем в deps, чтобы избежать циклов
 
   useFileWatchSync({
     filePath,
@@ -593,10 +593,10 @@ function RenderFile({
     setFileContent,
   });
 
-  // РР·РІР»РµРєР°РµРј РІСЃРµ РёРјРїРѕСЂС‚С‹ РёР· РєРѕРґР°
-  // extractImports С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // РР·РІР»РµРєР°РµРј все импорты из кода
+  // extractImports теперь импортируется из модуля
 
-  // findProjectRoot Рё resolvePath С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓСЋС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // findProjectRoot и resolvePath теперь импортируются из модуля
 
   useSplitEditorHtml({
     viewMode,
@@ -611,27 +611,27 @@ function RenderFile({
     setBlockMapForFile,
   });
 
-  // resolvePathSync С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // resolvePathSync теперь импортируется из модуля
 
-  // Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РїРѕРёСЃРєР° РјРѕРґСѓР»СЏ РїРѕ СЂР°Р·Р»РёС‡РЅС‹Рј РїСѓС‚СЏРј
-  // РЎРёРЅС…СЂРѕРЅРЅР°СЏ РІРµСЂСЃРёСЏ, РёСЃРїРѕР»СЊР·СѓРµС‚ СѓР¶Рµ СЂР°Р·СЂРµС€РµРЅРЅС‹Рµ РїСѓС‚Рё РёР· pathMap
+  // Вспомогательная функция для поиска модуля по различным путям
+  // Синхронная версия, использует уже разрешенные пути из pathMap
   const findModulePath = (
     importPath: string,
     basePath: string,
     pathMap: Record<string, string>,
     dependencyModules: Record<string, string>
   ) => {
-    // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РїРѕ РѕСЂРёРіРёРЅР°Р»СЊРЅРѕРјСѓ РїСѓС‚Рё (РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё, РєРѕС‚РѕСЂС‹Рµ СѓР¶Рµ СЂР°Р·СЂРµС€РµРЅС‹)
+    // Пробуем найти по оригинальному пути (включая @ пути, которые уже разрешены)
     if (pathMap[importPath]) {
       return pathMap[importPath];
     }
 
-    // РС‰РµРј РІ dependencyModules
+    // РС‰РµРј в dependencyModules
     if (dependencyModules[importPath]) {
       return dependencyModules[importPath];
     }
 
-    // Р Р°Р·СЂРµС€Р°РµРј РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ СЃРёРЅС…СЂРѕРЅРЅРѕ (РґР»СЏ РїСѓС‚РµР№ Р±РµР· @)
+    // Разрешаем относительный путь синхронно (для путей без @)
     if (!importPath.startsWith('@/') && !importPath.startsWith('http')) {
       const resolvedPath = resolvePathSync(basePath, importPath);
 
@@ -643,7 +643,7 @@ function RenderFile({
         pathMapKeys: Object.keys(pathMap).filter(k => k.includes(importPath) || k.includes(resolvedPath.split('/').pop() || '')).slice(0, 5)
       });
 
-      // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё
+      // Пробуем найти по разрешенному пути
       if (pathMap[resolvedPath]) {
         return pathMap[resolvedPath];
       }
@@ -652,28 +652,28 @@ function RenderFile({
         return dependencyModules[resolvedPath];
       }
 
-      // РР·РІР»РµРєР°РµРј РёРјСЏ С„Р°Р№Р»Р° РёР· СЂР°Р·СЂРµС€РµРЅРЅРѕРіРѕ РїСѓС‚Рё РґР»СЏ Р±РѕР»РµРµ РіРёР±РєРѕРіРѕ РїРѕРёСЃРєР°
+      // РР·РІР»РµРєР°РµРј имя файла из разрешенного пути для более гибкого поиска
       const fileName = resolvedPath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       const pathWithoutExt = resolvedPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
-      const lastPart = resolvedPath.split('/').slice(-2).join('/'); // РџРѕСЃР»РµРґРЅРёРµ 2 С‡Р°СЃС‚Рё РїСѓС‚Рё
+      const lastPart = resolvedPath.split('/').slice(-2).join('/'); // Последние 2 части пути
 
-      // РўР°РєР¶Рµ РїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё РІ РєР»СЋС‡Р°С…
-      // РќРѕСЂРјР°Р»РёР·СѓРµРј РїСѓС‚Рё РґР»СЏ СЃСЂР°РІРЅРµРЅРёСЏ (СѓР±РёСЂР°РµРј РЅР°С‡Р°Р»СЊРЅС‹Рµ/РєРѕРЅРµС‡РЅС‹Рµ СЃР»РµС€Рё)
+      // Также пробуем найти по разрешенному пути в ключах
+      // Нормализуем пути для сравнения (убираем начальные/конечные слеши)
       const normalizedResolved = resolvedPath.replace(/^\/+|\/+$/g, '');
       const normalizedPathWithoutExt = pathWithoutExt.replace(/^\/+|\/+$/g, '');
       const normalizedLastPart = lastPart.replace(/^\/+|\/+$/g, '');
 
-      // РС‰РµРј РїРѕ РІСЃРµРј Р·РЅР°С‡РµРЅРёСЏРј РІ pathMap (Р°Р±СЃРѕР»СЋС‚РЅС‹Рј РїСѓС‚СЏРј)
+      // РС‰РµРј по всем значениям в pathMap (абсолютным путям)
       for (const [key, value] of Object.entries(pathMap)) {
         const normalizedKey = key.replace(/^\/+|\/+$/g, '');
         const normalizedValue = String(value).replace(/^\/+|\/+$/g, '');
 
-        // РўРѕС‡РЅРѕРµ СЃРѕРІРїР°РґРµРЅРёРµ
+        // Точное совпадение
         if (normalizedKey === normalizedResolved || normalizedKey === normalizedPathWithoutExt) {
           return value;
         }
 
-        // РџСЂРѕРІРµСЂСЏРµРј, Р·Р°РєР°РЅС‡РёРІР°РµС‚СЃСЏ Р»Рё РєР»СЋС‡ РёР»Рё Р·РЅР°С‡РµРЅРёРµ РЅР° СЂР°Р·СЂРµС€РµРЅРЅС‹Р№ РїСѓС‚СЊ
+        // Проверяем, заканчивается ли ключ или значение на разрешенный путь
         if (normalizedKey.endsWith('/' + normalizedResolved) ||
             normalizedResolved.endsWith('/' + normalizedKey) ||
             normalizedKey.endsWith('/' + normalizedPathWithoutExt) ||
@@ -683,7 +683,7 @@ function RenderFile({
           return value;
         }
 
-        // РџСЂРѕРІРµСЂСЏРµРј Р·РЅР°С‡РµРЅРёРµ (Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ)
+        // Проверяем значение (абсолютный путь)
         if (normalizedValue.endsWith('/' + normalizedResolved) ||
             normalizedResolved.endsWith('/' + normalizedValue) ||
             normalizedValue.endsWith('/' + normalizedPathWithoutExt) ||
@@ -694,13 +694,13 @@ function RenderFile({
           return value;
         }
 
-        // РџСЂРѕРІРµСЂСЏРµРј РїРѕ РёРјРµРЅРё С„Р°Р№Р»Р°
+        // Проверяем по имени файла
         if (normalizedKey.includes('/' + fileName) || normalizedValue.includes('/' + fileName + '.')) {
           return value;
         }
       }
 
-      // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РІ dependencyModules РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё
+      // Пробуем найти в dependencyModules по разрешенному пути
       for (const [key, value] of Object.entries(dependencyModules)) {
         const normalizedKey = String(key).replace(/^\/+|\/+$/g, '');
         if (normalizedKey === normalizedResolved ||
@@ -715,7 +715,7 @@ function RenderFile({
         }
       }
 
-      // РџРѕСЃР»РµРґРЅСЏСЏ РїРѕРїС‹С‚РєР°: РёС‰РµРј РїРѕ РІСЃРµРј Р·РЅР°С‡РµРЅРёСЏРј РІ pathMap, РєРѕС‚РѕСЂС‹Рµ Р·Р°РєР°РЅС‡РёРІР°СЋС‚СЃСЏ РЅР° РёРјСЏ С„Р°Р№Р»Р°
+      // Последняя попытка: ищем по всем значениям в pathMap, которые заканчиваются на имя файла
       for (const [key, value] of Object.entries(pathMap)) {
         const valueStr = String(value);
         if (valueStr.includes(fileName + '.js') || valueStr.includes(fileName + '.jsx') ||
@@ -723,7 +723,7 @@ function RenderFile({
             valueStr.endsWith('/' + fileName) || valueStr.endsWith('/' + fileName + '.js') ||
             valueStr.endsWith('/' + fileName + '.jsx') || valueStr.endsWith('/' + fileName + '.ts') ||
             valueStr.endsWith('/' + fileName + '.tsx')) {
-          // РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ СЌС‚Рѕ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ РЅСѓР¶РЅС‹Р№ С„Р°Р№Р» РїРѕ РїРѕСЃР»РµРґРЅРёРј С‡Р°СЃС‚СЏРј РїСѓС‚Рё
+          // Проверяем, что это действительно нужный файл по последним частям пути
           const valueParts = valueStr.split('/');
           const resolvedParts = resolvedPath.split('/');
           if (valueParts.length >= 2 && resolvedParts.length >= 2) {
@@ -737,7 +737,7 @@ function RenderFile({
         }
       }
 
-      // Р•С‰Рµ РѕРґРЅР° РїРѕРїС‹С‚РєР°: РёС‰РµРј РїРѕ РІСЃРµРј РєР»СЋС‡Р°Рј, РєРѕС‚РѕСЂС‹Рµ СЃРѕРґРµСЂР¶Р°С‚ РїРѕСЃР»РµРґРЅРёРµ С‡Р°СЃС‚Рё РїСѓС‚Рё
+      // Еще одна попытка: ищем по всем ключам, которые содержат последние части пути
       const resolvedParts = resolvedPath.split('/');
       if (resolvedParts.length >= 2) {
         const targetLast2 = resolvedParts.slice(-2).join('/');
@@ -747,12 +747,12 @@ function RenderFile({
           const keyStr = String(key);
           const valueStr = String(value);
 
-          // РџСЂРѕРІРµСЂСЏРµРј, СЃРѕРґРµСЂР¶РёС‚ Р»Рё РєР»СЋС‡ РёР»Рё Р·РЅР°С‡РµРЅРёРµ РїРѕСЃР»РµРґРЅРёРµ С‡Р°СЃС‚Рё РїСѓС‚Рё
+          // Проверяем, содержит ли ключ или значение последние части пути
           if (keyStr.includes(targetLast2) || keyStr.includes(targetLast2NoExt) ||
               valueStr.includes(targetLast2) || valueStr.includes(targetLast2NoExt) ||
               keyStr.endsWith(targetLast2) || keyStr.endsWith(targetLast2NoExt) ||
               valueStr.endsWith(targetLast2) || valueStr.endsWith(targetLast2NoExt)) {
-            // РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ СЌС‚Рѕ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ РЅСѓР¶РЅС‹Р№ С„Р°Р№Р»
+            // Проверяем, что это действительно нужный файл
             const valueParts = valueStr.split('/');
             if (valueParts.length >= 2) {
               const valueLast2 = valueParts.slice(-2).join('/');
@@ -767,15 +767,15 @@ function RenderFile({
       }
     }
 
-    // Р•СЃР»Рё РїСѓС‚СЊ СЃ @, РїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РµРіРѕ СЂР°Р·СЂРµС€РµРЅРЅСѓСЋ РІРµСЂСЃРёСЋ
+    // Если путь с @, пробуем найти его разрешенную версию
     if (importPath.startsWith('@/')) {
-      // РС‰РµРј РІСЃРµ РєР»СЋС‡Рё, РєРѕС‚РѕСЂС‹Рµ РјРѕРіСѓС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІРѕРІР°С‚СЊ СЌС‚РѕРјСѓ @ РїСѓС‚Рё
+      // РС‰РµРј все ключи, которые могут соответствовать этому @ пути
       for (const [key, value] of Object.entries(pathMap)) {
         if (key.includes(importPath.substring(2)) || value.includes(importPath.substring(2))) {
           return value;
         }
       }
-      // РўР°РєР¶Рµ РёС‰РµРј РІ dependencyModules
+      // Также ищем в dependencyModules
       for (const [key, value] of Object.entries(dependencyModules)) {
         if (key.includes(importPath.substring(2)) || value.includes(importPath.substring(2))) {
           return value;
@@ -789,11 +789,11 @@ function RenderFile({
       resolvedPath: !importPath.startsWith('@/') && !importPath.startsWith('http') ? resolvePathSync(basePath, importPath) : 'N/A'
     });
 
-    // Р’РѕР·РІСЂР°С‰Р°РµРј РѕСЂРёРіРёРЅР°Р»СЊРЅС‹Р№ РїСѓС‚СЊ РєР°Рє fallback
+    // Возвращаем оригинальный путь как fallback
     return importPath;
   };
 
-  // Р РµРєСѓСЂСЃРёРІРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ Р·Р°РіСЂСѓР·РєРё РІСЃРµС… Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+  // Рекурсивная функция для загрузки всех зависимостей
   const isCoreReactImport = (importPath: string) => /^(react|react-dom|react-native)(\/|$)/.test(String(importPath || '').trim());
   const isHttpImport = (importPath: string) => /^https?:\/\//i.test(String(importPath || '').trim());
   const isProjectAliasImport = (importPath: string) => String(importPath || '').trim().startsWith('@/');
@@ -829,7 +829,7 @@ function RenderFile({
       alreadyLoaded: loadedDeps.has(importPath)
     });
 
-    // Р Р°Р·СЂРµС€Р°РµРј РїСѓС‚СЊ (С‚РµРїРµСЂСЊ Р°СЃРёРЅС…СЂРѕРЅРЅРѕ РґР»СЏ РїРѕРґРґРµСЂР¶РєРё @ РїСѓС‚РµР№)
+    // Разрешаем путь (теперь асинхронно для поддержки @ путей)
     const resolvedPath = await resolvePathMemo(basePath, importPath);
 
     console.log(`[LoadAllDependencies] Resolved path:`, {
@@ -838,16 +838,16 @@ function RenderFile({
       resolvedPath
     });
 
-    // РСЃРїРѕР»СЊР·СѓРµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РєР°Рє РєР»СЋС‡ РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ РґСѓР±Р»РёСЂРѕРІР°РЅРёСЏ
+    // РСЃРїРѕР»СЊР·СѓРµРј абсолютный путь как ключ для предотвращения дублирования
     if (loadedDeps.has(resolvedPath)) {
-      // Р•СЃР»Рё С„Р°Р№Р» СѓР¶Рµ Р·Р°РіСЂСѓР¶РµРЅ, РґРѕР±Р°РІР»СЏРµРј С‚РѕР»СЊРєРѕ РјР°РїРїРёРЅРі РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРіРѕ РїСѓС‚Рё
+      // Если файл уже загружен, добавляем только маппинг относительного пути
       console.log(`[LoadAllDependencies] Dependency already loaded: ${importPath} (resolved: ${resolvedPath}) from ${baseFileName}`);
       pathMap[importPath] = resolvedPath;
       return { pathMap, actualPathMap };
     }
     loadedDeps.add(resolvedPath);
 
-    // Р—Р°РіСЂСѓР¶Р°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё
+    // Загружаем зависимость по разрешенному пути
     const depResult = await loadDependency(basePath, importPath);
     if (!depResult.success) {
       console.warn(`[LoadAllDependencies] Failed to load dependency from ${baseFileName}:`, {
@@ -870,37 +870,37 @@ function RenderFile({
     const depPath = String(depResult.path ?? resolvedPath);
     const depContent = String(depResult.content ?? '');
 
-    // РЎРѕС…СЂР°РЅСЏРµРј С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р° РґР»СЏ СЂР°Р·СЂРµС€РµРЅРЅРѕРіРѕ РїСѓС‚Рё
+    // Сохраняем фактический путь файла для разрешенного пути
     actualPathMap[resolvedPath] = depPath;
     actualPathMap[depPath] = depPath;
 
-    // РЎРѕС…СЂР°РЅСЏРµРј РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё РєР°Рє РѕСЃРЅРѕРІРЅРѕРјСѓ РєР»СЋС‡Сѓ
+    // Сохраняем по абсолютному пути как основному ключу
     dependencyMap[resolvedPath] = depContent;
     dependencyPaths.push(depPath);
 
-    // РЎРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі: РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ -> Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ
+    // Сохраняем маппинг: относительный путь -> абсолютный путь
     pathMap[importPath] = resolvedPath;
-    // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі СЂР°Р·СЂРµС€РµРЅРЅРѕРіРѕ РїСѓС‚Рё (РµСЃР»Рё РѕРЅ РѕС‚Р»РёС‡Р°РµС‚СЃСЏ РѕС‚ С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°)
+    // Также сохраняем маппинг разрешенного пути (если он отличается от фактического пути файла)
     if (resolvedPath !== depPath) {
       pathMap[resolvedPath] = depPath;
     }
-    // РЎРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р° Рє СЃР°РјРѕРјСѓ СЃРµР±Рµ
+    // Сохраняем маппинг фактического пути файла к самому себе
     pathMap[depPath] = depPath;
 
-    // Р”Р»СЏ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№ С‚Р°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј СЂР°Р·СЂРµС€РµРЅРЅС‹Р№ РїСѓС‚СЊ РєР°Рє РєР»СЋС‡
-    // Р­С‚Рѕ РїРѕРјРѕР¶РµС‚ РЅР°Р№С‚Рё РјРѕРґСѓР»СЊ, РєРѕРіРґР° РјС‹ СЂР°Р·СЂРµС€Р°РµРј РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ РІ findModulePath
+    // Для относительных путей также сохраняем разрешенный путь как ключ
+    // Это поможет найти модуль, когда мы разрешаем относительный путь в findModulePath
     if (importPath.startsWith('./') || importPath.startsWith('../')) {
-      // Р Р°Р·СЂРµС€Р°РµРј РїСѓС‚СЊ СЃРёРЅС…СЂРѕРЅРЅРѕ РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ РјР°РїРїРёРЅРіР°
+      // Разрешаем путь синхронно для сохранения маппинга
       const syncResolved = resolvePathSync(basePath, importPath);
       if (syncResolved !== resolvedPath && syncResolved !== depPath && !pathMap[syncResolved]) {
         pathMap[syncResolved] = depPath;
       }
-      // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РїСѓС‚СЊ Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ
+      // Также сохраняем путь без расширения
       const syncResolvedNoExt = syncResolved.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       if (syncResolvedNoExt !== syncResolved && syncResolvedNoExt !== depPath && !pathMap[syncResolvedNoExt]) {
         pathMap[syncResolvedNoExt] = depPath;
       }
-      // РЎРѕС…СЂР°РЅСЏРµРј РїРѕСЃР»РµРґРЅРёРµ 2 С‡Р°СЃС‚Рё РїСѓС‚Рё (РЅР°РїСЂРёРјРµСЂ, styles/commonStyles)
+      // Сохраняем последние 2 части пути (например, styles/commonStyles)
       const pathParts = syncResolved.split('/');
       if (pathParts.length >= 2) {
         const last2Parts = pathParts.slice(-2).join('/');
@@ -914,13 +914,13 @@ function RenderFile({
       }
     }
 
-    // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РїСѓС‚СЊ Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ РґР»СЏ С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°
+    // Также сохраняем путь без расширения для фактического пути файла
     const depPathNoExt = depPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
     if (depPathNoExt !== depPath && !pathMap[depPathNoExt]) {
       pathMap[depPathNoExt] = depPath;
     }
 
-    // РЎРѕС…СЂР°РЅСЏРµРј РїРѕСЃР»РµРґРЅРёРµ 2 С‡Р°СЃС‚Рё С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°
+    // Сохраняем последние 2 части фактического пути файла
     const depPathParts = depPath.split('/');
     if (depPathParts.length >= 2) {
       const depLast2Parts = depPathParts.slice(-2).join('/');
@@ -940,7 +940,7 @@ function RenderFile({
       savedKeys: Object.keys(pathMap).filter(k => pathMap[k] === depPath).slice(0, 10)
     });
 
-    // РР·РІР»РµРєР°РµРј РёРјРїРѕСЂС‚С‹ РёР· Р·Р°РіСЂСѓР¶РµРЅРЅРѕР№ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
+    // РР·РІР»РµРєР°РµРј импорты из загруженной зависимости
     const depFileName = depPath.split('/').pop() || depPath.split('\\').pop() || 'unknown';
     const depImports = extractImports(depContent, depFileName);
 
@@ -950,11 +950,11 @@ function RenderFile({
       imports: depImports.map(i => ({ path: i.path, line: i.line }))
     });
 
-    // Р РµРєСѓСЂСЃРёРІРЅРѕ Р·Р°РіСЂСѓР¶Р°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
-    const depBasePath = depPath; // РСЃРїРѕР»СЊР·СѓРµРј С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р° РєР°Рє Р±Р°Р·РѕРІС‹Р№
+    // Рекурсивно загружаем зависимости зависимостей
+    const depBasePath = depPath; // РСЃРїРѕР»СЊР·СѓРµРј фактический путь файла как базовый
     for (const depImp of depImports) {
-      // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
-      // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
+      // Пропускаем только внешние библиотеки (npm пакеты)
+      // Теперь обрабатываем локальные импорты, включая @ пути
       if (isCoreReactImport(depImp.path) ||
           isHttpImport(depImp.path) ||
           isBarePackageImport(depImp.path)) {
@@ -969,7 +969,7 @@ function RenderFile({
         basePath: depBasePath
       });
 
-      // Р РµРєСѓСЂСЃРёРІРЅРѕ Р·Р°РіСЂСѓР¶Р°РµРј СЃ РїСЂР°РІРёР»СЊРЅС‹Рј Р±Р°Р·РѕРІС‹Рј РїСѓС‚РµРј (С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р°)
+      // Рекурсивно загружаем с правильным базовым путем (фактический путь файла)
       const result = await loadAllDependencies(depImp.path, depBasePath, loadedDeps, dependencyMap, dependencyPaths, pathMap, actualPathMap);
       if (result) {
         Object.assign(pathMap, result.pathMap);
@@ -983,9 +983,9 @@ function RenderFile({
     return { pathMap, actualPathMap };
   };
 
-  // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РєРѕРґ React С„Р°Р№Р»Р° СЃ РїРѕРґРґРµСЂР¶РєРѕР№ Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+  // Обрабатываем код React файла с поддержкой зависимостей
   const processReactCode = async (code, basePath) => {
-    // РР·РІР»РµРєР°РµРј РёРјРїРѕСЂС‚С‹
+    // РР·РІР»РµРєР°РµРј импорты
     const fileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
     const imports = extractImports(code, fileName);
     console.log(`[ProcessReactCode] Processing file: ${fileName}`, {
@@ -997,18 +997,18 @@ function RenderFile({
 
     const dependencies: Record<string, string> = {};
     const dependencyModules: Record<string, string> = {};
-    const dependencyPaths: string[] = []; // РњР°СЃСЃРёРІ РїСѓС‚РµР№ Рє Р·Р°РІРёСЃРёРјС‹Рј С„Р°Р№Р»Р°Рј
-    const loadedDeps = new Set<string>(); // Р”Р»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ С†РёРєР»РёС‡РµСЃРєРёС… Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
-    const pathMap: Record<string, string> = {}; // РњР°РїРїРёРЅРі: РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ -> Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ
-    const actualPathMap: Record<string, string> = {}; // РњР°РїРїРёРЅРі: СЂР°Р·СЂРµС€РµРЅРЅС‹Р№ РїСѓС‚СЊ -> С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р°
+    const dependencyPaths: string[] = []; // Массив путей к зависимым файлам
+    const loadedDeps = new Set<string>(); // Для предотвращения циклических зависимостей
+    const pathMap: Record<string, string> = {}; // Маппинг: относительный путь -> абсолютный путь
+    const actualPathMap: Record<string, string> = {}; // Маппинг: разрешенный путь -> фактический путь файла
     const directCssBlocks: string[] = [];
     const directCssSeenPaths = new Set<string>();
     const externalPackageImports = new Set<string>();
 
-    // Р—Р°РіСЂСѓР¶Р°РµРј РІСЃРµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё СЂРµРєСѓСЂСЃРёРІРЅРѕ
+    // Загружаем все зависимости рекурсивно
     for (const imp of imports) {
-      // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
-      // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
+      // Пропускаем только внешние библиотеки (npm пакеты)
+      // Теперь обрабатываем локальные импорты, включая @ пути
       if (isCoreReactImport(imp.path) || isHttpImport(imp.path)) {
         console.log(`[ProcessReactCode] Skipping external library: ${imp.path} from ${fileName}`);
         continue;
@@ -1028,7 +1028,7 @@ function RenderFile({
       });
 
       const result = await loadAllDependencies(imp.path, basePath, loadedDeps, dependencies, dependencyPaths, pathMap, actualPathMap);
-      // РћР±СЉРµРґРёРЅСЏРµРј СЂРµР·СѓР»СЊС‚Р°С‚С‹
+      // Объединяем результаты
       if (result) {
         Object.assign(pathMap, result.pathMap);
         Object.assign(actualPathMap, result.actualPathMap);
@@ -1049,19 +1049,19 @@ function RenderFile({
       }
     }
 
-    // РСЃРїРѕР»СЊР·СѓРµРј pathMap РґР»СЏ Р·Р°РїРѕР»РЅРµРЅРёСЏ dependencyModules
-    // РћСЃРЅРѕРІРЅРѕР№ РєР»СЋС‡ - Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ, РЅРѕ С‚Р°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№
+    // РСЃРїРѕР»СЊР·СѓРµРј pathMap для заполнения dependencyModules
+    // Основной ключ - абсолютный путь, но также сохраняем маппинг относительных путей
     for (const [relativePath, absolutePath] of Object.entries(pathMap)) {
-      // РЎРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРіРѕ РїСѓС‚Рё Рє Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ
+      // Сохраняем маппинг относительного пути к абсолютному
       dependencyModules[relativePath] = absolutePath;
-      // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РєР°Рє РєР»СЋС‡ (РµСЃР»Рё РѕРЅ РµС‰Рµ РЅРµ СЃРѕС…СЂР°РЅРµРЅ)
+      // Также сохраняем абсолютный путь как ключ (если он еще не сохранен)
       if (!dependencyModules[absolutePath]) {
         dependencyModules[absolutePath] = absolutePath;
       }
     }
 
-    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РєРѕРґ - СѓРґР°Р»СЏРµРј РёРјРїРѕСЂС‚С‹ React, РЅРѕ СЃРѕС…СЂР°РЅСЏРµРј Р»РѕРєР°Р»СЊРЅС‹Рµ
-    // РЎРЅР°С‡Р°Р»Р° СЃРѕС…СЂР°РЅСЏРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ default export РїРµСЂРµРґ СѓРґР°Р»РµРЅРёРµРј
+    // Обрабатываем код - удаляем импорты React, но сохраняем локальные
+    // Сначала сохраняем информацию о default export перед удалением
     let defaultExportInfo: { name: string; type: string } | null = null;
     const defaultExportMatch = code.match(/export\s+default\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
     if (defaultExportMatch) {
@@ -1072,11 +1072,11 @@ function RenderFile({
     }
 
     let processedCode = code
-      // РЈРґР°Р»СЏРµРј import React from 'react'
+      // Удаляем import React from 'react'
       .replace(/import\s+React\s+from\s+['"]react['"];?\s*/gi, '')
-      // РЈРґР°Р»СЏРµРј import { ... } from 'react'
+      // Удаляем import { ... } from 'react'
       .replace(/import\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '')
-      // РЈРґР°Р»СЏРµРј export default, РѕСЃС‚Р°РІР»СЏРµРј С‚РѕР»СЊРєРѕ РѕРїСЂРµРґРµР»РµРЅРёРµ
+      // Удаляем export default, оставляем только определение
       .replace(/export\s+default\s+/g, '')
       .trim();
 
@@ -1086,13 +1086,13 @@ function RenderFile({
       processedCode = `${IMPORTED_COMPONENT_BOUNDARY_HELPER}\n${processedCode}`;
     }
 
-    // РЎРѕР·РґР°РµРј РєРѕРґ РґР»СЏ РјРѕРґСѓР»РµР№ Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+    // Создаем код для модулей зависимостей
     let modulesCode = '';
     let collectedCss = '';
     let importReplacements = {};
 
-    // РЇРІРЅРѕ РґРѕР±Р°РІР»СЏРµРј CSS, РёРјРїРѕСЂС‚РёСЂРѕРІР°РЅРЅС‹Р№ РЅР°РїСЂСЏРјСѓСЋ РІ С‚РµРєСѓС‰РµРј С„Р°Р№Р»Рµ (side-effect imports),
-    // С‡С‚РѕР±С‹ СЃС‚РёР»Рё РіР°СЂР°РЅС‚РёСЂРѕРІР°РЅРЅРѕ РїРѕРїР°РґР°Р»Рё РІ preview.
+    // Явно добавляем CSS, импортированный напрямую в текущем файле (side-effect imports),
+    // чтобы стили гарантированно попадали в preview.
     if (directCssBlocks.length > 0) {
       collectedCss += directCssBlocks.join('');
     }
@@ -1149,14 +1149,14 @@ function RenderFile({
       return alias ? `const ${alias} = {};` : '';
     };
 
-    // РЎРѕР±РёСЂР°РµРј СѓРЅРёРєР°Р»СЊРЅС‹Рµ Р°Р±СЃРѕР»СЋС‚РЅС‹Рµ РїСѓС‚Рё РёР· pathMap
+    // Собираем уникальные абсолютные пути из pathMap
     const uniqueAbsolutePaths = new Set(Object.values(pathMap));
-    const processedDeps = new Set(); // Р”Р»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ СѓР¶Рµ РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… Р°Р±СЃРѕР»СЋС‚РЅС‹С… РїСѓС‚РµР№
+    const processedDeps = new Set(); // Для отслеживания уже обработанных абсолютных путей
 
-    // РЎРѕР±РёСЂР°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Р·Р°РІРёСЃРёРјРѕСЃС‚СЏС… РєР°Р¶РґРѕРіРѕ РјРѕРґСѓР»СЏ РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё
+    // Собираем информацию о зависимостях каждого модуля для сортировки
     const moduleDependencies = new Map(); // absolutePath -> Set of absolute paths of dependencies
 
-    // РЎРЅР°С‡Р°Р»Р° СЃРѕР±РёСЂР°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РґР»СЏ РєР°Р¶РґРѕРіРѕ РјРѕРґСѓР»СЏ
+    // Сначала собираем зависимости для каждого модуля
     for (const absolutePath of uniqueAbsolutePaths) {
       if (processedDeps.has(absolutePath)) {
         continue;
@@ -1173,12 +1173,12 @@ function RenderFile({
 
       if (!content) continue;
 
-      // РР·РІР»РµРєР°РµРј РёРјРїРѕСЂС‚С‹ РёР· РјРѕРґСѓР»СЏ
+      // РР·РІР»РµРєР°РµРј импорты из модуля
       const depImports = extractImports(content, absolutePath);
       const depSet = new Set();
 
       for (const imp of depImports) {
-        // РџСЂРѕРїСѓСЃРєР°РµРј РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё
+        // Пропускаем внешние библиотеки
         if (isBarePackageImport(imp.path)) {
           externalPackageImports.add(imp.path);
           continue;
@@ -1187,7 +1187,7 @@ function RenderFile({
           continue;
         }
 
-        // РќР°С…РѕРґРёРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
+        // Находим абсолютный путь зависимости
         const depResolvedPath = pathMap[imp.path] || dependencyModules[imp.path];
         if (
           depResolvedPath &&
@@ -1201,14 +1201,14 @@ function RenderFile({
       moduleDependencies.set(absolutePath, depSet);
     }
 
-    // РўРѕРїРѕР»РѕРіРёС‡РµСЃРєР°СЏ СЃРѕСЂС‚РёСЂРѕРІРєР° РјРѕРґСѓР»РµР№ РїРѕ Р·Р°РІРёСЃРёРјРѕСЃС‚СЏРј
+    // Топологическая сортировка модулей по зависимостям
     const sortedModules: string[] = [];
     const visited: Set<string> = new Set();
     const visiting: Set<string> = new Set();
 
     const visit = (modulePath) => {
       if (visiting.has(modulePath)) {
-        // Р¦РёРєР»РёС‡РµСЃРєР°СЏ Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ - РїСЂРѕРїСѓСЃРєР°РµРј
+        // Циклическая зависимость - пропускаем
         return;
       }
       if (visited.has(modulePath)) {
@@ -1227,7 +1227,7 @@ function RenderFile({
       sortedModules.push(modulePath);
     };
 
-    // Р—Р°РїСѓСЃРєР°РµРј С‚РѕРїРѕР»РѕРіРёС‡РµСЃРєСѓСЋ СЃРѕСЂС‚РёСЂРѕРІРєСѓ
+    // Запускаем топологическую сортировку
     for (const absolutePath of uniqueAbsolutePaths) {
       if (!visited.has(absolutePath)) {
         visit(absolutePath);
@@ -1236,17 +1236,17 @@ function RenderFile({
 
     console.log('RenderFile: Sorted modules by dependencies:', sortedModules.map(p => p.split('/').pop()));
 
-    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РєР°Р¶РґСѓСЋ Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ РІ РѕС‚СЃРѕСЂС‚РёСЂРѕРІР°РЅРЅРѕРј РїРѕСЂСЏРґРєРµ
-    processedDeps.clear(); // РЎР±СЂР°СЃС‹РІР°РµРј РґР»СЏ РїРѕРІС‚РѕСЂРЅРѕРіРѕ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ
+    // Обрабатываем каждую зависимость в отсортированном порядке
+    processedDeps.clear(); // Сбрасываем для повторного использования
     for (const absolutePath of sortedModules) {
       if (processedDeps.has(absolutePath)) {
         continue;
       }
       processedDeps.add(absolutePath);
 
-      // РџРѕР»СѓС‡Р°РµРј РєРѕРЅС‚РµРЅС‚ РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё
+      // Получаем контент по абсолютному пути
       let content = dependencies[absolutePath];
-      // Р•СЃР»Рё РЅРµ РЅР°Р№РґРµРЅРѕ РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё, РёС‰РµРј РїРѕ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРјСѓ РёР· pathMap
+      // Если не найдено по абсолютному пути, ищем по относительному из pathMap
       if (!content) {
         for (const [relPath, absPath] of Object.entries(pathMap)) {
           if (absPath === absolutePath) {
@@ -1260,22 +1260,22 @@ function RenderFile({
         continue;
       }
 
-      // РСЃРїРѕР»СЊР·СѓРµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РєР°Рє РѕСЃРЅРѕРІРЅРѕР№ РєР»СЋС‡ РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё
+      // РСЃРїРѕР»СЊР·СѓРµРј абсолютный путь как основной ключ для обработки
       if (isCssModulePath(absolutePath)) {
         collectedCss += `\n/* ${absolutePath} */\n${content}\n`;
         continue;
       }
 
       const importPath = absolutePath;
-      // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ
-      // РЎРЅР°С‡Р°Р»Р° РёР·РІР»РµРєР°РµРј РІСЃРµ СЌРєСЃРїРѕСЂС‚С‹
+      // Обрабатываем зависимость
+      // Сначала извлекаем все экспорты
       let moduleExports: Record<string, unknown> = {};
       let hasDefaultExport = false;
       let defaultExportName: string | null = null;
       const namedExports: string[] = [];
 
-      // РџРѕР»СѓС‡Р°РµРј С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р° РґР»СЏ С‚РµРєСѓС‰РµР№ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё (РґР»СЏ СЂР°Р·СЂРµС€РµРЅРёСЏ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№)
-      // РСЃРїРѕР»СЊР·СѓРµРј actualPathMap РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°
+      // Получаем фактический путь файла для текущей зависимости (для разрешения относительных путей)
+      // РСЃРїРѕР»СЊР·СѓРµРј actualPathMap для получения фактического пути файла
       const currentDepResolvedPath = dependencyModules[importPath] || importPath;
       const currentDepActualPath = actualPathMap[currentDepResolvedPath] || currentDepResolvedPath;
       const currentDepBasePath = currentDepActualPath.substring(0, currentDepActualPath.lastIndexOf('/'));
@@ -1360,16 +1360,16 @@ function RenderFile({
         continue;
       }
 
-      // РћС‚Р»Р°РґРѕС‡РЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ
+      // Отладочная информация
       console.log('RenderFile: Processing dependency:', {
         importPath,
         currentDepResolvedPath,
         currentDepActualPath,
         currentDepBasePath,
-        pathMapKeys: Object.keys(pathMap).slice(0, 10) // РџРµСЂРІС‹Рµ 10 РєР»СЋС‡РµР№ РґР»СЏ РѕС‚Р»Р°РґРєРё
+        pathMapKeys: Object.keys(pathMap).slice(0, 10) // Первые 10 ключей для отладки
       });
 
-      // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј СЌРєСЃРїРѕСЂС‚С‹
+      // Обрабатываем экспорты
       const instrumentedDependency = instrumentJsx(String(content ?? ''), currentDepActualPath);
       let processedDep: string = String(instrumentedDependency.code ?? '');
 
@@ -1377,8 +1377,8 @@ function RenderFile({
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:605',message:'Processing dependency before removing imports',data:{importPath,contentLength:processedDep.length,hasImports:processedDep.includes('import'),hasExports:processedDep.includes('export')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
 
-      // РЎРќРђР§РђР›Рђ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј СЌРєСЃРїРѕСЂС‚С‹, РџРћРўРћРњ СѓРґР°Р»СЏРµРј РёРјРїРѕСЂС‚С‹
-      // Named exports: export const/let/var (РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р”Рћ СѓРґР°Р»РµРЅРёСЏ РёРјРїРѕСЂС‚РѕРІ)
+      // СНАЧАЛА обрабатываем экспорты, ПОТОМ удаляем импорты
+      // Named exports: export const/let/var (обрабатываем ДО удаления импортов)
       const namedConstExports: string[] = [];
       processedDep = processedDep.replace(/export\s+(const|let|var)\s+(\w+)\s*=/g, (match: string, keyword: string, name: string) => {
         // #region agent log
@@ -1391,7 +1391,7 @@ function RenderFile({
         return `${keyword} ${name} =`;
       });
 
-      // Named exports: export function (РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р”Рћ СѓРґР°Р»РµРЅРёСЏ РёРјРїРѕСЂС‚РѕРІ)
+      // Named exports: export function (обрабатываем ДО удаления импортов)
       const namedFunctionExports: string[] = [];
       processedDep = processedDep.replace(/export\s+function\s+(\w+)/g, (match: string, name: string) => {
         namedFunctionExports.push(name);
@@ -1401,39 +1401,39 @@ function RenderFile({
         return `function ${name}`;
       });
 
-      // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РёРјРїРѕСЂС‚С‹ РёР· Р·Р°РІРёСЃРёРјРѕРіРѕ С„Р°Р№Р»Р° РїРµСЂРµРґ РІСЃС‚СЂР°РёРІР°РЅРёРµРј
-      // РРјРїРѕСЂС‚С‹ React Рё React Native Р±СѓРґСѓС‚ РґРѕСЃС‚СѓРїРЅС‹ РіР»РѕР±Р°Р»СЊРЅРѕ
-      // Р”Р»СЏ Р»РѕРєР°Р»СЊРЅС‹С… РёРјРїРѕСЂС‚РѕРІ Р·Р°РјРµРЅСЏРµРј РёС… РЅР° РєРѕРґ РґРѕСЃС‚СѓРїР° Рє РјРѕРґСѓР»СЏРј
+      // Обрабатываем импорты из зависимого файла перед встраиванием
+      // РРјРїРѕСЂС‚С‹ React и React Native будут доступны глобально
+      // Для локальных импортов заменяем их на код доступа к модулям
       processedDep = processedDep
-        // РЈРґР°Р»СЏРµРј import React from 'react'
+        // Удаляем import React from 'react'
         .replace(/import\s+React\s+from\s+['"]react['"];?\s*/gi, '')
-        // РЈРґР°Р»СЏРµРј import { ... } from 'react'
+        // Удаляем import { ... } from 'react'
         .replace(/import\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '')
-        // РЈРґР°Р»СЏРµРј import { ... } from 'react-native'
+        // Удаляем import { ... } from 'react-native'
         .replace(/import\s*\{[^}]*\}\s*from\s+['"]react-native['"];?\s*/gi, '')
         .replace(/import\s+['"][^'"]+['"];?\s*/g, '')
-        // Р—Р°РјРµРЅСЏРµРј РІСЃРµ РѕСЃС‚Р°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹ РЅР° РєРѕРґ РґРѕСЃС‚СѓРїР° Рє РјРѕРґСѓР»СЏРј
+        // Заменяем все остальные импорты на код доступа к модулям
         .replace(/import\s+(.*?)\s+from\s+['"](.*?)['"];?\s*/g, (match: string, importSpec: string, depImportPath: string) => {
 
           const currentDepFileName = currentDepActualPath.split('/').pop() || currentDepActualPath.split('\\').pop() || 'unknown';
 
-          // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
-          // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
+          // Пропускаем только внешние библиотеки (npm пакеты)
+          // Теперь обрабатываем локальные импорты, включая @ пути
           if (isCoreReactImport(depImportPath) ||
               isHttpImport(depImportPath)) {
             console.log(`[ProcessDependency] Skipping external import in ${currentDepFileName}: ${depImportPath}`);
-            return ''; // РЈРґР°Р»СЏРµРј РёРјРїРѕСЂС‚
+            return ''; // Удаляем импорт
           }
 
-          // Р”Р»СЏ Р»РѕРєР°Р»СЊРЅС‹С… РёРјРїРѕСЂС‚РѕРІ Р·Р°РјРµРЅСЏРµРј РЅР° РєРѕРґ РґРѕСЃС‚СѓРїР° Рє РјРѕРґСѓР»СЏРј
-          // РСЃРїРѕР»СЊР·СѓРµРј С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р° Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РґР»СЏ СЂР°Р·СЂРµС€РµРЅРёСЏ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№
+          // Для локальных импортов заменяем на код доступа к модулям
+          // РСЃРїРѕР»СЊР·СѓРµРј фактический путь файла зависимости для разрешения относительных путей
           if (isCssModulePath(depImportPath)) {
             return createCssImportReplacement(importSpec);
           }
 
           const finalDepPath = findModulePath(depImportPath, currentDepActualPath, pathMap, dependencyModules);
 
-          // Р Р°Р·СЂРµС€Р°РµРј РїСѓС‚СЊ СЃРёРЅС…СЂРѕРЅРЅРѕ РґР»СЏ РіРµРЅРµСЂР°С†РёРё РІСЃРµС… РІРѕР·РјРѕР¶РЅС‹С… РІР°СЂРёР°РЅС‚РѕРІ РєР»СЋС‡РµР№
+          // Разрешаем путь синхронно для генерации всех возможных вариантов ключей
           const resolvedPathSync = resolvePathSync(currentDepActualPath, depImportPath);
           const resolvedPathNoExt = resolvedPathSync.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
           const resolvedParts = resolvedPathSync.split('/');
@@ -1442,7 +1442,7 @@ function RenderFile({
           const resolvedFileName = resolvedParts[resolvedParts.length - 1] || '';
           const resolvedFileNameNoExt = resolvedFileName.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
 
-          // РЎРѕР·РґР°РµРј СЃРїРёСЃРѕРє РІСЃРµС… РІРѕР·РјРѕР¶РЅС‹С… РєР»СЋС‡РµР№ РґР»СЏ РїРѕРёСЃРєР° РјРѕРґСѓР»СЏ
+          // Создаем список всех возможных ключей для поиска модуля
           const possibleKeys = [
             finalDepPath,
             depImportPath,
@@ -1454,7 +1454,7 @@ function RenderFile({
             resolvedFileNameNoExt
           ].filter(Boolean);
 
-          // РЎРµСЂРёР°Р»РёР·СѓРµРј РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ С€Р°Р±Р»РѕРЅРЅРѕР№ СЃС‚СЂРѕРєРµ
+          // Сериализуем для использования в шаблонной строке
           const possibleKeysJson = JSON.stringify(possibleKeys);
 
           console.log(`[ProcessDependency] Processing import in ${currentDepFileName}:`, {
@@ -1480,26 +1480,26 @@ function RenderFile({
               const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
               let orig = parts[0].trim();
               let alias = parts[1].trim();
-              // Р’Р°Р»РёРґР°С†РёСЏ РёРјРµРЅРё РїРµСЂРµРјРµРЅРЅРѕР№: СѓР±РёСЂР°РµРј РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ СЃРёРјРІРѕР»С‹
+              // Валидация имени переменной: убираем недопустимые символы
               alias = alias.replace(/[^a-zA-Z0-9_$]/g, '');
               if (!alias || !/^[a-zA-Z_$]/.test(alias)) {
-                // Р•СЃР»Рё РёРјСЏ РЅРµРІР°Р»РёРґРЅРѕ, РёСЃРїРѕР»СЊР·СѓРµРј Р±РµР·РѕРїР°СЃРЅРѕРµ РёРјСЏ
+                // Если имя невалидно, используем безопасное имя
                 alias = 'imported_' + Math.random().toString(36).substr(2, 9);
               }
-              // РўР°РєР¶Рµ РІР°Р»РёРґРёСЂСѓРµРј orig, С‚Р°Рє РєР°Рє РѕРЅ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ module.${orig}
+              // Также валидируем orig, так как он используется в module.${orig}
               orig = orig.replace(/[^a-zA-Z0-9_$]/g, '');
               if (!orig) {
                 orig = 'default';
               }
               return `const ${alias} = (() => {
-                // Р–РґРµРј, РїРѕРєР° РјРѕРґСѓР»Рё Р·Р°РіСЂСѓР·СЏС‚СЃСЏ (РЅР° СЃР»СѓС‡Р°Р№, РµСЃР»Рё РјРѕРґСѓР»СЊ РµС‰Рµ Р·Р°РіСЂСѓР¶Р°РµС‚СЃСЏ)
+                // Ждем, пока модули загрузятся (на случай, если модуль еще загружается)
                 const waitForModule = (maxAttempts = 50) => {
                   const possibleKeys = ${possibleKeysJson};
                   let module = null;
                   
                   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                    // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РјРѕРґСѓР»СЊ РїРѕ РІСЃРµРј РІРѕР·РјРѕР¶РЅС‹Рј РєР»СЋС‡Р°Рј
-                    // РРіРЅРѕСЂРёСЂСѓРµРј null Р·РЅР°С‡РµРЅРёСЏ (РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅРЅС‹Рµ СЃР»РѕС‚С‹)
+                    // Пробуем найти модуль по всем возможным ключам
+                    // РРіРЅРѕСЂРёСЂСѓРµРј null значения (предварительно зарегистрированные слоты)
                     for (const key of possibleKeys) {
                       if (window.__modules__ && window.__modules__[key] !== null && window.__modules__[key] !== undefined) {
                         module = window.__modules__[key];
@@ -1507,14 +1507,14 @@ function RenderFile({
                       }
                     }
                     
-                    // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё РїРѕ С‚РѕС‡РЅС‹Рј РєР»СЋС‡Р°Рј, РёС‰РµРј РїРѕ С‡Р°СЃС‚РёС‡РЅРѕРјСѓ СЃРѕРІРїР°РґРµРЅРёСЋ
+                    // Если не нашли по точным ключам, ищем по частичному совпадению
                     if (!module && window.__modules__) {
                       const fileName = '${resolvedFileNameNoExt}';
                       const last2Parts = '${resolvedLast2NoExt}';
                       const importPathClean = '${depImportPath.replace(/\.\.?\//g, '')}';
                       for (const key of Object.keys(window.__modules__)) {
                         const value = window.__modules__[key];
-                        // РРіРЅРѕСЂРёСЂСѓРµРј null Р·РЅР°С‡РµРЅРёСЏ
+                        // РРіРЅРѕСЂРёСЂСѓРµРј null значения
                         if (value !== null && value !== undefined && 
                             (key.includes(fileName) || key.includes(last2Parts) || 
                             key.endsWith('${depImportPath}') || key.includes(importPathClean))) {
@@ -1526,12 +1526,12 @@ function RenderFile({
                     
                     if (module) break;
                     
-                    // Р•СЃР»Рё РјРѕРґСѓР»СЊ РЅРµ РЅР°Р№РґРµРЅ, Р¶РґРµРј РЅРµРјРЅРѕРіРѕ Рё РїСЂРѕР±СѓРµРј СЃРЅРѕРІР°
+                    // Если модуль не найден, ждем немного и пробуем снова
                     if (attempt < maxAttempts - 1) {
-                      // РЎРёРЅС…СЂРѕРЅРЅРѕРµ РѕР¶РёРґР°РЅРёРµ (РЅРµ РёРґРµР°Р»СЊРЅРѕ, РЅРѕ СЂР°Р±РѕС‚Р°РµС‚)
+                      // Синхронное ожидание (не идеально, но работает)
                       const start = Date.now();
                       while (Date.now() - start < 10) {
-                        // Р–РґРµРј 10ms
+                        // Ждем 10ms
                       }
                     }
                   }
@@ -1559,14 +1559,14 @@ function RenderFile({
           } else {
             // Default import: import name from ...
             return `const ${importSpec.trim()} = (() => {
-              // Р–РґРµРј, РїРѕРєР° РјРѕРґСѓР»Рё Р·Р°РіСЂСѓР·СЏС‚СЃСЏ (РЅР° СЃР»СѓС‡Р°Р№, РµСЃР»Рё РјРѕРґСѓР»СЊ РµС‰Рµ Р·Р°РіСЂСѓР¶Р°РµС‚СЃСЏ)
+              // Ждем, пока модули загрузятся (на случай, если модуль еще загружается)
               const waitForModule = (maxAttempts = 50) => {
                 const possibleKeys = ${possibleKeysJson};
                 let module = null;
                 
                 for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                  // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РјРѕРґСѓР»СЊ РїРѕ РІСЃРµРј РІРѕР·РјРѕР¶РЅС‹Рј РєР»СЋС‡Р°Рј
-                  // РРіРЅРѕСЂРёСЂСѓРµРј null Р·РЅР°С‡РµРЅРёСЏ (РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅРЅС‹Рµ СЃР»РѕС‚С‹)
+                  // Пробуем найти модуль по всем возможным ключам
+                  // РРіРЅРѕСЂРёСЂСѓРµРј null значения (предварительно зарегистрированные слоты)
                   for (const key of possibleKeys) {
                     if (window.__modules__ && window.__modules__[key] !== null && window.__modules__[key] !== undefined) {
                       module = window.__modules__[key];
@@ -1574,14 +1574,14 @@ function RenderFile({
                     }
                   }
                   
-                  // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё РїРѕ С‚РѕС‡РЅС‹Рј РєР»СЋС‡Р°Рј, РёС‰РµРј РїРѕ С‡Р°СЃС‚РёС‡РЅРѕРјСѓ СЃРѕРІРїР°РґРµРЅРёСЋ
+                  // Если не нашли по точным ключам, ищем по частичному совпадению
                   if (!module && window.__modules__) {
                     const fileName = '${resolvedFileNameNoExt}';
                     const last2Parts = '${resolvedLast2NoExt}';
                     const importPathClean = '${depImportPath.replace(/\.\.?\//g, '')}';
                     for (const key of Object.keys(window.__modules__)) {
                       const value = window.__modules__[key];
-                      // РРіРЅРѕСЂРёСЂСѓРµРј null Р·РЅР°С‡РµРЅРёСЏ
+                      // РРіРЅРѕСЂРёСЂСѓРµРј null значения
                       if (value !== null && value !== undefined && 
                           (key.includes(fileName) || key.includes(last2Parts) || 
                           key.endsWith('${depImportPath}') || key.includes(importPathClean))) {
@@ -1593,12 +1593,12 @@ function RenderFile({
                   
                   if (module) break;
                   
-                  // Р•СЃР»Рё РјРѕРґСѓР»СЊ РЅРµ РЅР°Р№РґРµРЅ, Р¶РґРµРј РЅРµРјРЅРѕРіРѕ Рё РїСЂРѕР±СѓРµРј СЃРЅРѕРІР°
+                  // Если модуль не найден, ждем немного и пробуем снова
                   if (attempt < maxAttempts - 1) {
-                    // РЎРёРЅС…СЂРѕРЅРЅРѕРµ РѕР¶РёРґР°РЅРёРµ (РЅРµ РёРґРµР°Р»СЊРЅРѕ, РЅРѕ СЂР°Р±РѕС‚Р°РµС‚)
+                    // Синхронное ожидание (не идеально, но работает)
                     const start = Date.now();
                     while (Date.now() - start < 10) {
-                      // Р–РґРµРј 10ms
+                      // Ждем 10ms
                     }
                   }
                 }
@@ -1635,10 +1635,10 @@ function RenderFile({
       if (defaultExportMatch) {
         hasDefaultExport = true;
         const exportValue = defaultExportMatch[1].trim();
-        // Р•СЃР»Рё СЌС‚Рѕ РїРµСЂРµРјРµРЅРЅР°СЏ РёР»Рё РІС‹СЂР°Р¶РµРЅРёРµ
+        // Если это переменная или выражение
         if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(exportValue)) {
           defaultExportName = exportValue;
-          // РЈРґР°Р»СЏРµРј СЃС‚СЂРѕРєСѓ export default РїРѕР»РЅРѕСЃС‚СЊСЋ
+          // Удаляем строку export default полностью
           processedDep = processedDep.replace(/export\s+default\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*;?\s*/g, '');
         } else {
           defaultExportName = '__defaultExport';
@@ -1667,13 +1667,13 @@ function RenderFile({
         processedDep = processedDep.replace(/export\s+\{([^}]+)\}/g, '');
       }
 
-      // Р•СЃР»Рё РЅРµС‚ default export, РЅРѕ РµСЃС‚СЊ named export 'styles', РёСЃРїРѕР»СЊР·СѓРµРј РµРіРѕ РєР°Рє default
+      // Если нет default export, но есть named export 'styles', используем его как default
       if (!hasDefaultExport && namedExports.includes('styles')) {
         defaultExportName = 'styles';
         hasDefaultExport = true;
       }
 
-      // РЈРґР°Р»СЏРµРј РІСЃРµ РѕСЃС‚Р°РІС€РёРµСЃСЏ СЌРєСЃРїРѕСЂС‚С‹ (РЅР° СЃР»СѓС‡Р°Р№, РµСЃР»Рё С‡С‚Рѕ-С‚Рѕ РїСЂРѕРїСѓСЃС‚РёР»Рё)
+      // Удаляем все оставшиеся экспорты (на случай, если что-то пропустили)
       processedDep = processedDep.replace(/export\s+default\s+.*?;?\s*/g, '');
       processedDep = processedDep.replace(/export\s+\{[^}]+\}\s*;?\s*/g, '');
 
@@ -1688,25 +1688,25 @@ function RenderFile({
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:752',message:'Creating module code',data:{importPath,absolutePath:moduleAbsolutePath,hasDefaultExport,defaultExportName,namedExportsCount:namedExports.length,namedExports:namedExports.slice(0,5),allRelativePathsCount:allRelativePaths.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
 
-      // РЎРѕР·РґР°РµРј РјРѕРґСѓР»СЊ
+      // Создаем модуль
       modulesCode += `
-        // РњРѕРґСѓР»СЊ: ${importPath} (absolute: ${moduleAbsolutePath})
+        // Модуль: ${importPath} (absolute: ${moduleAbsolutePath})
         (function() {
-          // РЈР±РµР¶РґР°РµРјСЃСЏ, С‡С‚Рѕ window.__modules__ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°РЅ
+          // Убеждаемся, что window.__modules__ инициализирован
           window.__modules__ = window.__modules__ || {};
           
-          // РЈР±РµР¶РґР°РµРјСЃСЏ, С‡С‚Рѕ React Native РґРѕСЃС‚СѓРїРµРЅ (РґР»СЏ StyleSheet Рё С‚.Рґ.)
+          // Убеждаемся, что React Native доступен (для StyleSheet и т.д.)
           const { StyleSheet } = (typeof window !== 'undefined' && window.ReactNative) || {};
           
-          // Р’РђР–РќРћ: Р’С‹РїРѕР»РЅСЏРµРј РєРѕРґ РјРѕРґСѓР»СЏ РџРћРЎР›Р• С‚РѕРіРѕ, РєР°Рє РІСЃРµ РјРѕРґСѓР»Рё РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅС‹
-          // Р­С‚Рѕ РіР°СЂР°РЅС‚РёСЂСѓРµС‚, С‡С‚Рѕ РєРѕРіРґР° РєРѕРґ РјРѕРґСѓР»СЏ РѕР±СЂР°С‰Р°РµС‚СЃСЏ Рє РґСЂСѓРіРёРј РјРѕРґСѓР»СЏРј С‡РµСЂРµР· window.__modules__,
-          // СЌС‚Рё РјРѕРґСѓР»Рё СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓСЋС‚ (РґР°Р¶Рµ РµСЃР»Рё РѕРЅРё РµС‰Рµ РЅРµ РІС‹РїРѕР»РЅРёР»РёСЃСЊ)
+          // ВАЖНО: Выполняем код модуля ПОСЛЕ того, как все модули предварительно зарегистрированы
+          // Это гарантирует, что когда код модуля обращается к другим модулям через window.__modules__,
+          // эти модули уже существуют (даже если они еще не выполнились)
           ${processedDep}
           
-          // РўРµРїРµСЂСЊ РІСЃРµ РїРµСЂРµРјРµРЅРЅС‹Рµ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РґРѕСЃС‚СѓРїРЅС‹ РІ СЌС‚РѕР№ РѕР±Р»Р°СЃС‚Рё РІРёРґРёРјРѕСЃС‚Рё
+          // Теперь все переменные должны быть доступны в этой области видимости
           const moduleExports = {};
           
-          // Р”РѕР±Р°РІР»СЏРµРј named exports - РёСЃРїРѕР»СЊР·СѓРµРј РїСЂСЏРјСѓСЋ РїСЂРѕРІРµСЂРєСѓ РІ С‚РµРєСѓС‰РµР№ РѕР±Р»Р°СЃС‚Рё РІРёРґРёРјРѕСЃС‚Рё
+          // Добавляем named exports - используем прямую проверку в текущей области видимости
           ${namedExports.length > 0 ? namedExports
             .map(
               (name) => `if (typeof ${name} !== "undefined") {
@@ -1721,21 +1721,21 @@ function RenderFile({
               // #endregion
               console.error('Named export ${name} is undefined in module ${importPath}!');
               console.error('Trying to find variable in different ways...');
-              // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РїРµСЂРµРјРµРЅРЅСѓСЋ С‡РµСЂРµР· СЂР°Р·Р»РёС‡РЅС‹Рµ СЃРїРѕСЃРѕР±С‹
+              // Пробуем найти переменную через различные способы
               try {
-                // РџСЂРѕР±СѓРµРј С‡РµСЂРµР· window (РµСЃР»Рё Р±С‹Р»Р° РѕР±СЉСЏРІР»РµРЅР° РіР»РѕР±Р°Р»СЊРЅРѕ)
+                // Пробуем через window (если была объявлена глобально)
                 if (typeof window !== 'undefined' && typeof window.${name} !== 'undefined') {
                   moduleExports.${name} = window.${name};
                   console.log('Found ${name} on window object');
                 } else {
-                  // РџСЂРѕР±СѓРµРј С‡РµСЂРµР· this (РІ СЃС‚СЂРѕРіРѕРј СЂРµР¶РёРјРµ СЌС‚Рѕ РЅРµ СЃСЂР°Р±РѕС‚Р°РµС‚, РЅРѕ РїРѕРїСЂРѕР±СѓРµРј)
+                  // Пробуем через this (в строгом режиме это не сработает, но попробуем)
                   try {
                     if (typeof this !== 'undefined' && typeof this.${name} !== 'undefined') {
                       moduleExports.${name} = this.${name};
                       console.log('Found ${name} on this object');
                 }
               } catch(e) {}
-                  // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё, РІС‹РІРѕРґРёРј РѕС‚Р»Р°РґРѕС‡РЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ
+                  // Если не нашли, выводим отладочную информацию
                   if (!moduleExports.${name}) {
                     console.error('Could not find ${name} in any scope');
                     console.error('Available variables:', Object.keys(typeof window !== 'undefined' ? window : {}));
@@ -1747,7 +1747,7 @@ function RenderFile({
             }`
           ).join('\n          ') : '// No named exports'}
           
-          // Р”РѕР±Р°РІР»СЏРµРј default export
+          // Добавляем default export
           ${hasDefaultExport && defaultExportName ? 
             `moduleExports.default = typeof ${defaultExportName} !== "undefined" ? ${defaultExportName} : (moduleExports.styles || moduleExports);` : 
             'moduleExports.default = moduleExports.styles || moduleExports;'
@@ -1760,35 +1760,35 @@ function RenderFile({
           console.log('Module named exports list:', ${JSON.stringify(namedExports)});
           console.log('Module exports keys:', Object.keys(moduleExports));
           
-          // Р РµРіРёСЃС‚СЂРёСЂСѓРµРј РјРѕРґСѓР»СЊ РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё (РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРЅРѕРјСѓ)
+          // Регистрируем модуль по абсолютному пути (нормализованному)
           window.__modules__['${moduleAbsolutePath}'] = moduleExports;
-          // РўР°РєР¶Рµ СЂРµРіРёСЃС‚СЂРёСЂСѓРµРј РїРѕ РІСЃРµРј РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Рј РїСѓС‚СЏРј РёР· pathMap РґР»СЏ РѕР±СЂР°С‚РЅРѕР№ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё
+          // Также регистрируем по всем относительным путям из pathMap для обратной совместимости
           window.__modules__['${importPath}'] = moduleExports;
           
-          // Р РµРіРёСЃС‚СЂРёСЂСѓРµРј РїРѕ РІСЃРµРј РїСѓС‚СЏРј, РєРѕС‚РѕСЂС‹Рµ СѓРєР°Р·С‹РІР°СЋС‚ РЅР° СЌС‚РѕС‚ Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ
+          // Регистрируем по всем путям, которые указывают на этот абсолютный путь
           const allPaths = ${JSON.stringify(allRelativePaths)};
           allPaths.forEach(path => {
             window.__modules__[path] = moduleExports;
           });
           
-          // Р РµРіРёСЃС‚СЂРёСЂСѓРµРј РїРѕ РІСЃРµРј РІРѕР·РјРѕР¶РЅС‹Рј РІР°СЂРёР°РЅС‚Р°Рј РїСѓС‚РµР№ РґР»СЏ РїРѕРґРґРµСЂР¶РєРё РёРјРїРѕСЂС‚РѕРІ РёР· СЂР°Р·РЅС‹С… РєРѕРЅС‚РµРєСЃС‚РѕРІ
+          // Регистрируем по всем возможным вариантам путей для поддержки импортов из разных контекстов
           const allPossiblePaths = ${JSON.stringify(Array.from(allPossiblePaths))};
           allPossiblePaths.forEach(path => {
             if (path && path.trim()) {
-              // Р­РєСЂР°РЅРёСЂСѓРµРј РїСѓС‚СЊ РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕРіРѕ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ РєР°С‡РµСЃС‚РІРµ РєР»СЋС‡Р°
+              // Экранируем путь для безопасного использования в качестве ключа
               const escapedPath = path.replace(/'/g, "\\'");
               window.__modules__[path] = moduleExports;
             }
           });
           
-          // Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕ СЂРµРіРёСЃС‚СЂРёСЂСѓРµРј РїРѕ РёРјРµРЅРё С„Р°Р№Р»Р° Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ РґР»СЏ Р»СѓС‡С€РµР№ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё
+          // Дополнительно регистрируем по имени файла без расширения для лучшей совместимости
           const fileName = '${moduleAbsolutePath}'.split('/').pop().replace(/\.(js|jsx)$/, '');
           if (fileName) {
             window.__modules__[fileName] = moduleExports;
           }
           
-          // РўР°РєР¶Рµ СЂРµРіРёСЃС‚СЂРёСЂСѓРµРј РїРѕ РІСЃРµРј РІР°СЂРёР°РЅС‚Р°Рј РїСѓС‚РµР№, РєРѕС‚РѕСЂС‹Рµ РјРѕРіСѓС‚ Р±С‹С‚СЊ РёСЃРїРѕР»СЊР·РѕРІР°РЅС‹ РёР· СЂР°Р·РЅС‹С… РєРѕРЅС‚РµРєСЃС‚РѕРІ
-          // (РЅР°РїСЂРёРјРµСЂ, '../components/Header' РёР· HomeScreen Рё './components/Header' РёР· App)
+          // Также регистрируем по всем вариантам путей, которые могут быть использованы из разных контекстов
+          // (например, '../components/Header' из HomeScreen и './components/Header' из App)
           const resolvedVariants = [
             '${moduleAbsolutePath}',
             '${moduleAbsolutePath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '')}',
@@ -1810,11 +1810,11 @@ function RenderFile({
         })();
       `;
 
-      // Р—Р°РјРµРЅСЏРµРј РёРјРїРѕСЂС‚ РЅР° РґРѕСЃС‚СѓРї Рє РјРѕРґСѓР»СЋ
-      // РС‰РµРј РёРјРїРѕСЂС‚ РїРѕ РІСЃРµРј РІРѕР·РјРѕР¶РЅС‹Рј РїСѓС‚СЏРј (РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРјСѓ Рё Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ)
+      // Заменяем импорт на доступ к модулю
+      // РС‰РµРј импорт по всем возможным путям (относительному и абсолютному)
       let importStatement = imports.find(imp => imp.path === importPath);
       if (!importStatement) {
-        // Р•СЃР»Рё РЅРµ РЅР°Р№РґРµРЅРѕ РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё, РёС‰РµРј РїРѕ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Рј РїСѓС‚СЏРј РёР· pathMap
+        // Если не найдено по абсолютному пути, ищем по относительным путям из pathMap
         for (const [relPath, absPath] of Object.entries(pathMap)) {
           if (absPath === importPath) {
             importStatement = imports.find(imp => imp.path === relPath);
@@ -1823,7 +1823,7 @@ function RenderFile({
         }
       }
       if (importStatement) {
-        // РџР°СЂСЃРёРј, С‡С‚Рѕ РёРјРµРЅРЅРѕ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ
+        // Парсим, что именно импортируется
         const match = importStatement.fullStatement.match(/import\s+(.*?)\s+from/);
         if (match) {
           const importSpec = match[1].trim();
@@ -1831,7 +1831,7 @@ function RenderFile({
             importReplacements[importStatement.fullStatement] = createCssImportReplacement(importSpec);
             continue;
           }
-          // РџСЂРѕРІРµСЂСЏРµРј import * as name from ...
+          // Проверяем import * as name from ...
           const starAsMatch = importStatement.fullStatement.match(/import\s+\*\s+as\s+(\w+)/);
           if (starAsMatch) {
             const alias = starAsMatch[1];
@@ -1839,7 +1839,7 @@ function RenderFile({
           } else if (importSpec.startsWith('{')) {
             // Named imports: import { a, b as c } from ...
             const names = importSpec.replace(/[{}]/g, '').split(',').map((n: string) => n.trim()).filter((n: string) => n);
-            // РџРѕР»СѓС‡Р°РµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РґР»СЏ СЌС‚РѕРіРѕ РјРѕРґСѓР»СЏ
+            // Получаем абсолютный путь для этого модуля
             const absolutePath = dependencyModules[importPath] || importPath;
             // #region agent log
             fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:795',message:'Processing named imports',data:{importPath,absolutePath,importSpec,names,namedExports:namedExports.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
@@ -1848,27 +1848,27 @@ function RenderFile({
               const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
               let orig = parts[0].trim();
               let alias = parts[1].trim();
-              // Р’Р°Р»РёРґР°С†РёСЏ РёРјРµРЅРё РїРµСЂРµРјРµРЅРЅРѕР№: СѓР±РёСЂР°РµРј РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ СЃРёРјРІРѕР»С‹
+              // Валидация имени переменной: убираем недопустимые символы
               alias = alias.replace(/[^a-zA-Z0-9_$]/g, '');
               if (!alias || !/^[a-zA-Z_$]/.test(alias)) {
-                // Р•СЃР»Рё РёРјСЏ РЅРµРІР°Р»РёРґРЅРѕ, РёСЃРїРѕР»СЊР·СѓРµРј Р±РµР·РѕРїР°СЃРЅРѕРµ РёРјСЏ
+                // Если имя невалидно, используем безопасное имя
                 alias = 'imported_' + Math.random().toString(36).substr(2, 9);
               }
-              // РўР°РєР¶Рµ РІР°Р»РёРґРёСЂСѓРµРј orig, С‚Р°Рє РєР°Рє РѕРЅ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ module.${orig}
+              // Также валидируем orig, так как он используется в module.${orig}
               orig = orig.replace(/[^a-zA-Z0-9_$]/g, '');
               if (!orig) {
                 orig = 'default';
               }
-              // РџСЂРѕР±СѓРµРј СЃРЅР°С‡Р°Р»Р° Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ, РїРѕС‚РѕРј РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№
-              // Р”РѕР±Р°РІР»СЏРµРј РїСЂРѕРІРµСЂРєСѓ Рё Р»РѕРіРёСЂРѕРІР°РЅРёРµ РґР»СЏ РѕС‚Р»Р°РґРєРё
+              // Пробуем сначала абсолютный путь, потом относительный
+              // Добавляем проверку и логирование для отладки
               return `const ${alias} = (() => {
                 // #region agent log
                 {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:import-resolver',message:'Resolving import',data:{orig:'${orig}',alias:'${alias}',importPath:'${importPath}',absolutePath:'${absolutePath}',modulesAvailable:Object.keys(window.__modules__||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
-                // РС‰РµРј РјРѕРґСѓР»СЊ РїРѕ РІСЃРµРј РІРѕР·РјРѕР¶РЅС‹Рј РїСѓС‚СЏРј
+                // РС‰РµРј модуль по всем возможным путям
                 const module1 = window.__modules__ && window.__modules__['${absolutePath}'];
                 const module2 = window.__modules__ && window.__modules__['${importPath}'];
-                // РўР°РєР¶Рµ РїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РјРѕРґСѓР»СЊ РїРѕ Р»СЋР±РѕРјСѓ РїСѓС‚Рё, РєРѕС‚РѕСЂС‹Р№ СЃРѕРґРµСЂР¶РёС‚ РёРјСЏ С„Р°Р№Р»Р°
+                // Также пробуем найти модуль по любому пути, который содержит имя файла
                 let module3 = null;
                 const fileName = '${absolutePath}'.split('/').pop().replace(/\.(js|jsx)$/, '');
                 if (window.__modules__) {
@@ -1908,17 +1908,17 @@ function RenderFile({
             importReplacements[importStatement.fullStatement] = replacements.join('\n');
           } else {
             // Default import: import name from ...
-            // РџРѕР»СѓС‡Р°РµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РґР»СЏ СЌС‚РѕРіРѕ РјРѕРґСѓР»СЏ (РёСЃРїРѕР»СЊР·СѓРµРј С‚Сѓ Р¶Рµ Р»РѕРіРёРєСѓ, С‡С‚Рѕ Рё РґР»СЏ named imports)
+            // Получаем абсолютный путь для этого модуля (используем ту же логику, что и для named imports)
             const absolutePath = dependencyModules[importPath] || importPath;
 
-            // РџРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ default export РёР· РѕР±СЂР°Р±РѕС‚Р°РЅРЅРѕР№ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
-            // РС‰РµРј РјРѕРґСѓР»СЊ РІ dependencies РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё
+            // Получаем информацию о default export из обработанной зависимости
+            // РС‰РµРј модуль в dependencies по абсолютному пути
             const depContent = dependencies[absolutePath] || dependencies[importPath];
             let hasDefaultExport2 = false;
             let defaultExportName2: string | null = null;
 
             if (depContent) {
-              // РџСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ default export РІ СЃРѕРґРµСЂР¶РёРјРѕРј
+              // Проверяем наличие default export в содержимом
               const defaultExportMatch = depContent.match(/export\s+default\s+(.+?)(;|$)/s);
               if (defaultExportMatch) {
                 hasDefaultExport2 = true;
@@ -1935,14 +1935,14 @@ function RenderFile({
             fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:885',message:'Processing default import',data:{importPath,absolutePath,importSpec,hasDefaultExport:hasDefaultExport2,defaultExportName:defaultExportName2},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
             // #endregion
 
-            // РЎРѕР·РґР°РµРј РєРѕРґ РґР»СЏ РёРјРїРѕСЂС‚Р° default Р·РЅР°С‡РµРЅРёСЏ
+            // Создаем код для импорта default значения
             importReplacements[importStatement.fullStatement] = `const ${importSpec} = (() => {
               // #region agent log
               fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generated:default-import-resolver',message:'Resolving default import',data:{importSpec:'${importSpec}',importPath:'${importPath}',absolutePath:'${absolutePath}'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
               // #endregion
               const module1 = window.__modules__ && window.__modules__['${absolutePath}'];
               const module2 = window.__modules__ && window.__modules__['${importPath}'];
-              // РўР°РєР¶Рµ РїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РјРѕРґСѓР»СЊ РїРѕ Р»СЋР±РѕРјСѓ РїСѓС‚Рё, РєРѕС‚РѕСЂС‹Р№ СЃРѕРґРµСЂР¶РёС‚ РёРјСЏ С„Р°Р№Р»Р°
+              // Также пробуем найти модуль по любому пути, который содержит имя файла
               let module3 = null;
               const fileName = '${absolutePath}'.split('/').pop().replace(/\.(js|jsx)$/, '');
               if (window.__modules__) {
@@ -1975,23 +1975,23 @@ function RenderFile({
       }
     }
 
-    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РёРјРїРѕСЂС‚С‹ РІ РѕСЃРЅРѕРІРЅРѕРј С„Р°Р№Р»Рµ
+    // Обрабатываем импорты в основном файле
     for (const imp of imports) {
-      // РџСЂРѕРїСѓСЃРєР°РµРј РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё
+      // Пропускаем внешние библиотеки
       if (isCoreReactImport(imp.path) || isHttpImport(imp.path)) {
         continue;
       }
 
-      // РџРѕР»СѓС‡Р°РµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РґР»СЏ СЌС‚РѕРіРѕ РёРјРїРѕСЂС‚Р°
+      // Получаем абсолютный путь для этого импорта
       const absolutePath = dependencyModules[imp.path] || pathMap[imp.path] || imp.path;
 
-      // РџР°СЂСЃРёРј, С‡С‚Рѕ РёРјРµРЅРЅРѕ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ
+      // Парсим, что именно импортируется
       const match = imp.fullStatement.match(/import\s+(.*?)\s+from/);
       if (!match) continue;
 
       const importSpec = match[1].trim();
 
-      // РџСЂРѕРІРµСЂСЏРµРј import * as name from ...
+      // Проверяем import * as name from ...
       const starAsMatch = imp.fullStatement.match(/import\s+\*\s+as\s+(\w+)/);
       if (starAsMatch) {
         const alias = starAsMatch[1];
@@ -2003,13 +2003,13 @@ function RenderFile({
           const parts = name.includes(' as ') ? name.split(' as ') : [name, name];
           let orig = parts[0].trim();
           let alias = parts[1].trim();
-          // Р’Р°Р»РёРґР°С†РёСЏ РёРјРµРЅРё РїРµСЂРµРјРµРЅРЅРѕР№: СѓР±РёСЂР°РµРј РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ СЃРёРјРІРѕР»С‹
+          // Валидация имени переменной: убираем недопустимые символы
           alias = alias.replace(/[^a-zA-Z0-9_$]/g, '');
           if (!alias || !/^[a-zA-Z_$]/.test(alias)) {
-            // Р•СЃР»Рё РёРјСЏ РЅРµРІР°Р»РёРґРЅРѕ, РёСЃРїРѕР»СЊР·СѓРµРј Р±РµР·РѕРїР°СЃРЅРѕРµ РёРјСЏ
+            // Если имя невалидно, используем безопасное имя
             alias = 'imported_' + Math.random().toString(36).substr(2, 9);
           }
-          // РўР°РєР¶Рµ РІР°Р»РёРґРёСЂСѓРµРј orig, С‚Р°Рє РєР°Рє РѕРЅ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ module.${orig}
+          // Также валидируем orig, так как он используется в module.${orig}
           orig = orig.replace(/[^a-zA-Z0-9_$]/g, '');
           if (!orig) {
             orig = 'default';
@@ -2070,7 +2070,7 @@ function RenderFile({
       }
     }
 
-    // Р—Р°РјРµРЅСЏРµРј РёРјРїРѕСЂС‚С‹ РІ РєРѕРґРµ
+    // Заменяем импорты в коде
     console.log('RenderFile: Import replacements:', importReplacements);
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:817',message:'Before replacing imports',data:{importReplacementsCount:Object.keys(importReplacements).length,processedCodeLength:processedCode.length,importReplacements:Object.keys(importReplacements).map(k=>k.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
@@ -2090,7 +2090,7 @@ function RenderFile({
       }
     }
 
-    // РЈРґР°Р»СЏРµРј РѕСЃС‚Р°РІС€РёРµСЃСЏ Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹ (РєРѕС‚РѕСЂС‹Рµ РЅРµ Р±С‹Р»Рё Р·Р°РјРµРЅРµРЅС‹)
+    // Удаляем оставшиеся локальные импорты (которые не были заменены)
     processedCode = processedCode.replace(/import\s+.*?from\s+['"].*?['"];?\s*/g, '');
     processedCode = processedCode.replace(/import\s+['"][^'"]+['"];?\s*/g, '');
 
@@ -2098,14 +2098,14 @@ function RenderFile({
     console.log('RenderFile: Modules code length:', modulesCode.length);
     console.log('RenderFile: Dependency paths:', dependencyPaths);
 
-    // РЎРѕР·РґР°РµРј РєРѕРґ РґР»СЏ РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕР№ СЂРµРіРёСЃС‚СЂР°С†РёРё РІСЃРµС… РјРѕРґСѓР»РµР№
-    // Р­С‚Рѕ РіР°СЂР°РЅС‚РёСЂСѓРµС‚, С‡С‚Рѕ РјРѕРґСѓР»Рё Р±СѓРґСѓС‚ РґРѕСЃС‚СѓРїРЅС‹, РґР°Р¶Рµ РµСЃР»Рё РѕРЅРё РµС‰Рµ РЅРµ РІС‹РїРѕР»РЅРёР»РёСЃСЊ
+    // Создаем код для предварительной регистрации всех модулей
+    // Это гарантирует, что модули будут доступны, даже если они еще не выполнились
     const allModulePaths = new Set<string>();
-    // РЎРѕР±РёСЂР°РµРј РІСЃРµ РІРѕР·РјРѕР¶РЅС‹Рµ РїСѓС‚Рё РґР»СЏ РєР°Р¶РґРѕРіРѕ РјРѕРґСѓР»СЏ
+    // Собираем все возможные пути для каждого модуля
     for (const [relPath, absPath] of Object.entries(pathMap)) {
       allModulePaths.add(relPath);
       allModulePaths.add(absPath);
-      // РўР°РєР¶Рµ РґРѕР±Р°РІР»СЏРµРј РІР°СЂРёР°РЅС‚С‹ Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ Рё РїРѕСЃР»РµРґРЅРёРµ С‡Р°СЃС‚Рё РїСѓС‚Рё
+      // Также добавляем варианты без расширения и последние части пути
       const absPathNoExt = absPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       allModulePaths.add(absPathNoExt);
       const parts = absPath.split('/');
@@ -2119,7 +2119,7 @@ function RenderFile({
       }
     }
 
-    // РўР°РєР¶Рµ РґРѕР±Р°РІР»СЏРµРј РІСЃРµ РїСѓС‚Рё РёР· allPossiblePaths РґР»СЏ РєР°Р¶РґРѕРіРѕ РјРѕРґСѓР»СЏ
+    // Также добавляем все пути из allPossiblePaths для каждого модуля
     for (const absolutePath of uniqueAbsolutePaths) {
       const moduleAbsolutePath = dependencyModules[absolutePath] || absolutePath;
       const pathParts = moduleAbsolutePath.split('/');
@@ -2134,7 +2134,7 @@ function RenderFile({
     }
 
     const preRegisterCode = Array.from(allModulePaths).filter(Boolean).map((path: string) => {
-      // Р­РєСЂР°РЅРёСЂСѓРµРј РєР°РІС‹С‡РєРё РІ РїСѓС‚Рё
+      // Экранируем кавычки в пути
       const escapedPath = path.replace(/'/g, "\\'");
       return `window.__modules__['${escapedPath}'] = window.__modules__['${escapedPath}'] || null;`;
     }).join('\n        ');
@@ -2155,14 +2155,14 @@ function RenderFile({
         }`;
     }).join('\n');
 
-    // РћР±РµСЂС‚С‹РІР°РµРј modulesCode, С‡С‚РѕР±С‹ СЃРЅР°С‡Р°Р»Р° РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ РјРѕРґСѓР»Рё
+    // Обертываем modulesCode, чтобы сначала предварительно зарегистрировать модули
     const wrappedModulesCode = `
-        // РџСЂРµРґРІР°СЂРёС‚РµР»СЊРЅР°СЏ СЂРµРіРёСЃС‚СЂР°С†РёСЏ РІСЃРµС… РјРѕРґСѓР»РµР№ (СЃРѕР·РґР°РµРј РїСѓСЃС‚С‹Рµ СЃР»РѕС‚С‹)
+        // Предварительная регистрация всех модулей (создаем пустые слоты)
         ${preRegisterCode}
         
         console.log('Pre-registered ${allModulePaths.size} module paths:', ${JSON.stringify(Array.from(allModulePaths).slice(0, 20))});
         
-        // РўРµРїРµСЂСЊ Р·Р°РіСЂСѓР¶Р°РµРј РјРѕРґСѓР»Рё (РѕРЅРё Р·Р°РїРѕР»РЅСЏС‚ РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅРЅС‹Рµ СЃР»РѕС‚С‹)
+        // Теперь загружаем модули (они заполнят предварительно зарегистрированные слоты)
         ${modulesCode}
         
         console.log('All modules loaded. Total modules:', Object.keys(window.__modules__ || {}).length);
@@ -2174,47 +2174,47 @@ function RenderFile({
       modulesCode: wrappedModulesCode,
       externalModulesCode,
       stylesCode: collectedCss,
-      dependencyPaths: dependencyPaths, // Р’РѕР·РІСЂР°С‰Р°РµРј РїСѓС‚Рё Р·Р°РІРёСЃРёРјС‹С… С„Р°Р№Р»РѕРІ
-      defaultExportInfo: defaultExportInfo // РЎРѕС…СЂР°РЅСЏРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ default export
+      dependencyPaths: dependencyPaths, // Возвращаем пути зависимых файлов
+      defaultExportInfo: defaultExportInfo // Сохраняем информацию о default export
     };
   };
 
-  // detectComponents С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ react-processor
+  // detectComponents теперь импортируется из модуля react-processor
 
-  // РЎРѕР·РґР°РµРј HTML РѕР±РµСЂС‚РєСѓ РґР»СЏ React С„Р°Р№Р»РѕРІ
+  // Создаем HTML обертку для React файлов
   const createReactHTML = async (code, basePath) => {
-    // Р’РђР–РќРћ: СЃРЅР°С‡Р°Р»Р° РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј РРЎРҐРћР”РќР«Р™ РєРѕРґ, С‡С‚РѕР±С‹ data-no-code-ui-id Р±С‹Р»Рё СЃС‚Р°Р±РёР»СЊРЅС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ С„Р°Р№Р»Р°.
-    // РџРѕС‚РѕРј СѓР¶Рµ РїСЂРѕРіРѕРЅСЏРµРј processReactCode вЂ” РѕРЅ РЅРµ РґРѕР»Р¶РµРЅ Р»РѕРјР°С‚СЊ data-no-code-ui-id.
-    console.log('рџ”µ createReactHTML: РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј РёСЃС…РѕРґРЅС‹Р№ РєРѕРґ', {
+    // ВАЖНО: сначала инструментируем РРЎРҐРћР”РќР«Р™ код, чтобы data-no-code-ui-id были стабильны относительно файла.
+    // Потом уже прогоняем processReactCode вЂ” он не должен ломать data-no-code-ui-id.
+    console.log('рџ”µ createReactHTML: инструментируем исходный код', {
       codeLength: code.length,
       codePreview: code.substring(0, 300),
       hasJsxElements: /<[A-Za-z]/.test(code)
     });
     const instOriginal = instrumentJsx(code, basePath);
-    console.log('рџ”µ createReactHTML: СЂРµР·СѓР»СЊС‚Р°С‚ РёРЅСЃС‚СЂСѓРјРµРЅС‚Р°С†РёРё РёСЃС…РѕРґРЅРѕРіРѕ РєРѕРґР°', {
+    console.log('рџ”µ createReactHTML: результат инструментации исходного кода', {
       instOriginalMapKeys: Object.keys(instOriginal.map).length,
       instOriginalMapSample: Object.keys(instOriginal.map).slice(0, 5),
       instOriginalCodeLength: instOriginal.code.length,
       instOriginalCodeHasIds: (instOriginal.code.match(/data-no-code-ui-id/g) || []).length
     });
 
-    // РЎРЅР°С‡Р°Р»Р° РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РєРѕРґ (Р·Р°РіСЂСѓР¶Р°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё, Р·Р°РјРµРЅСЏРµРј РёРјРїРѕСЂС‚С‹)
+    // Сначала обрабатываем код (загружаем зависимости, заменяем импорты)
     const processed = await processReactCode(instOriginal.code, basePath);
-    const processedCodeBeforeInst = processed.code; // СѓР¶Рµ СЃРѕРґРµСЂР¶РёС‚ data-no-code-ui-id (РёР»Рё legacy data-mrpak-id)
+    const processedCodeBeforeInst = processed.code; // уже содержит data-no-code-ui-id (или legacy data-mrpak-id)
     const modulesCode = processed.modulesCode || '';
     const externalModulesCode = processed.externalModulesCode || '';
     const stylesCode = processed.stylesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
     const defaultExportInfo = processed.defaultExportInfo || null;
 
-    // РЎРѕР±РёСЂР°РµРј РєР°СЂС‚Сѓ РґР»СЏ РїСЂРµРІСЊСЋ/СЂРµРґР°РєС‚РѕСЂР° РЅР° РѕР±СЂР°Р±РѕС‚Р°РЅРЅРѕРј РєРѕРґРµ (Р°С‚СЂРёР±СѓС‚С‹ СѓР¶Рµ РµСЃС‚СЊ).
+    // Собираем карту для превью/редактора на обработанном коде (атрибуты уже есть).
     const instProcessed = instrumentJsx(processedCodeBeforeInst, basePath);
     const processedCode = instProcessed.code;
 
-    // Р”РµС‚РµРєС‚РёСЂСѓРµРј РєРѕРјРїРѕРЅРµРЅС‚С‹ РІ РѕР±СЂР°Р±РѕС‚Р°РЅРЅРѕРј РєРѕРґРµ
+    // Детектируем компоненты в обработанном коде
     const detectedComponents = detectComponents(processedCode);
 
-    // Р•СЃР»Рё РµСЃС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ default export, РґРѕР±Р°РІР»СЏРµРј РµС‘ СЃ РЅР°РёРІС‹СЃС€РёРј РїСЂРёРѕСЂРёС‚РµС‚РѕРј
+    // Если есть информация о default export, добавляем её с наивысшим приоритетом
     if (defaultExportInfo && !detectedComponents.find(c => c.name === defaultExportInfo.name && c.type === 'default-export')) {
       detectedComponents.unshift({
         name: defaultExportInfo.name,
@@ -2223,13 +2223,13 @@ function RenderFile({
       });
     }
 
-    // РќР°С…РѕРґРёРј РєРѕРјРїРѕРЅРµРЅС‚ РґР»СЏ СЂРµРЅРґРµСЂРёРЅРіР° РїРѕ РїСЂРёРѕСЂРёС‚РµС‚Сѓ
+    // Находим компонент для рендеринга по приоритету
     let componentToRender: string | null = null;
     let componentName: string | null = null;
 
-    // РџСЂРёРѕСЂРёС‚РµС‚: default export > named exports > РѕСЃС‚Р°Р»СЊРЅС‹Рµ РєРѕРјРїРѕРЅРµРЅС‚С‹
+    // Приоритет: default export > named exports > остальные компоненты
     for (const comp of detectedComponents) {
-      // РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ РєРѕРјРїРѕРЅРµРЅС‚ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ РєРѕРґРµ
+      // Проверяем, что компонент действительно существует в коде
       const componentExists = new RegExp(`(?:const|let|var|function)\\s+${comp.name}\\s*[=(]`).test(processedCode) ||
                                new RegExp(`\\b${comp.name}\\s*=`).test(processedCode);
       if (componentExists) {
@@ -2239,7 +2239,7 @@ function RenderFile({
       }
     }
 
-    // Fallback: РїСЂРѕР±СѓРµРј СЃС‚Р°РЅРґР°СЂС‚РЅС‹Рµ РёРјРµРЅР°
+    // Fallback: пробуем стандартные имена
     if (!componentToRender) {
       const standardNames = ['App', 'MyComponent', 'Component'];
       for (const name of standardNames) {
@@ -2259,7 +2259,7 @@ function RenderFile({
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>React Component Preview</title>
     <script>
-        // РџРµСЂРµРґР°РµРј filePath РІ РіР»РѕР±Р°Р»СЊРЅСѓСЋ РїРµСЂРµРјРµРЅРЅСѓСЋ РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ СЃРєСЂРёРїС‚Рµ
+        // Передаем filePath в глобальную переменную для использования в скрипте
         window.__MRPAK_FILE_PATH__ = ${JSON.stringify(basePath)};
         window.addEventListener('unhandledrejection', (event) => {
           const reason = event && event.reason;
@@ -2379,10 +2379,10 @@ function RenderFile({
     </script>
     <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
         (async () => {
-        // React РґРѕСЃС‚СѓРїРµРЅ РіР»РѕР±Р°Р»СЊРЅРѕ С‡РµСЂРµР· CDN
+        // React доступен глобально через CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         
-        // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј window.__modules__ Р”Рћ Р·Р°РіСЂСѓР·РєРё РјРѕРґСѓР»РµР№
+        // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј window.__modules__ ДО загрузки модулей
         window.__modules__ = window.__modules__ || {};
         const __mrpakOriginalConsoleError = console.error;
         console.error = (...args) => {
@@ -2396,16 +2396,16 @@ function RenderFile({
         await (window.__externalModulesReady__ || Promise.resolve());
         console.log('Before loading modules, window.__modules__ initialized');
         
-        // Р—Р°РіСЂСѓР¶Р°РµРј РјРѕРґСѓР»Рё Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+        // Загружаем модули зависимостей
         ${modulesCode}
         
-        // РћС‚Р»Р°РґРѕС‡РЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ
+        // Отладочная информация
         console.log('Available modules:', Object.keys(window.__modules__ || {}));
         Object.keys(window.__modules__ || {}).forEach(path => {
           console.log('Module:', path, window.__modules__[path]);
         });
         
-        // Р¤СѓРЅРєС†РёСЏ РґР»СЏ РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂРѕРІР°РЅРёСЏ DOM СЌР»РµРјРµРЅС‚РѕРІ СЃ data-no-code-ui-id (legacy data-mrpak-id РїРѕРґРґРµСЂР¶РёРІР°РµРј)
+        // Функция для инструментирования DOM элементов с data-no-code-ui-id (legacy data-mrpak-id поддерживаем)
         function instrumentReactDOM(rootElement, filePath) {
           if (!rootElement) return;
           
@@ -2446,14 +2446,14 @@ function RenderFile({
           const all = rootElement.querySelectorAll ? Array.from(rootElement.querySelectorAll('*')) : [];
           
           all.forEach((el) => {
-            // РџСЂРѕРїСѓСЃРєР°РµРј СЌР»РµРјРµРЅС‚С‹, РєРѕС‚РѕСЂС‹Рµ СѓР¶Рµ РёРјРµСЋС‚ id-Р°С‚СЂРёР±СѓС‚
+            // Пропускаем элементы, которые уже имеют id-атрибут
             const existing = (el.getAttribute && (el.getAttribute('data-no-code-ui-id') || el.getAttribute('data-mrpak-id'))) || null;
             if (existing) {
               used.add(existing);
               return;
             }
             
-            // РџСЂРѕРїСѓСЃРєР°РµРј script, style Рё РґСЂСѓРіРёРµ СЃР»СѓР¶РµР±РЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
+            // Пропускаем script, style и другие служебные элементы
             const tagName = (el.tagName || '').toLowerCase();
             if (['script', 'style', 'meta', 'link', 'title', 'head'].includes(tagName)) {
               return;
@@ -2462,7 +2462,7 @@ function RenderFile({
             const selector = makeSelectorForElement(el);
             let id = makeMrpakId(filePath, selector, tagName);
             
-            // РЈР±РµР¶РґР°РµРјСЃСЏ, С‡С‚Рѕ ID СѓРЅРёРєР°Р»РµРЅ
+            // Убеждаемся, что ID уникален
             if (used.has(id)) {
               let i = 2;
               while (used.has(\`\${id}:\${i}\`)) i += 1;
@@ -2479,14 +2479,14 @@ function RenderFile({
         try {
             ${processedCode}
             
-            // РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РЅР°С…РѕРґРёРј РєРѕРјРїРѕРЅРµРЅС‚ РґР»СЏ СЂРµРЅРґРµСЂРёРЅРіР°
+            // Автоматически находим компонент для рендеринга
             let Component = null;
             ${componentToRender ? 
-              `// РСЃРїРѕР»СЊР·СѓРµРј Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РЅР°Р№РґРµРЅРЅС‹Р№ РєРѕРјРїРѕРЅРµРЅС‚: ${componentName}
+              `// РСЃРїРѕР»СЊР·СѓРµРј автоматически найденный компонент: ${componentName}
               if (typeof ${componentName} !== 'undefined') {
                 Component = ${componentName};
               }` : 
-              `// РџСЂРѕР±СѓРµРј СЃС‚Р°РЅРґР°СЂС‚РЅС‹Рµ РёРјРµРЅР° РєР°Рє fallback
+              `// Пробуем стандартные имена как fallback
               if (typeof App !== 'undefined') {
                 Component = App;
               } else if (typeof MyComponent !== 'undefined') {
@@ -2494,7 +2494,7 @@ function RenderFile({
               } else if (typeof Component !== 'undefined') {
                 Component = Component;
               } else {
-                // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё Р»СЋР±РѕР№ РєРѕРјРїРѕРЅРµРЅС‚ СЃ Р·Р°РіР»Р°РІРЅРѕР№ Р±СѓРєРІС‹
+                // Пробуем найти любой компонент с заглавной буквы
                 const allVars = Object.keys(typeof window !== 'undefined' ? window : {});
                 for (const varName of allVars) {
                   if (varName[0] === varName[0].toUpperCase() && 
@@ -2511,26 +2511,26 @@ function RenderFile({
                 const root = ReactDOM.createRoot(document.getElementById('root'));
                 root.render(React.createElement(Component));
                 
-                // РџРѕСЃР»Рµ СЂРµРЅРґРµСЂРёРЅРіР° React РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј DOM Рё Р±Р»РѕРєРёСЂСѓРµРј РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
+                // После рендеринга React инструментируем DOM и блокируем интерактивные элементы
                 setTimeout(() => {
                   const rootElement = document.getElementById('root');
                   const filePath = window.__MRPAK_FILE_PATH__ || '';
                   
-                  // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј DOM СЌР»РµРјРµРЅС‚С‹ СЃ data-no-code-ui-id (legacy data-mrpak-id РїРѕРґРґРµСЂР¶РёРІР°РµРј)
+                  // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј DOM элементы с data-no-code-ui-id (legacy data-mrpak-id поддерживаем)
                   instrumentReactDOM(rootElement, filePath);
                   
-                  // РћР±РЅРѕРІР»СЏРµРј РґРµСЂРµРІРѕ СЃР»РѕРµРІ РїРѕСЃР»Рµ РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂРѕРІР°РЅРёСЏ
+                  // Обновляем дерево слоев после инструментирования
                   if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
                     window.__MRPAK_BUILD_TREE__();
                   }
                   
-                  // РСЃРїРѕР»СЊР·СѓРµРј MutationObserver РґР»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ РЅРѕРІС‹С… СЌР»РµРјРµРЅС‚РѕРІ
+                  // РСЃРїРѕР»СЊР·СѓРµРј MutationObserver для отслеживания новых элементов
                   const observer = new MutationObserver((mutations) => {
-                    // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј РЅРѕРІС‹Рµ СЌР»РµРјРµРЅС‚С‹
+                    // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј новые элементы
                     const rootElement = document.getElementById('root');
                     if (rootElement) {
                       instrumentReactDOM(rootElement, filePath);
-                      // РћР±РЅРѕРІР»СЏРµРј РґРµСЂРµРІРѕ СЃР»РѕРµРІ РїРѕСЃР»Рµ РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂРѕРІР°РЅРёСЏ
+                      // Обновляем дерево слоев после инструментирования
                       if (typeof buildTree === 'function') {
                         buildTree();
                       }
@@ -2565,7 +2565,7 @@ function RenderFile({
 </html>
     `;
 
-    console.log('рџ”µ createReactHTML: С„РёРЅР°Р»СЊРЅС‹Р№ СЂРµР·СѓР»СЊС‚Р°С‚', {
+    console.log('рџ”µ createReactHTML: финальный результат', {
       blockMapForEditorKeys: Object.keys(instProcessed.map).length,
       blockMapForFileKeys: Object.keys(instOriginal.map).length,
       blockMapForFileSample: Object.keys(instOriginal.map).slice(0, 5),
@@ -2580,26 +2580,26 @@ function RenderFile({
     };
   };
 
-  // РЎРѕР·РґР°РµРј HTML РѕР±РµСЂС‚РєСѓ РґР»СЏ React Native С„Р°Р№Р»РѕРІ
+  // Создаем HTML обертку для React Native файлов
   const createReactNativeHTML = async (code: string, basePath: string) => {
-    // Р’РђР–РќРћ: СЃРЅР°С‡Р°Р»Р° РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј РРЎРҐРћР”РќР«Р™ РєРѕРґ, С‡С‚РѕР±С‹ data-no-code-ui-id Р±С‹Р»Рё СЃС‚Р°Р±РёР»СЊРЅС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ С„Р°Р№Р»Р°.
+    // ВАЖНО: сначала инструментируем РРЎРҐРћР”РќР«Р™ код, чтобы data-no-code-ui-id были стабильны относительно файла.
     const instOriginal = instrumentJsx(code, basePath);
 
-    // РЎРЅР°С‡Р°Р»Р° РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РєРѕРґ (Р·Р°РіСЂСѓР¶Р°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё, Р·Р°РјРµРЅСЏРµРј РёРјРїРѕСЂС‚С‹)
+    // Сначала обрабатываем код (загружаем зависимости, заменяем импорты)
     const processed = await processReactCode(instOriginal.code, basePath);
-    const processedCodeBeforeInst = processed.code; // СѓР¶Рµ СЃРѕРґРµСЂР¶РёС‚ data-no-code-ui-id (РёР»Рё legacy data-mrpak-id)
+    const processedCodeBeforeInst = processed.code; // уже содержит data-no-code-ui-id (или legacy data-mrpak-id)
     const modulesCode = processed.modulesCode || '';
     const dependencyPaths = processed.dependencyPaths || [];
     const defaultExportInfo = processed.defaultExportInfo || null;
 
-    // РЎРѕР±РёСЂР°РµРј РєР°СЂС‚Сѓ РґР»СЏ РїСЂРµРІСЊСЋ/СЂРµРґР°РєС‚РѕСЂР° РЅР° РѕР±СЂР°Р±РѕС‚Р°РЅРЅРѕРј РєРѕРґРµ (Р°С‚СЂРёР±СѓС‚С‹ СѓР¶Рµ РµСЃС‚СЊ).
+    // Собираем карту для превью/редактора на обработанном коде (атрибуты уже есть).
     const instProcessed = instrumentJsx(processedCodeBeforeInst, basePath);
     const processedCode = instProcessed.code;
 
-    // Р”РµС‚РµРєС‚РёСЂСѓРµРј РєРѕРјРїРѕРЅРµРЅС‚С‹ РІ РѕР±СЂР°Р±РѕС‚Р°РЅРЅРѕРј РєРѕРґРµ
+    // Детектируем компоненты в обработанном коде
     const detectedComponents = detectComponents(processedCode);
 
-    // Р•СЃР»Рё РµСЃС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ default export, РґРѕР±Р°РІР»СЏРµРј РµС‘ СЃ РЅР°РёРІС‹СЃС€РёРј РїСЂРёРѕСЂРёС‚РµС‚РѕРј
+    // Если есть информация о default export, добавляем её с наивысшим приоритетом
     if (defaultExportInfo && !detectedComponents.find(c => c.name === defaultExportInfo.name && c.type === 'default-export')) {
       detectedComponents.unshift({
         name: defaultExportInfo.name,
@@ -2608,13 +2608,13 @@ function RenderFile({
       });
     }
 
-    // РќР°С…РѕРґРёРј РєРѕРјРїРѕРЅРµРЅС‚ РґР»СЏ СЂРµРЅРґРµСЂРёРЅРіР° РїРѕ РїСЂРёРѕСЂРёС‚РµС‚Сѓ
+    // Находим компонент для рендеринга по приоритету
     let componentToRender: string | null = null;
     let componentName = null;
 
-    // РџСЂРёРѕСЂРёС‚РµС‚: default export > named exports > РѕСЃС‚Р°Р»СЊРЅС‹Рµ РєРѕРјРїРѕРЅРµРЅС‚С‹
+    // Приоритет: default export > named exports > остальные компоненты
     for (const comp of detectedComponents) {
-      // РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ РєРѕРјРїРѕРЅРµРЅС‚ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ РєРѕРґРµ
+      // Проверяем, что компонент действительно существует в коде
       const componentExists = new RegExp(`(?:const|let|var|function)\\s+${comp.name}\\s*[=(]`).test(processedCode) ||
                                new RegExp(`\\b${comp.name}\\s*=`).test(processedCode);
       if (componentExists) {
@@ -2624,7 +2624,7 @@ function RenderFile({
       }
     }
 
-    // Fallback: РїСЂРѕР±СѓРµРј СЃС‚Р°РЅРґР°СЂС‚РЅС‹Рµ РёРјРµРЅР°
+    // Fallback: пробуем стандартные имена
     if (!componentToRender) {
       const standardNames = ['App', 'MyComponent', 'Component'];
       for (const name of standardNames) {
@@ -2644,7 +2644,7 @@ function RenderFile({
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>React Native Web Component Preview</title>
     <script>
-        // РџРµСЂРµРґР°РµРј filePath РІ РіР»РѕР±Р°Р»СЊРЅСѓСЋ РїРµСЂРµРјРµРЅРЅСѓСЋ РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ СЃРєСЂРёРїС‚Рµ
+        // Передаем filePath в глобальную переменную для использования в скрипте
         window.__MRPAK_FILE_PATH__ = ${JSON.stringify(basePath)};
         window.addEventListener('unhandledrejection', (event) => {
           const reason = event && event.reason;
@@ -2658,14 +2658,14 @@ function RenderFile({
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script>
-      // Р¤СѓРЅРєС†РёСЏ РґР»СЏ РЅРѕСЂРјР°Р»РёР·Р°С†РёРё СЃС‚РёР»РµР№ React Native РІ CSS СЃС‚РёР»Рё
+      // Функция для нормализации стилей React Native в CSS стили
       function normalizeStyle(style) {
         if (!style) return {};
         if (Array.isArray(style)) {
-          // Р•СЃР»Рё РјР°СЃСЃРёРІ СЃС‚РёР»РµР№, РѕР±СЉРµРґРёРЅСЏРµРј РёС…, РїСЂРѕРїСѓСЃРєР°СЏ null/undefined
+          // Если массив стилей, объединяем их, пропуская null/undefined
           const validStyles = style.filter(s => s != null && typeof s === 'object');
           if (validStyles.length === 0) return {};
-          // Р РµРєСѓСЂСЃРёРІРЅРѕ РЅРѕСЂРјР°Р»РёР·СѓРµРј Рё РѕР±СЉРµРґРёРЅСЏРµРј
+          // Рекурсивно нормализуем и объединяем
           const merged = {};
           validStyles.forEach(s => {
             const normalized = normalizeStyle(s);
@@ -2675,21 +2675,21 @@ function RenderFile({
         }
         if (typeof style !== 'object' || style === null) return {};
         
-        // РЎРѕР·РґР°РµРј РЅРѕРІС‹Р№ РѕР±СЉРµРєС‚ РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕР№ СЂР°Р±РѕС‚С‹
+        // Создаем новый объект для безопасной работы
         const result = {};
         for (const key in style) {
           if (style.hasOwnProperty(key)) {
             const value = style[key];
-            // РџСЂРѕРїСѓСЃРєР°РµРј null, undefined, С„СѓРЅРєС†РёРё Рё РѕР±СЉРµРєС‚С‹ (РєСЂРѕРјРµ Date)
+            // Пропускаем null, undefined, функции и объекты (кроме Date)
             if (value === null || value === undefined) continue;
             if (typeof value === 'function') continue;
             if (typeof value === 'object' && !(value instanceof Date) && !Array.isArray(value)) {
-              // РџСЂРѕРїСѓСЃРєР°РµРј РѕР±СЉРµРєС‚С‹ С‚РёРїР° shadowOffset, transform Рё С‚.Рґ.
-              // РћРЅРё РЅРµ РїРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ РЅР°РїСЂСЏРјСѓСЋ РІ CSS
+              // Пропускаем объекты типа shadowOffset, transform и т.д.
+              // Они не поддерживаются напрямую в CSS
               continue;
             }
             
-            // РЎРїРёСЃРѕРє СЃРІРѕР№СЃС‚РІ, РєРѕС‚РѕСЂС‹Рµ С‚СЂРµР±СѓСЋС‚ 'px' РґР»СЏ С‡РёСЃР»РѕРІС‹С… Р·РЅР°С‡РµРЅРёР№
+            // Список свойств, которые требуют 'px' для числовых значений
             const pixelProperties = [
               'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
               'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
@@ -2702,45 +2702,45 @@ function RenderFile({
               'outlineWidth', 'gap', 'rowGap', 'columnGap'
             ];
             
-            // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј Р·РЅР°С‡РµРЅРёСЏ - Р’РђР–РќРћ: С‚РѕР»СЊРєРѕ РїСЂРёРјРёС‚РёРІС‹
+            // Обрабатываем значения - ВАЖНО: только примитивы
             let cssValue;
             if (typeof value === 'number') {
-              // Р”Р»СЏ С‡РёСЃР»РѕРІС‹С… Р·РЅР°С‡РµРЅРёР№ РґРѕР±Р°РІР»СЏРµРј 'px' РґР»СЏ СЂР°Р·РјРµСЂРѕРІ
+              // Для числовых значений добавляем 'px' для размеров
               if (pixelProperties.includes(key)) {
                 cssValue = value + 'px';
               } else if (key === 'opacity' || key === 'zIndex' || key === 'flex' || 
                          key === 'flexGrow' || key === 'flexShrink' || key === 'order' ||
                          key === 'fontWeight') {
-                // Р­С‚Рё СЃРІРѕР№СЃС‚РІР° РѕСЃС‚Р°СЋС‚СЃСЏ С‡РёСЃР»Р°РјРё
+                // Эти свойства остаются числами
                 cssValue = value;
               } else {
-                // РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РґР»СЏ РґСЂСѓРіРёС… С‡РёСЃР»РѕРІС‹С… Р·РЅР°С‡РµРЅРёР№ С‚РѕР¶Рµ РґРѕР±Р°РІР»СЏРµРј px
+                // По умолчанию для других числовых значений тоже добавляем px
                 cssValue = value + 'px';
               }
             } else if (typeof value === 'string') {
               cssValue = value;
             } else if (Array.isArray(value)) {
-              // РњР°СЃСЃРёРІС‹ РїСЂРµРѕР±СЂР°Р·СѓРµРј РІ СЃС‚СЂРѕРєРё, РЅРѕ С‚РѕР»СЊРєРѕ РµСЃР»Рё СЌР»РµРјРµРЅС‚С‹ РїСЂРёРјРёС‚РёРІС‹
+              // Массивы преобразуем в строки, но только если элементы примитивы
               cssValue = value.map(v => String(v)).join(' ');
             } else if (value instanceof Date) {
               cssValue = value.toISOString();
             } else {
-              // РџСЂРѕРїСѓСЃРєР°РµРј РІСЃРµ РѕСЃС‚Р°Р»СЊРЅРѕРµ
+              // Пропускаем все остальное
               continue;
             }
             
-            // РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ Р·РЅР°С‡РµРЅРёРµ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ РїСЂРёРјРёС‚РёРІ
+            // Проверяем, что значение действительно примитив
             if (typeof cssValue !== 'string' && typeof cssValue !== 'number' && typeof cssValue !== 'boolean') {
               continue;
             }
             
-            // Р’РђР–РќРћ: React С‚СЂРµР±СѓРµС‚ camelCase РґР»СЏ inline СЃС‚РёР»РµР№, РќР• kebab-case!
-            // kebab-case РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ С‚РѕР»СЊРєРѕ РІ CSS С„Р°Р№Р»Р°С…, РЅРѕ РЅРµ РІ inline СЃС‚РёР»СЏС… С‡РµСЂРµР· РѕР±СЉРµРєС‚С‹
-            // РџРѕСЌС‚РѕРјСѓ РѕСЃС‚Р°РІР»СЏРµРј РєР»СЋС‡ РєР°Рє РµСЃС‚СЊ (camelCase)
-            const cssKey = key; // РќР• РєРѕРЅРІРµСЂС‚РёСЂСѓРµРј РІ kebab-case!
+            // ВАЖНО: React требует camelCase для inline стилей, НЕ kebab-case!
+            // kebab-case используется только в CSS файлах, но не в inline стилях через объекты
+            // Поэтому оставляем ключ как есть (camelCase)
+            const cssKey = key; // НЕ конвертируем в kebab-case!
             
-            // РЈР±РµР¶РґР°РµРјСЃСЏ, С‡С‚Рѕ РјС‹ СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‚РѕР»СЊРєРѕ СЃС‚СЂРѕРєСѓ РёР»Рё С‡РёСЃР»Рѕ
-            // РќРѕ РѕСЃС‚Р°РІР»СЏРµРј С‡РёСЃР»Р° РєР°Рє С‡РёСЃР»Р° (РґР»СЏ opacity, zIndex Рё С‚.Рґ.)
+            // Убеждаемся, что мы устанавливаем только строку или число
+            // Но оставляем числа как числа (для opacity, zIndex и т.д.)
             if (typeof cssValue === 'number' && (key === 'opacity' || key === 'zIndex' || key === 'flex' || 
                 key === 'flexGrow' || key === 'flexShrink' || key === 'order' || key === 'fontWeight')) {
               result[cssKey] = cssValue;
@@ -2752,17 +2752,17 @@ function RenderFile({
         return result;
       }
       
-      // React Native Web РєРѕРјРїРѕРЅРµРЅС‚С‹ С‡РµСЂРµР· РїРѕР»РёС„РёР»Р»
-      // РЎРѕР·РґР°РµРј Р±Р°Р·РѕРІС‹Рµ РєРѕРјРїРѕРЅРµРЅС‚С‹, СЃРѕРІРјРµСЃС‚РёРјС‹Рµ СЃ React
+      // React Native Web компоненты через полифилл
+      // Создаем базовые компоненты, совместимые с React
       window.ReactNative = {
         View: React.forwardRef((props, ref) => {
           const { style, ...otherProps } = props;
           const baseStyle = { display: 'flex', flexDirection: 'column' };
-          // Р’РђР–РќРћ: normalizeStyle РІСЃРµРіРґР° РІС‹Р·С‹РІР°РµС‚СЃСЏ, РґР°Р¶Рµ РµСЃР»Рё style undefined
+          // ВАЖНО: normalizeStyle всегда вызывается, даже если style undefined
           const normalizedStyle = normalizeStyle(style);
           const computedStyle = Object.assign({}, baseStyle, normalizedStyle);
           
-          // Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР°: СѓР±РµР¶РґР°РµРјСЃСЏ, С‡С‚Рѕ computedStyle РЅРµ СЃРѕРґРµСЂР¶РёС‚ РјР°СЃСЃРёРІРѕРІ РёР»Рё РѕР±СЉРµРєС‚РѕРІ
+          // Дополнительная проверка: убеждаемся, что computedStyle не содержит массивов или объектов
           const safeStyle = {};
           for (const key in computedStyle) {
             const value = computedStyle[key];
@@ -2780,11 +2780,11 @@ function RenderFile({
         Text: React.forwardRef((props, ref) => {
           const { style, ...otherProps } = props;
           const baseStyle = { display: 'inline' };
-          // Р’РђР–РќРћ: normalizeStyle РІСЃРµРіРґР° РІС‹Р·С‹РІР°РµС‚СЃСЏ, РґР°Р¶Рµ РµСЃР»Рё style undefined
+          // ВАЖНО: normalizeStyle всегда вызывается, даже если style undefined
           const normalizedStyle = normalizeStyle(style);
           const computedStyle = Object.assign({}, baseStyle, normalizedStyle);
           
-          // Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР°: СѓР±РµР¶РґР°РµРјСЃСЏ, С‡С‚Рѕ computedStyle РЅРµ СЃРѕРґРµСЂР¶РёС‚ РјР°СЃСЃРёРІРѕРІ РёР»Рё РѕР±СЉРµРєС‚РѕРІ
+          // Дополнительная проверка: убеждаемся, что computedStyle не содержит массивов или объектов
           const safeStyle = {};
           for (const key in computedStyle) {
             const value = computedStyle[key];
@@ -2810,7 +2810,7 @@ function RenderFile({
           const normalizedStyle = normalizeStyle(style);
           const computedStyle = Object.assign({}, baseStyle, normalizedStyle);
           
-          // Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё
+          // Дополнительная проверка для безопасности
           const safeStyle = {};
           for (const key in computedStyle) {
             const value = computedStyle[key];
@@ -2850,7 +2850,7 @@ function RenderFile({
           const normalizedStyle = normalizeStyle(style);
           const computedStyle = Object.assign({}, baseStyle, normalizedStyle);
           
-          // Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё
+          // Дополнительная проверка для безопасности
           const safeStyle = {};
           for (const key in computedStyle) {
             const value = computedStyle[key];
@@ -2888,7 +2888,7 @@ function RenderFile({
         },
         StyleSheet: {
           create: (styles) => {
-            // Р’РѕР·РІСЂР°С‰Р°РµРј СЃС‚РёР»Рё РєР°Рє РµСЃС‚СЊ, РЅРѕ СЃ РЅРѕСЂРјР°Р»РёР·Р°С†РёРµР№ РїСЂРё РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРё
+            // Возвращаем стили как есть, но с нормализацией при использовании
             const result = {};
             for (const key in styles) {
               if (styles.hasOwnProperty(key)) {
@@ -2906,7 +2906,7 @@ function RenderFile({
         }
       };
       
-      // Р”РѕР±Р°РІР»СЏРµРј Р°РЅРёРјР°С†РёСЋ РґР»СЏ ActivityIndicator
+      // Добавляем анимацию для ActivityIndicator
       const styleEl = document.createElement('style');
       styleEl.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
       document.head.appendChild(styleEl);
@@ -2945,15 +2945,15 @@ function RenderFile({
     </div>
     <div id="root"></div>
     <script type="text/babel" data-type="module" data-presets="mrpak-tsx">
-        // React Рё React Native Web РґРѕСЃС‚СѓРїРЅС‹ РіР»РѕР±Р°Р»СЊРЅРѕ С‡РµСЂРµР· CDN
+        // React и React Native Web доступны глобально через CDN
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         const ReactNative = window.ReactNative || {};
         const { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } = ReactNative;
         
-        // Р”РµСЃС‚СЂСѓРєС‚СѓСЂРёСЂСѓРµРј РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ РєРѕРґРµ
+        // Деструктурируем для использования в коде
         const RN = ReactNative;
         
-        // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј window.__modules__ Р”Рћ Р·Р°РіСЂСѓР·РєРё РјРѕРґСѓР»РµР№
+        // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј window.__modules__ ДО загрузки модулей
         window.__modules__ = window.__modules__ || {};
         const __mrpakOriginalConsoleError = console.error;
         console.error = (...args) => {
@@ -2966,10 +2966,10 @@ function RenderFile({
         };
         console.log('Before loading modules, window.__modules__ initialized');
         
-        // Р—Р°РіСЂСѓР¶Р°РµРј РјРѕРґСѓР»Рё Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+        // Загружаем модули зависимостей
         ${modulesCode}
         
-        // РћС‚Р»Р°РґРѕС‡РЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ - РїСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ РјРѕРґСѓР»Рё Р·Р°РіСЂСѓР¶РµРЅС‹
+        // Отладочная информация - проверяем, что модули загружены
         console.log('After loading modules, available modules:', Object.keys(window.__modules__ || {}));
         Object.keys(window.__modules__ || {}).forEach(path => {
           const module = window.__modules__[path];
@@ -2981,7 +2981,7 @@ function RenderFile({
           }
         });
         
-        // Р¤СѓРЅРєС†РёСЏ РґР»СЏ РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂРѕРІР°РЅРёСЏ DOM СЌР»РµРјРµРЅС‚РѕРІ СЃ data-no-code-ui-id (legacy data-mrpak-id РїРѕРґРґРµСЂР¶РёРІР°РµРј)
+        // Функция для инструментирования DOM элементов с data-no-code-ui-id (legacy data-mrpak-id поддерживаем)
         function instrumentReactDOM(rootElement, filePath) {
           if (!rootElement) return;
           
@@ -3022,14 +3022,14 @@ function RenderFile({
           const all = rootElement.querySelectorAll ? Array.from(rootElement.querySelectorAll('*')) : [];
           
           all.forEach((el) => {
-            // РџСЂРѕРїСѓСЃРєР°РµРј СЌР»РµРјРµРЅС‚С‹, РєРѕС‚РѕСЂС‹Рµ СѓР¶Рµ РёРјРµСЋС‚ id-Р°С‚СЂРёР±СѓС‚
+            // Пропускаем элементы, которые уже имеют id-атрибут
             const existing = (el.getAttribute && (el.getAttribute('data-no-code-ui-id') || el.getAttribute('data-mrpak-id'))) || null;
             if (existing) {
               used.add(existing);
               return;
             }
             
-            // РџСЂРѕРїСѓСЃРєР°РµРј script, style Рё РґСЂСѓРіРёРµ СЃР»СѓР¶РµР±РЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
+            // Пропускаем script, style и другие служебные элементы
             const tagName = (el.tagName || '').toLowerCase();
             if (['script', 'style', 'meta', 'link', 'title', 'head'].includes(tagName)) {
               return;
@@ -3038,7 +3038,7 @@ function RenderFile({
             const selector = makeSelectorForElement(el);
             let id = makeMrpakId(filePath, selector, tagName);
             
-            // РЈР±РµР¶РґР°РµРјСЃСЏ, С‡С‚Рѕ ID СѓРЅРёРєР°Р»РµРЅ
+            // Убеждаемся, что ID уникален
             if (used.has(id)) {
               let i = 2;
               while (used.has(\`\${id}:\${i}\`)) i += 1;
@@ -3052,16 +3052,16 @@ function RenderFile({
           });
         }
         
-        // РџРµСЂРµС…РІР°С‚С‹РІР°РµРј createElement РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё РјР°СЃСЃРёРІРѕРІ СЃС‚РёР»РµР№ РІ РѕР±С‹С‡РЅС‹С… HTML СЌР»РµРјРµРЅС‚Р°С…
+        // Перехватываем createElement для обработки массивов стилей в обычных HTML элементах
         const originalCreateElement = React.createElement;
         React.createElement = function(type, props, ...children) {
-          // Р•СЃР»Рё СЌС‚Рѕ СЃС‚СЂРѕРєРѕРІС‹Р№ С‚РёРї (HTML СЌР»РµРјРµРЅС‚) Рё РµСЃС‚СЊ style prop
+          // Если это строковый тип (HTML элемент) и есть style prop
           if (typeof type === 'string' && props && props.style) {
-            // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РјР°СЃСЃРёРІ СЃС‚РёР»РµР№, РµСЃР»Рё РѕРЅ РµСЃС‚СЊ
+            // Обрабатываем массив стилей, если он есть
             if (Array.isArray(props.style)) {
               props = { ...props, style: normalizeStyle(props.style) };
             } else if (props.style && typeof props.style === 'object') {
-              // РќРѕСЂРјР°Р»РёР·СѓРµРј РґР°Р¶Рµ РѕРґРёРЅРѕС‡РЅС‹Рµ РѕР±СЉРµРєС‚С‹ СЃС‚РёР»РµР№
+              // Нормализуем даже одиночные объекты стилей
               props = { ...props, style: normalizeStyle(props.style) };
             }
           }
@@ -3074,14 +3074,14 @@ function RenderFile({
             // #endregion
             ${processedCode}
             
-            // РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РЅР°С…РѕРґРёРј РєРѕРјРїРѕРЅРµРЅС‚ РґР»СЏ СЂРµРЅРґРµСЂРёРЅРіР°
+            // Автоматически находим компонент для рендеринга
             let Component = null;
             ${componentToRender ? 
-              `// РСЃРїРѕР»СЊР·СѓРµРј Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РЅР°Р№РґРµРЅРЅС‹Р№ РєРѕРјРїРѕРЅРµРЅС‚: ${componentName}
+              `// РСЃРїРѕР»СЊР·СѓРµРј автоматически найденный компонент: ${componentName}
               if (typeof ${componentName} !== 'undefined') {
                 Component = ${componentName};
               }` : 
-              `// РџСЂРѕР±СѓРµРј СЃС‚Р°РЅРґР°СЂС‚РЅС‹Рµ РёРјРµРЅР° РєР°Рє fallback
+              `// Пробуем стандартные имена как fallback
               if (typeof App !== 'undefined') {
                 Component = App;
               } else if (typeof MyComponent !== 'undefined') {
@@ -3089,7 +3089,7 @@ function RenderFile({
               } else if (typeof Component !== 'undefined') {
                 Component = Component;
               } else {
-                // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё Р»СЋР±РѕР№ РєРѕРјРїРѕРЅРµРЅС‚ СЃ Р·Р°РіР»Р°РІРЅРѕР№ Р±СѓРєРІС‹
+                // Пробуем найти любой компонент с заглавной буквы
                 const allVars = Object.keys(typeof window !== 'undefined' ? window : {});
                 for (const varName of allVars) {
                   if (varName[0] === varName[0].toUpperCase() && 
@@ -3106,26 +3106,26 @@ function RenderFile({
                 const root = ReactDOM.createRoot(document.getElementById('root'));
                 root.render(React.createElement(Component));
                 
-                // РџРѕСЃР»Рµ СЂРµРЅРґРµСЂРёРЅРіР° React РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј DOM Рё Р±Р»РѕРєРёСЂСѓРµРј РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
+                // После рендеринга React инструментируем DOM и блокируем интерактивные элементы
                 setTimeout(() => {
                   const rootElement = document.getElementById('root');
                   const filePath = window.__MRPAK_FILE_PATH__ || '';
                   
-                  // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј DOM СЌР»РµРјРµРЅС‚С‹ СЃ data-no-code-ui-id (legacy data-mrpak-id РїРѕРґРґРµСЂР¶РёРІР°РµРј)
+                  // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј DOM элементы с data-no-code-ui-id (legacy data-mrpak-id поддерживаем)
                   instrumentReactDOM(rootElement, filePath);
                   
-                  // РћР±РЅРѕРІР»СЏРµРј РґРµСЂРµРІРѕ СЃР»РѕРµРІ РїРѕСЃР»Рµ РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂРѕРІР°РЅРёСЏ
+                  // Обновляем дерево слоев после инструментирования
                   if (window.__MRPAK_BUILD_TREE__ && typeof window.__MRPAK_BUILD_TREE__ === 'function') {
                     window.__MRPAK_BUILD_TREE__();
                   }
                   
-                  // РСЃРїРѕР»СЊР·СѓРµРј MutationObserver РґР»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ РЅРѕРІС‹С… СЌР»РµРјРµРЅС‚РѕРІ
+                  // РСЃРїРѕР»СЊР·СѓРµРј MutationObserver для отслеживания новых элементов
                   const observer = new MutationObserver((mutations) => {
-                    // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј РЅРѕРІС‹Рµ СЌР»РµРјРµРЅС‚С‹
+                    // РРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂСѓРµРј новые элементы
                     const rootElement = document.getElementById('root');
                     if (rootElement) {
                       instrumentReactDOM(rootElement, filePath);
-                      // РћР±РЅРѕРІР»СЏРµРј РґРµСЂРµРІРѕ СЃР»РѕРµРІ РїРѕСЃР»Рµ РёРЅСЃС‚СЂСѓРјРµРЅС‚РёСЂРѕРІР°РЅРёСЏ
+                      // Обновляем дерево слоев после инструментирования
                       if (typeof buildTree === 'function') {
                         buildTree();
                       }
@@ -3669,7 +3669,7 @@ function RenderFile({
     );
   }
 
-    // Р РµРЅРґРµСЂРёРЅРі HTML С„Р°Р№Р»РѕРІ
+    // Рендеринг HTML файлов
   if (fileType === 'html' && fileContent) {
     if (isProcessingHTML) {
       return (
@@ -3750,7 +3750,7 @@ function RenderFile({
       </View>
     );
   }
-  // Р РµРЅРґРµСЂРёРЅРі React С„Р°Р№Р»РѕРІ (JSX/TSX)
+  // Рендеринг React файлов (JSX/TSX)
   if (fileType === 'react' && fileContent) {
     if (isProcessingReact || !reactHTML) {
       return (
@@ -3829,7 +3829,7 @@ function RenderFile({
       </View>
     );
   }
-  // Р РµРЅРґРµСЂРёРЅРі React Native С„Р°Р№Р»РѕРІ
+  // Рендеринг React Native файлов
   if (fileType === 'react-native' && fileContent) {
     if (isProcessingReactNative || !reactNativeHTML) {
       return (
@@ -3908,7 +3908,7 @@ function RenderFile({
       </View>
     );
   }
-  // Р РµРЅРґРµСЂРёРЅРі С‚РµРєСЃС‚РѕРІС‹С… С„Р°Р№Р»РѕРІ (JS, TS, CSS, JSON, Markdown Рё РґСЂ.)
+  // Рендеринг текстовых файлов (JS, TS, CSS, JSON, Markdown и др.)
   console.log('RenderFile: Rendering text file, type:', fileType, 'content length:', fileContent?.length);
   const monacoLanguage = getMonacoLanguage(fileType, filePath);
   const languageNames = {
