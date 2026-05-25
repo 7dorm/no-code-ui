@@ -1,125 +1,68 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
 import { getFileType } from '../../../shared/lib/file-type-detector';
 import { onFileChanged, readFile, unwatchFile, watchFile } from '../../../shared/api/electron-api';
-import type { BlockMap, LayersTree, StagedComponentImport, StagedOp, StylePatch } from '../types';
-
-type SelectedBlock = { id: string; meta?: unknown } | null;
-type ChangesLogEntry = { ts: number; filePath: string; blockId: string; patch: StylePatch | { op: string } };
+import { useEditorStore } from '../../../store/editorStore';
 
 type UseFileWatchSyncParams = {
   filePath: string;
-  fileType: string | null;
-  viewMode: 'preview' | 'split' | 'changes';
-  projectRoot: string | null;
-  selectedBlock: SelectedBlock;
   astManagerRef: React.MutableRefObject<AstBidirectionalManager | null>;
   isUpdatingFromConstructorRef: React.MutableRefObject<boolean>;
   isUpdatingFromFileRef: React.MutableRefObject<boolean>;
-  sendIframeCommand: (cmd: Record<string, unknown>) => void;
   loadFile: (targetFilePath: string) => Promise<void> | void;
-  updateMonacoEditorWithScroll: (newContent: string) => void;
+  updateMonacoEditorWithScroll: (newContent: any) => void;
   onViewModeChange: (mode: 'preview' | 'split' | 'changes') => void;
   clearHistory: () => void;
-  updateStagedPatches: (updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>) => void;
-  updateStagedOps: (updater: ((prev: StagedOp[]) => StagedOp[]) | StagedOp[]) => void;
-  updateStagedComponentImports: (updater: ((prev: StagedComponentImport[]) => StagedComponentImport[]) | StagedComponentImport[]) => void;
-  updateHasStagedChanges: (value: boolean) => void;
-  setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setFileType: React.Dispatch<React.SetStateAction<string | null>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setError: (error: string | null) => void;
   setReactHTML: React.Dispatch<React.SetStateAction<string>>;
   setReactNativeHTML: React.Dispatch<React.SetStateAction<string>>;
   setIsProcessingReact: React.Dispatch<React.SetStateAction<boolean>>;
   setIsProcessingReactNative: React.Dispatch<React.SetStateAction<boolean>>;
-  setUnsavedContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setIsModified: React.Dispatch<React.SetStateAction<boolean>>;
-  setBlockMap: React.Dispatch<React.SetStateAction<BlockMap>>;
-  setBlockMapForFile: React.Dispatch<React.SetStateAction<BlockMap>>;
-  setSelectedBlock: React.Dispatch<React.SetStateAction<SelectedBlock>>;
-  setChangesLog: React.Dispatch<React.SetStateAction<ChangesLogEntry[]>>;
-  setEditorHTML: React.Dispatch<React.SetStateAction<string>>;
-  setLayersTree: React.Dispatch<React.SetStateAction<LayersTree | null>>;
-  setLayerNames: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  setProjectRoot: React.Dispatch<React.SetStateAction<string | null>>;
-  setIframeCommand: React.Dispatch<React.SetStateAction<Record<string, unknown> | null>>;
-  setExternalDropTargetState: React.Dispatch<React.SetStateAction<{
-    source: string;
-    sourceId: string | null;
-    targetId: string | null;
-  } | null>>;
+  setUnsavedContent: (content: string | null) => void;
   setRenderVersion: React.Dispatch<React.SetStateAction<number>>;
-};
-
-type FileWatchHandlerContext = {
-  viewMode: 'preview' | 'split' | 'changes';
-  fileType: string | null;
-  selectedBlock: SelectedBlock;
-  projectRoot: string | null;
-  sendIframeCommand: (cmd: Record<string, unknown>) => void;
-  updateMonacoEditorWithScroll: (newContent: string) => void;
-  loadFile: (targetFilePath: string) => Promise<void> | void;
 };
 
 export function useFileWatchSync({
   filePath,
-  fileType,
-  viewMode,
-  projectRoot,
-  selectedBlock,
   astManagerRef,
   isUpdatingFromConstructorRef,
   isUpdatingFromFileRef,
-  sendIframeCommand,
   loadFile,
   updateMonacoEditorWithScroll,
   onViewModeChange,
   clearHistory,
-  updateStagedPatches,
-  updateStagedOps,
-  updateStagedComponentImports,
-  updateHasStagedChanges,
-  setFileContent,
-  setFileType,
   setError,
   setReactHTML,
   setReactNativeHTML,
   setIsProcessingReact,
   setIsProcessingReactNative,
   setUnsavedContent,
-  setIsModified,
-  setBlockMap,
-  setBlockMapForFile,
-  setSelectedBlock,
-  setChangesLog,
-  setEditorHTML,
-  setLayersTree,
-  setLayerNames,
-  setProjectRoot,
-  setIframeCommand,
-  setExternalDropTargetState,
   setRenderVersion,
 }: UseFileWatchSyncParams) {
-  const handlerContextRef = useRef<FileWatchHandlerContext>({
-    viewMode,
+  const {
     fileType,
-    selectedBlock,
-    projectRoot,
-    sendIframeCommand,
-    updateMonacoEditorWithScroll,
-    loadFile,
-  });
-
-  handlerContextRef.current = {
+    setFileType,
     viewMode,
-    fileType,
-    selectedBlock,
     projectRoot,
+    selectedBlock,
+    setSelectedBlock,
     sendIframeCommand,
-    updateMonacoEditorWithScroll,
-    loadFile,
-  };
+    setFileContent,
+    setIsModified,
+    setBlockMap,
+    setBlockMapForFile,
+    setChangesLog,
+    setEditorHTML,
+    updateStagedPatches,
+    updateStagedComponentImports,
+    setHasStagedChanges,
+    updateStagedOps,
+    setLayersTree,
+    setLayerNames,
+    setProjectRoot,
+    setExternalDropTargetState,
+  } = useEditorStore();
 
   useEffect(() => {
     let currentFilePath = filePath;
@@ -147,11 +90,13 @@ export function useFileWatchSync({
     setEditorHTML('');
     updateStagedPatches({});
     updateStagedComponentImports([]);
-    updateHasStagedChanges(false);
+    setHasStagedChanges(false);
     updateStagedOps([]);
     setLayersTree(null);
     setLayerNames({});
-    setIframeCommand(null);
+    setProjectRoot(null);
+    // Send iframe command null sets it to null
+    useEditorStore.setState({ iframeCommand: null });
     setExternalDropTargetState(null);
     setUnsavedContent(null);
     setIsModified(false);
@@ -163,10 +108,12 @@ export function useFileWatchSync({
 
     const handleFileChanged = async (changedFilePath: string) => {
       if (changedFilePath !== currentFilePath) return;
-      const ctx = handlerContextRef.current;
-      const savedSelectedBlock = ctx.selectedBlock;
+      const state = useEditorStore.getState();
+      const currentSelectedBlock = state.selectedBlock;
+      const currentFileType = state.fileType;
+      const currentViewMode = state.viewMode;
 
-      if ((ctx.fileType === 'react' || ctx.fileType === 'react-native') && ctx.viewMode === 'split') {
+      if ((currentFileType === 'react' || currentFileType === 'react-native') && currentViewMode === 'split') {
         try {
           const readResult = await readFile(changedFilePath);
           if (readResult?.success && readResult.content) {
@@ -174,15 +121,15 @@ export function useFileWatchSync({
             const manager = astManagerRef.current;
 
             if (!manager) {
-              const newManager = new AstBidirectionalManager(changedFilePath, ctx.projectRoot);
+              const newManager = new AstBidirectionalManager(changedFilePath, projectRoot);
               const initResult = await newManager.initializeFromCode(newCode);
               if (initResult.ok) {
                 astManagerRef.current = newManager;
                 setFileContent(newCode);
-                if (savedSelectedBlock) {
+                if (currentSelectedBlock) {
                   setTimeout(() => {
-                    setSelectedBlock(savedSelectedBlock);
-                    ctx.sendIframeCommand({ type: MRPAK_CMD.SELECT, id: savedSelectedBlock.id });
+                    setSelectedBlock(currentSelectedBlock);
+                    sendIframeCommand({ type: MRPAK_CMD.SELECT, id: currentSelectedBlock.id });
                   }, 100);
                 }
                 return;
@@ -192,7 +139,7 @@ export function useFileWatchSync({
                 const updateResult = await manager.updateCodeASTFromCode(newCode, true);
                 if (updateResult.ok) {
                   setFileContent(newCode);
-                  ctx.updateMonacoEditorWithScroll(newCode);
+                  updateMonacoEditorWithScroll(newCode);
                 }
                 return;
               }
@@ -202,11 +149,11 @@ export function useFileWatchSync({
                 const updateResult = await manager.updateCodeASTFromCode(newCode, false);
                 if (updateResult.ok) {
                   setFileContent(newCode);
-                  ctx.updateMonacoEditorWithScroll(newCode);
-                  if (savedSelectedBlock) {
+                  updateMonacoEditorWithScroll(newCode);
+                  if (currentSelectedBlock) {
                     setTimeout(() => {
-                      setSelectedBlock(savedSelectedBlock);
-                      ctx.sendIframeCommand({ type: MRPAK_CMD.SELECT, id: savedSelectedBlock.id });
+                      setSelectedBlock(currentSelectedBlock);
+                      sendIframeCommand({ type: MRPAK_CMD.SELECT, id: currentSelectedBlock.id });
                     }, 100);
                   }
                   return;
@@ -222,11 +169,11 @@ export function useFileWatchSync({
       }
 
       setTimeout(() => {
-        ctx.loadFile(changedFilePath);
-        if (savedSelectedBlock) {
+        loadFile(changedFilePath);
+        if (currentSelectedBlock) {
           setTimeout(() => {
-            setSelectedBlock(savedSelectedBlock);
-            ctx.sendIframeCommand({ type: MRPAK_CMD.SELECT, id: savedSelectedBlock.id });
+            setSelectedBlock(currentSelectedBlock);
+            sendIframeCommand({ type: MRPAK_CMD.SELECT, id: currentSelectedBlock.id });
           }, 200);
         }
       }, 100);
@@ -246,6 +193,7 @@ export function useFileWatchSync({
     isUpdatingFromFileRef,
     loadFile,
     onViewModeChange,
+    projectRoot,
     sendIframeCommand,
     setBlockMap,
     setBlockMapForFile,
@@ -255,7 +203,6 @@ export function useFileWatchSync({
     setExternalDropTargetState,
     setFileContent,
     setFileType,
-    setIframeCommand,
     setIsModified,
     setIsProcessingReact,
     setIsProcessingReactNative,
@@ -267,7 +214,7 @@ export function useFileWatchSync({
     setRenderVersion,
     setSelectedBlock,
     setUnsavedContent,
-    updateHasStagedChanges,
+    setHasStagedChanges,
     updateMonacoEditorWithScroll,
     updateStagedComponentImports,
     updateStagedOps,

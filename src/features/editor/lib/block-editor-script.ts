@@ -482,8 +482,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 height: rect.height + mt + mb,
               });
               setRect(overlay.padding, {
-                left: rect.left + bl,
-                top: rect.top + bt,
+                left: rect.left + dx + bl,
+                top: rect.top + dy + bt,
                 width: rect.width - bl - br,
                 height: rect.height - bt - bb,
               });
@@ -511,9 +511,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               }
 
               const mode = cs.position === 'relative' ? 'relative' : moveMode;
-              const hasVisibleOffset = mode === 'relative' || Math.abs(ml) > 0.5 || Math.abs(mt) > 0.5;
+              const elLeft = mode === 'relative' ? (pxToNum(cs.left) || 0) : ml;
+              const elTop = mode === 'relative' ? (pxToNum(cs.top) || 0) : mt;
+              const hasVisibleOffset = mode === 'relative' || Math.abs(elLeft) > 0.5 || Math.abs(elTop) > 0.5;
               if (hasVisibleOffset) {
-                const labelText = 'offset ml:' + Math.round(ml) + ' mt:' + Math.round(mt);
+                const labelText = mode === 'relative' ? ('offset left:' + Math.round(elLeft) + ' top:' + Math.round(elTop)) : ('offset ml:' + Math.round(elLeft) + ' mt:' + Math.round(elTop));
                 setShiftBadge(labelText, rect.left - ml, rect.top - mt - 24);
               } else {
                 setShiftBadge('', 0, 0);
@@ -531,75 +533,6 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           };
 
-          const updateRelativeParentPreview = (el, dx, dy) => {
-            try {
-              ensureOverlay();
-              if (!el || !overlay.parent || !overlay.margin) return;
-              const rect = getElementVisualRect(el);
-              if (!rect) return;
-              const cs = window.getComputedStyle(el);
-              const mt = toNum(cs.marginTop);
-              const mr = toNum(cs.marginRight);
-              const mb = toNum(cs.marginBottom);
-              const ml = toNum(cs.marginLeft);
-              const bt = toNum(cs.borderTopWidth);
-              const br = toNum(cs.borderRightWidth);
-              const bb = toNum(cs.borderBottomWidth);
-              const bl = toNum(cs.borderLeftWidth);
-              const pt = toNum(cs.paddingTop);
-              const pr = toNum(cs.paddingRight);
-              const pb = toNum(cs.paddingBottom);
-              const pl = toNum(cs.paddingLeft);
-              const futureMl = ml + dx;
-              const futureMt = mt + dy;
-              const parentInfo = getParentContentRect(el);
-              const parent = parentInfo.parent;
-              if (!parent || parent === document.body || parent === document.documentElement) return;
-
-              const parentRect = parentInfo.rect;
-              const parentLeft = parentRect.left + parentInfo.padding.left;
-              const parentTop = parentRect.top + parentInfo.padding.top;
-              const parentRight = parentRect.right - parentInfo.padding.right;
-              const parentBottom = parentRect.bottom - parentInfo.padding.bottom;
-
-              const movedLeft = rect.left - futureMl;
-              const movedTop = rect.top - futureMt;
-              const movedRight = rect.right + mr;
-              const movedBottom = rect.bottom + mb;
-
-              setRect(overlay.margin, {
-                left: movedLeft,
-                top: movedTop,
-                width: Math.max(0, rect.width + futureMl + mr),
-                height: Math.max(0, rect.height + futureMt + mb),
-              });
-              setRect(overlay.content, {
-                left: rect.left + bl + pl,
-                top: rect.top + bt + pt,
-                width: Math.max(0, rect.width - bl - br - pl - pr),
-                height: Math.max(0, rect.height - bt - bb - pt - pb),
-              });
-              setRect(overlay.padding, {
-                left: rect.left + bl,
-                top: rect.top + bt,
-                width: Math.max(0, rect.width - bl - br),
-                height: Math.max(0, rect.height - bt - bb),
-              });
-
-              const unionLeft = Math.min(parentLeft, movedLeft);
-              const unionTop = Math.min(parentTop, movedTop);
-              const unionRight = Math.max(parentRight, movedRight);
-              const unionBottom = Math.max(parentBottom, movedBottom);
-
-              setRect(overlay.parent, {
-                left: unionLeft,
-                top: unionTop,
-                width: Math.max(0, unionRight - unionLeft),
-                height: Math.max(0, unionBottom - unionTop),
-              });
-              setShiftBadge('offset ml:' + Math.round(futureMl) + ' mt:' + Math.round(futureMt), movedLeft, movedTop - 24);
-            } catch (e) {}
-          };
 
           const snap = (v) => {
             if (moveMode !== 'grid8') return v;
@@ -668,7 +601,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           };
           const getMovePatchKeys = (mode) => {
             if (mode === 'relative') {
-              return { x: 'marginLeft', y: 'marginTop' };
+              return { x: 'left', y: 'top' };
             }
             return { x: 'left', y: 'top' };
           };
@@ -799,19 +732,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
             if (activeMoveMode === 'relative') {
               const cs = window.getComputedStyle(el);
-              const baseMl = toNum(cs.marginLeft);
-              const baseMt = toNum(cs.marginTop);
+              const baseLeft = pxToNum(cs.left) || 0;
+              const baseTop = pxToNum(cs.top) || 0;
               const deltaX = desiredLeft - rect.left;
               const deltaY = desiredTop - rect.top;
-              const nextMl = snap(baseMl + deltaX);
-              const nextMt = snap(baseMt + deltaY);
+              const nextLeft = snap(baseLeft + deltaX);
+              const nextTop = snap(baseTop + deltaY);
               const leftValue = formatMoveValue(
-                nextMl,
+                nextLeft,
                 getMoveAxisReferenceSize('relative', 'x', contentWidth, contentHeight),
                 'relative'
               );
               const topValue = formatMoveValue(
-                nextMt,
+                nextTop,
                 getMoveAxisReferenceSize('relative', 'y', contentWidth, contentHeight),
                 'relative'
               );
@@ -1821,7 +1754,15 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               });
               updateBoxOverlay();
               if (activeMoveMode === 'relative') {
-                updateRelativeParentPreview(selected, constrainedDx, constrainedDy);
+                const cs = window.getComputedStyle(selected);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
+                const futureLeft = baseLeft + constrainedDx;
+                const futureTop = baseTop + constrainedDy;
+                const rect = getElementVisualRect(selected);
+                if (rect) {
+                  setShiftBadge('offset left:' + Math.round(futureLeft) + ' top:' + Math.round(futureTop), rect.left - toNum(cs.marginLeft), rect.top - toNum(cs.marginTop) - 24);
+                }
               }
             } else {
               const resizeTarget = drag.resizeTarget || resizeTargetMode;
@@ -1980,14 +1921,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               });
               updateBoxOverlay();
               if (activeMoveMode === 'relative') {
-                updateRelativeParentPreview(selected, constrainedDx, constrainedDy);
+                const cs = window.getComputedStyle(selected);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
+                const futureLeft = baseLeft + constrainedDx;
+                const futureTop = baseTop + constrainedDy;
+                const rect = getElementVisualRect(selected);
+                if (rect) {
+                  setShiftBadge('offset left:' + Math.round(futureLeft) + ' top:' + Math.round(futureTop), rect.left - toNum(cs.marginLeft), rect.top - toNum(cs.marginTop) - 24);
+                }
               }
 
               // РЎРѕС…СЂР°РЅСЏРµРј С„РёРЅР°Р»СЊРЅС‹Рµ РєРѕРѕСЂРґРёРЅР°С‚С‹ РІ drag РѕР±СЉРµРєС‚
               if (activeMoveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
-                const baseLeft = pxToNum(cs.marginLeft);
-                const baseTop = pxToNum(cs.marginTop);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
                 const left = snap(baseLeft + constrainedDx);
                 const top = snap(baseTop + constrainedDy);
                 
@@ -2405,8 +2354,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
               if (activeMoveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
-                const baseLeft = pxToNum(cs.marginLeft);
-                const baseTop = pxToNum(cs.marginTop);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
                 const left = snap(baseLeft + constrainedDx);
                 const top = snap(baseTop + constrainedDy);
                 const leftValue = formatMoveValue(

@@ -1,31 +1,27 @@
 import { useEffect } from 'react';
 import { loadLayerNames } from '../../../blockEditor/LayerNamesStore';
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
+import { useEditorStore } from '../../../store/editorStore';
 import { findProjectRoot } from '../lib/path-resolver';
-import { resolveProjectRootSync } from '../utils';
-import type { LayerNames } from '../types';
 
 type UseAstOperationsParams = {
-  viewMode: 'preview' | 'split' | 'changes';
   filePath: string;
-  projectPath: string | null;
-  fileType: string | null;
-  fileContent: string | null;
-  setProjectRoot: React.Dispatch<React.SetStateAction<string | null>>;
-  setLayerNames: React.Dispatch<React.SetStateAction<LayerNames>>;
   astManagerRef: React.MutableRefObject<AstBidirectionalManager | null>;
 };
 
 export function useAstOperations({
-  viewMode,
   filePath,
-  projectPath,
-  fileType,
-  fileContent,
-  setProjectRoot,
-  setLayerNames,
   astManagerRef,
 }: UseAstOperationsParams) {
+  const {
+    viewMode,
+    fileType,
+    fileContent,
+    projectRoot,
+    setProjectRoot,
+    setLayerNames,
+  } = useEditorStore();
+
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -33,7 +29,19 @@ export function useAstOperations({
         return;
       }
       try {
-        let root = resolveProjectRootSync(filePath, projectPath);
+        let root = projectRoot;
+
+        if (!root && filePath) {
+          const normalizedPath = filePath.replace(/\\/g, '/');
+          const lastSlash = normalizedPath.lastIndexOf('/');
+          if (lastSlash > 0) {
+            root = normalizedPath.substring(0, lastSlash);
+            if (root.endsWith('/src')) {
+              root = root.substring(0, root.length - 4);
+            }
+          }
+        }
+
         if (!root) {
           root = await findProjectRoot(filePath);
         }
@@ -66,5 +74,5 @@ export function useAstOperations({
     return () => {
       cancelled = true;
     };
-  }, [viewMode, filePath, projectPath, fileType, fileContent, setProjectRoot, setLayerNames, astManagerRef]);
+  }, [viewMode, filePath, projectRoot, fileType, fileContent, setProjectRoot, setLayerNames, astManagerRef]);
 }

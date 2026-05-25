@@ -1,41 +1,40 @@
 import { useEffect } from 'react';
 import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
+import { useEditorStore } from '../../../store/editorStore';
 
 type UseKeyboardShortcutsParams = {
-  viewMode: 'preview' | 'split' | 'changes';
-  isModified: boolean;
-  hasStagedChanges: boolean;
   filePath: string;
   saveFile: (contentToSave?: string | null) => Promise<void> | void;
   commitStagedPatches: () => Promise<void> | void;
   unsavedContent: string | null;
-  fileContent: string | null;
   monacoEditorRef: React.MutableRefObject<any>;
   undo: () => void;
   redo: () => void;
-  selectedBlockId?: string | null;
-  sendIframeCommand: (cmd: any) => void;
 };
 
 export function useKeyboardShortcuts({
-  viewMode,
-  isModified,
-  hasStagedChanges,
   filePath,
   saveFile,
   commitStagedPatches,
   unsavedContent,
-  fileContent,
   monacoEditorRef,
   undo,
   redo,
-  selectedBlockId,
-  sendIframeCommand,
 }: UseKeyboardShortcutsParams) {
+  const {
+    viewMode,
+    isModified,
+    hasStagedChanges,
+    fileContent,
+    selectedBlock,
+    sendIframeCommand,
+  } = useEditorStore();
+
+  const selectedBlockId = selectedBlock?.id;
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const key = String(e.key || '').toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && key === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
         e.preventDefault();
         e.stopPropagation();
         if (typeof (e as any).stopImmediatePropagation === 'function') (e as any).stopImmediatePropagation();
@@ -68,20 +67,20 @@ export function useKeyboardShortcuts({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (viewMode !== 'split') return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if (viewMode === 'changes') return; // Undo/redo works in preview and split modes
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
         undo();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
         redo();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') {
         e.preventDefault();
         e.stopPropagation();
         redo();
@@ -120,4 +119,3 @@ export function useKeyboardShortcuts({
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [viewMode, selectedBlockId, sendIframeCommand]);
 }
-

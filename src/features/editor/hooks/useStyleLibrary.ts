@@ -3,7 +3,8 @@ import { readDirectory, readFile } from '../../../shared/api/electron-api';
 import { openFileDialog } from '../../../shared/api/filesystem-api';
 import { createFolder } from '../../file-operations/lib/file-operations';
 import { createFramework, isFrameworkSupported } from '../../../frameworks/FrameworkFactory';
-import type { BlockMap, StyleLibraryEntry, StylePatch } from '../types';
+import { useEditorStore } from '../../../store/editorStore';
+import type { StyleLibraryEntry } from '../types';
 import {
   ensureCssImportInCode,
   extractImportedCssPathsFromCode,
@@ -16,41 +17,37 @@ import {
 
 type UseStyleLibraryParams = {
   filePath: string;
-  fileType: string | null;
-  fileContent: string | null;
-  monacoEditorRef: React.MutableRefObject<{ getValue?: () => string } | null>;
-  blockMapForFile: BlockMap;
-  selectedBlock: { id: string; meta?: unknown } | null;
-  applyAndCommitPatch: (blockId: string, patch: StylePatch) => Promise<void>;
-  resolveToMappedBlockId: (rawId: unknown) => string | null;
-  writeFile: (targetPath: string, content: string, options?: { backup?: boolean }) => Promise<{ success?: boolean; error?: string }>;
-  updateMonacoEditorWithScroll: (newContent: string) => void;
-  setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
+  monacoEditorRef: React.MutableRefObject<any>;
+  applyAndCommitPatch: (blockId: any, patch: any) => Promise<void>;
+  resolveToMappedBlockId: (rawId: any) => string | null;
+  writeFile: (targetPath: string, content: string, options?: any) => Promise<any>;
+  updateMonacoEditorWithScroll: (newContent: any) => void;
   setUnsavedContent: React.Dispatch<React.SetStateAction<string | null>>;
-  setIsModified: React.Dispatch<React.SetStateAction<boolean>>;
   setRenderVersion: React.Dispatch<React.SetStateAction<number>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
 export function useStyleLibrary({
   filePath,
-  fileType,
-  fileContent,
   monacoEditorRef,
-  blockMapForFile,
-  selectedBlock,
   applyAndCommitPatch,
   resolveToMappedBlockId,
   writeFile,
   updateMonacoEditorWithScroll,
-  setFileContent,
   setUnsavedContent,
-  setIsModified,
   setRenderVersion,
   setError,
 }: UseStyleLibraryParams) {
+  const {
+    fileType,
+    fileContent,
+    setFileContent,
+    blockMapForFile,
+    selectedBlock,
+    setIsModified,
+  } = useEditorStore();
+
   const [styleLibraryEntries, setStyleLibraryEntries] = useState<StyleLibraryEntry[]>([]);
-  type DirectoryItem = { name?: string; isDirectory?: boolean; isFile?: boolean };
 
   const getCurrentFileDir = useCallback(() => {
     const normalized = toPosixPath(filePath);
@@ -59,7 +56,7 @@ export function useStyleLibrary({
   }, [filePath]);
 
   const isCanceledError = useCallback((error: unknown) => {
-    const message = String((error as { message?: string })?.message || error || '').toLowerCase();
+    const message = String((error as any)?.message || error || '').toLowerCase();
     return (
       message.includes('canceled')
       || message.includes('cancelled')
@@ -82,8 +79,8 @@ export function useStyleLibrary({
       }
 
       const styleDirs = dirResult.items
-        .filter((item: DirectoryItem) => item?.isDirectory && /^styles\d+$/i.test(String(item.name || '')))
-        .sort((a: DirectoryItem, b: DirectoryItem) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+        .filter((item: any) => item?.isDirectory && /^styles\d+$/i.test(String(item.name || '')))
+        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
 
       const cssPaths = new Set<string>();
       const collected: StyleLibraryEntry[] = [];
@@ -128,8 +125,8 @@ export function useStyleLibrary({
     if (!dirResult?.success || !Array.isArray(dirResult.items)) return null;
     const names = new Set(
       dirResult.items
-        .filter((item: DirectoryItem) => item?.isDirectory)
-        .map((item: DirectoryItem) => String(item.name || ''))
+        .filter((item: any) => item?.isDirectory)
+        .map((item: any) => String(item.name || ''))
     );
 
     let n = 1;
@@ -194,7 +191,7 @@ export function useStyleLibrary({
 
   const handleImportStyleFromPicker = useCallback(async () => {
     try {
-      const pickRes = await openFileDialog([{ name: 'CSS', extensions: ['css'] }]);
+      const pickRes = await openFileDialog([{ name: 'CSS', extensions: ['css'] } as any]);
       if (!pickRes || pickRes.canceled || !pickRes.fileHandle) return;
       const pickedFile = await pickRes.fileHandle.getFile();
       const cssText = await pickedFile.text();
@@ -252,10 +249,9 @@ export function useStyleLibrary({
         return;
       }
     } else {
-      const isRangeUsable = (entry: unknown) => {
-        const e = entry as { start?: number; end?: number } | null;
-        const start = Number(e?.start);
-        const end = Number(e?.end);
+      const isRangeUsable = (entry: any) => {
+        const start = Number(entry?.start);
+        const end = Number(entry?.end);
         return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end <= nextContent.length;
       };
       if (!isRangeUsable(mapEntry)) {
