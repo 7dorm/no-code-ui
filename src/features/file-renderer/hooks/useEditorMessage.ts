@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { isMrpakMessage, MRPAK_MSG } from '../../../blockEditor/EditorProtocol';
+import { isMrpakMessage, MRPAK_CMD, MRPAK_MSG } from '../../../blockEditor/EditorProtocol';
 import type { LayersTree, LivePosition, StagedComponentImport } from '../types';
 import {
   collectImportLocalNames,
   enrichLayersTree,
   getPathBasename,
+  resolveProjectRootSync,
   stripFileExtension,
   toSafeIdentifier,
   ensureUniqueImportName,
@@ -29,7 +30,8 @@ type UseEditorMessageParams = {
   setTextSnapshots: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   stageReparentBlockRef: React.MutableRefObject<((params: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => void) | null>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
-  stageInsertBlockRef: React.MutableRefObject<((params: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => any) | null>;
+  stageInsertBlockRef: React.MutableRefObject<((params: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => string | null) | null>;
+  sendIframeCommand: (cmd: Record<string, unknown>) => void;
   updateStagedComponentImports: (updater: ((prev: StagedComponentImport[]) => StagedComponentImport[]) | StagedComponentImport[]) => void;
   updateHasStagedChanges: (value: boolean) => void;
   setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
@@ -62,6 +64,7 @@ export function useEditorMessage({
   stageReparentBlockRef,
   setError,
   stageInsertBlockRef,
+  sendIframeCommand,
   updateStagedComponentImports,
   updateHasStagedChanges,
   setFileContent,
@@ -73,6 +76,17 @@ export function useEditorMessage({
   applyBlockPatch,
   setExternalDropTargetState,
 }: UseEditorMessageParams) {
+  const selectInsertedBlock = useCallback(
+    (blockId: string | null | undefined) => {
+      const id = String(blockId || '').trim();
+      if (!id) return;
+      setSelectedBlockIds([id]);
+      setSelectedBlock({ id });
+      sendIframeCommand({ type: MRPAK_CMD.SELECT, id });
+    },
+    [sendIframeCommand, setSelectedBlock, setSelectedBlockIds]
+  );
+
   const handleEditorMessage = useCallback(
     async (event: any) => {
       const data = event?.nativeEvent?.data;
@@ -204,7 +218,12 @@ export function useEditorMessage({
             }
             const snippet = supportsStyleOnlyArg ? `<${componentName} style={{}} />` : `<${componentName} />`;
             if (stageInsertBlockRef.current) {
-              await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet, skipIframeInsert: true });
+              const insertedId = await stageInsertBlockRef.current({
+                targetId: id,
+                mode: 'child',
+                snippet,
+                skipIframeInsert: true,
+              });
               updateStagedComponentImports((prev) => {
                 const exists = prev.some(
                   (item) =>
@@ -221,6 +240,9 @@ export function useEditorMessage({
                 setFileContent(liveCode);
               }
               setRenderVersion((v) => v + 1);
+              if (insertedId) {
+                window.setTimeout(() => selectInsertedBlock(insertedId), 0);
+              }
             }
             return;
           }
@@ -245,7 +267,12 @@ export function useEditorMessage({
                 : `<img src={${localName}} alt=\"\" />`;
 
             if (stageInsertBlockRef.current) {
-              await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet, skipIframeInsert: true });
+              const insertedId = await stageInsertBlockRef.current({
+                targetId: id,
+                mode: 'child',
+                snippet,
+                skipIframeInsert: true,
+              });
               updateStagedComponentImports((prev) => {
                 const exists = prev.some(
                   (item) =>
@@ -262,6 +289,9 @@ export function useEditorMessage({
                 setFileContent(liveCode);
               }
               setRenderVersion((v) => v + 1);
+              if (insertedId) {
+                window.setTimeout(() => selectInsertedBlock(insertedId), 0);
+              }
             }
             return;
           }
@@ -274,7 +304,8 @@ export function useEditorMessage({
           }
           const snippet = `<${tag}></${tag}>`;
           if (stageInsertBlockRef.current) {
-            await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet });
+            const insertedId = await stageInsertBlockRef.current({ targetId: id, mode: 'child', snippet });
+            selectInsertedBlock(insertedId);
           }
           return;
         }
@@ -304,7 +335,7 @@ export function useEditorMessage({
           });
         }
 
-        if (!projectRoot && !isIntermediate) {
+        if (!projectRoot && !resolveProjectRootSync(filePath) && !isIntermediate) {
           setError('Cannot apply changes: project is not loaded yet. Please wait and try again.');
           return;
         }
@@ -345,6 +376,8 @@ export function useEditorMessage({
       setStyleSnapshots,
       setTextSnapshots,
       stageInsertBlockRef,
+      selectInsertedBlock,
+      sendIframeCommand,
       stageReparentBlockRef,
       stagedComponentImportsRef,
       unsavedContent,

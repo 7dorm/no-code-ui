@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import type { CSSProperties } from 'react';
 
 /**
  * WebView компонент для React Native Web
@@ -22,24 +23,51 @@ function WebView({
   ...props 
 }: {
   source: { html?: string; uri?: string };
-  style?: any;
+  style?: CSSProperties;
   javaScriptEnabled?: boolean;
   domStorageEnabled?: boolean;
   startInLoadingState?: boolean;
   renderLoading?: () => React.ReactNode;
-  onError?: (error: any) => void;
-  onHttpError?: (error: any) => void;
-  onLoad?: (event: any) => void;
+  onError?: (event: { nativeEvent: { error?: string; description?: string; message?: string } }) => void;
+  onHttpError?: (error: Error) => void;
+  onLoad?: (event: { nativeEvent: {} }) => void;
   onLoadEnd?: () => void;
-  onMessage?: (event: any) => void;
-  outgoingMessage?: string;
+  onMessage?: (event: { nativeEvent: { data: unknown } }) => void;
+  outgoingMessage?: unknown;
   allowExternalScripts?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onMessageRef = useRef(onMessage);
+  const pendingOutgoingRef = useRef<unknown[]>([]);
   const [loading, setLoading] = useState(startInLoadingState);
+
+  const postOutgoingToIframe = (message: unknown) => {
+    if (!message) return;
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) {
+      pendingOutgoingRef.current.push(message);
+      return;
+    }
+    try {
+      iframe.contentWindow.postMessage(message, '*');
+    } catch (e) {
+      pendingOutgoingRef.current.push(message);
+    }
+  };
+
+  const flushPendingOutgoing = () => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow || pendingOutgoingRef.current.length === 0) return;
+    const queue = pendingOutgoingRef.current.slice();
+    pendingOutgoingRef.current = [];
+    queue.forEach((message) => {
+      try {
+        iframe.contentWindow?.postMessage(message, '*');
+      } catch (e) {}
+    });
+  };
 
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -151,15 +179,17 @@ function WebView({
         onLoad({ nativeEvent: {} });
       }
       if (onLoadEnd) {
-        onLoadEnd({ nativeEvent: {} });
+        onLoadEnd();
       }
+      flushPendingOutgoing();
     };
 
-    const handleError = (error: any) => {
+    const handleError = (error: Event | Error) => {
       setLoading(false);
       console.error('WebView iframe error:', error);
       if (onError) {
-        onError({ nativeEvent: { error: error.message || 'Unknown error' } });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        onError({ nativeEvent: { error: errorMessage } });
       }
     };
 
@@ -260,13 +290,7 @@ function WebView({
   // Отправка сообщений В iframe (без пересоздания iframe)
   useEffect(() => {
     if (!outgoingMessage) return;
-    const iframe = iframeRef.current;
-    if (!iframe || !iframe.contentWindow) return;
-    try {
-      iframe.contentWindow.postMessage(outgoingMessage, '*');
-    } catch (e) {
-      // ignore
-    }
+    postOutgoingToIframe(outgoingMessage);
   }, [outgoingMessage]);
 
   return (

@@ -6,6 +6,15 @@ import { readFile, readFileBase64 } from '../shared/api/electron-api';
 import { resolvePath } from '../features/file-renderer/lib/path-resolver';
 import { toHtmlStyleAttr } from '../blockEditor/styleUtils';
 
+interface HtmlMapEntry {
+  selector?: string;
+  [key: string]: unknown;
+}
+
+interface HtmlStylePatch {
+  [key: string]: unknown;
+}
+
 /**
  * Реализация Framework для HTML файлов
  */
@@ -189,7 +198,7 @@ export class HtmlFramework extends Framework {
   /**
    * Применяет патч стилей к HTML элементу
    */
-  applyStylePatch({ code, mapEntry, patch, externalStylesMap } : { code: string, mapEntry: any, patch: any, externalStylesMap: any }) {
+  applyStylePatch({ code, mapEntry, patch, externalStylesMap } : { code: string, mapEntry: HtmlMapEntry, patch: Record<string, unknown>, externalStylesMap: Record<string, unknown> }) {
     return applyStylePatch({
       fileType: 'html',
       fileContent: code,
@@ -208,7 +217,7 @@ export class HtmlFramework extends Framework {
    * @param {string} params.mode - 'child' или 'sibling'
    * @param {string} params.snippet - HTML код для вставки
    */
-  applyInsert({ code, targetEntry, targetId, mode, snippet } : { code: string, targetEntry: any, targetId: string, mode: string, snippet: string }) {
+  applyInsert({ code, targetEntry, targetId, mode, snippet } : { code: string, targetEntry: HtmlMapEntry, targetId: string, mode: string, snippet: string }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -228,7 +237,7 @@ export class HtmlFramework extends Framework {
    * @param {Object} params.entry - запись элемента (содержит selector)
    * @param {string} params.blockId - ID элемента (ключ в blockMap)
    */
-  applyDelete({ code, entry, blockId } : { code: string, entry: any, blockId: string }) {
+  applyDelete({ code, entry, blockId } : { code: string, entry: HtmlMapEntry, blockId: string }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -250,11 +259,11 @@ export class HtmlFramework extends Framework {
    */
   applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId } : {
     code: string;
-    sourceEntry: any;
+    sourceEntry: HtmlMapEntry;
     sourceId: string;
-    targetEntry: any;
+    targetEntry: HtmlMapEntry;
     targetId: string;
-    targetBeforeEntry?: any;
+    targetBeforeEntry?: HtmlMapEntry;
     targetBeforeId?: string | null;
   }) {
     return applyHtmlOp({
@@ -277,7 +286,7 @@ export class HtmlFramework extends Framework {
    * @param {string} params.blockId - ID элемента
    * @param {string} params.text - новый текст
    */
-  applySetText({ code, entry, blockId, text } : { code: string, entry: any, blockId: string, text: string }) {
+  applySetText({ code, entry, blockId, text } : { code: string, entry: HtmlMapEntry, blockId: string, text: string }) {
     return applyHtmlOp({
       html: code,
       op: {
@@ -342,7 +351,7 @@ export class HtmlFramework extends Framework {
   /**
    * Коммитит накопленные патчи и операции в HTML файл
    */
-  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile } : { originalCode: string, stagedPatches: any, stagedOps: any, blockMapForFile: any, externalStylesMap: any, filePath: string, resolvePath: any, readFile: any, writeFile: any }): Promise<CommitPatchesResult> {
+  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile } : { originalCode: string, stagedPatches: Record<string, Record<string, unknown>>, stagedOps: any[], blockMapForFile: Record<string, unknown>, externalStylesMap: Record<string, unknown>, filePath: string, resolvePath: (path: string, base?: string) => string, readFile: (path: string) => { success: boolean, content: string }, writeFile: (path: string, content: string) => { success: boolean, error?: string } }): Promise<CommitPatchesResult> {
     const entries = Object.entries(stagedPatches || {}).filter(
       ([id, p]) => id && p && Object.keys(p).length > 0
     );
@@ -420,7 +429,7 @@ export class HtmlFramework extends Framework {
   /**
    * Вспомогательный метод для создания селектора элемента
    */
-  _makeSelectorForElement(el) {
+  _makeSelectorForElement(el: Element) {
     const parts = [];
     let cur = el;
     while (cur && cur.nodeType === 1) {
@@ -442,7 +451,7 @@ export class HtmlFramework extends Framework {
   /**
    * Добавляет data-no-code-ui-id в HTML сниппет, если атрибут ещё не задан
    */
-  ensureSnippetHasMrpakId(snippet, mrpakId) {
+  ensureSnippetHasMrpakId(snippet: string, mrpakId: string) {
     const s = String(snippet || '').trim();
     if (!s) return s;
     if (/\bdata-no-code-ui-id\s*=/.test(s) || /\bdata-mrpak-id\s*=/.test(s)) return s;
@@ -456,7 +465,7 @@ export class HtmlFramework extends Framework {
   /**
    * Строит HTML сниппет для вставки нового блока
    */
-  buildInsertSnippet({ tag, text, stylePatch }) {
+  buildInsertSnippet({ tag, text, stylePatch }: { tag?: string, text?: string, stylePatch?: any }) {
     const styleAttr = stylePatch ? toHtmlStyleAttr(stylePatch) : '';
     const attrs = styleAttr ? ` style="${styleAttr}"` : '';
     const tagName = tag || 'div';

@@ -6,34 +6,67 @@ import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
 import { readFile } from '../../../shared/api/electron-api';
 import { extractJsxToComponent } from '../../../blockEditor/extractJsxToComponent';
 import type {
+  BlockMapEntry,
   BlockMap,
+  HistoryOperation,
+  InsertHistoryOperation,
+  DeleteOperationDedup,
+  LayerNode,
   LayersTree,
+  LivePosition,
   StagedComponentImport,
   StagedOp,
   StylePatch,
 } from '../types';
-import { ensureComponentImportInCode } from '../utils';
+import { ensureComponentImportInCode, resolveProjectRootSync } from '../utils';
+import { findProjectRoot } from '../lib/path-resolver';
+
+type StyleSnapshot = {
+  inlineStyle: string;
+  computedStyle?: Record<string, unknown>;
+};
+
+type FileWriteResult = {
+  success?: boolean;
+  error?: string;
+};
+
+type MonacoEditorLike = {
+  getValue?: () => string;
+};
+
+type ReparentOperationDedup = {
+  key: string;
+  timestamp: number;
+};
+
+type ChangesLogEntry = {
+  ts: number;
+  filePath: string;
+  blockId: string;
+  patch: StylePatch | { op: StagedOp['type'] };
+};
 
 type UseBlockOperationsParams = {
   blockMap: BlockMap;
   blockMapForFile: BlockMap;
   layersTree: LayersTree | null;
-  styleSnapshots: Record<string, { inlineStyle: string; computedStyle?: any }>;
+  styleSnapshots: Record<string, StyleSnapshot>;
   stagedPatchesRef: React.MutableRefObject<Record<string, StylePatch>>;
   stagedOpsRef: React.MutableRefObject<StagedOp[]>;
   stagedComponentImportsRef: React.MutableRefObject<StagedComponentImport[]>;
   hasStagedChangesRef: React.MutableRefObject<boolean>;
   astManagerRef: React.MutableRefObject<AstBidirectionalManager | null>;
   isUpdatingFromConstructorRef: React.MutableRefObject<boolean>;
-  monacoEditorRef: React.MutableRefObject<any>;
+  monacoEditorRef: React.MutableRefObject<MonacoEditorLike | null>;
   fileType: string | null;
   filePath: string;
   fileContent: string | null;
   projectRoot: string | null;
   externalStylesMap: Record<string, { path: string; type: string }>;
   resolvePathForFramework: (inputPath: string, basePath?: string) => string;
-  writeFile: (targetPath: string, content: string, options?: any) => Promise<any>;
-  updateMonacoEditorWithScroll: (newContent: any) => void;
+  writeFile: (targetPath: string, content: string, options?: { backup?: boolean }) => Promise<FileWriteResult>;
+  updateMonacoEditorWithScroll: (newContent: string) => void;
   updateStagedPatches: (
     updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>
   ) => void;
@@ -42,25 +75,25 @@ type UseBlockOperationsParams = {
     updater: ((prev: StagedComponentImport[]) => StagedComponentImport[]) | StagedComponentImport[]
   ) => void;
   updateHasStagedChanges: (value: boolean) => void;
-  addToHistory: (operation: any) => void;
-  addToHistoryDebounced: (operation: any, isIntermediate?: boolean) => void;
+  addToHistory: (operation: HistoryOperation) => void;
+  addToHistoryDebounced: (operation: HistoryOperation, isIntermediate?: boolean) => void;
   clearHistory: () => void;
-  sendIframeCommand: (cmd: any) => void;
+  sendIframeCommand: (cmd: Record<string, unknown>) => void;
   textSnapshots: Record<string, string>;
-  lastInsertOperationRef: React.MutableRefObject<any>;
-  lastDeleteOperationRef: React.MutableRefObject<any>;
-  lastReparentOperationRef: React.MutableRefObject<any>;
-  setChangesLog: React.Dispatch<React.SetStateAction<Array<{ ts: number; filePath: string; blockId: any; patch: any }>>>;
+  lastInsertOperationRef: React.MutableRefObject<InsertHistoryOperation | null>;
+  lastDeleteOperationRef: React.MutableRefObject<DeleteOperationDedup | null>;
+  lastReparentOperationRef: React.MutableRefObject<ReparentOperationDedup | null>;
+  setChangesLog: React.Dispatch<React.SetStateAction<ChangesLogEntry[]>>;
   setFileContent: React.Dispatch<React.SetStateAction<string | null>>;
   setUnsavedContent: React.Dispatch<React.SetStateAction<string | null>>;
   setIsModified: React.Dispatch<React.SetStateAction<boolean>>;
   setRenderVersion: React.Dispatch<React.SetStateAction<number>>;
   setShowSaveIndicator: React.Dispatch<React.SetStateAction<boolean>>;
-  selectedBlock: { id: string; meta?: any } | null;
+  selectedBlock: { id: string; meta?: unknown } | null;
   selectedBlockIds: string[];
-  setSelectedBlock: React.Dispatch<React.SetStateAction<{ id: string; meta?: any } | null>>;
+  setSelectedBlock: React.Dispatch<React.SetStateAction<{ id: string; meta?: unknown } | null>>;
   setSelectedBlockIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setLivePosition: React.Dispatch<React.SetStateAction<{ left: number | null; top: number | null; width: number | null; height: number | null }>>;
+  setLivePosition: React.Dispatch<React.SetStateAction<LivePosition>>;
   onProjectFilesChanged?: () => void;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 };
@@ -128,7 +161,27 @@ export function useBlockOperations({
     return Object.keys(previousValue).length > 0 ? previousValue : null;
   }, [styleSnapshots]);
 
-  const resolveToMappedBlockId = useCallback((rawId: any): string | null => {
+  const ensureAstManager = useCallback(async (): Promise<AstBidirectionalManager | null> => {
+    if (astManagerRef.current) return astManagerRef.current;
+    if (fileType !== 'react' && fileType !== 'react-native') return null;
+
+    const code = String(monacoEditorRef?.current?.getValue?.() || fileContent || '');
+    if (!code) return null;
+
+    let root = projectRoot || resolveProjectRootSync(filePath);
+    if (!root) {
+      root = await findProjectRoot(filePath);
+    }
+    if (!root) return null;
+
+    const manager = new AstBidirectionalManager(filePath, root);
+    const initResult = await manager.initializeFromCode(code);
+    if (!initResult.ok) return null;
+    astManagerRef.current = manager;
+    return manager;
+  }, [astManagerRef, fileContent, filePath, fileType, monacoEditorRef, projectRoot]);
+
+  const resolveToMappedBlockId = useCallback((rawId: unknown): string | null => {
     const hasMapEntry = (id: string) => !!blockMapForFile?.[id];
     let current = String(rawId || '').trim();
     if (!current) return null;
@@ -144,7 +197,17 @@ export function useBlockOperations({
     return null;
   }, [blockMapForFile, layersTree?.nodes]);
 
-  const applyBlockPatch = useCallback(async (blockId: any, patch: any, isIntermediate = false) => {
+  const syncPatchToPreview = useCallback((blockId: string, patch: StylePatch) => {
+    const mappedId = resolveToMappedBlockId(blockId) || String(blockId || '');
+    if (!mappedId || !patch || typeof patch !== 'object') return;
+    sendIframeCommand({
+      type: MRPAK_CMD.SET_STYLE,
+      id: mappedId,
+      patch,
+    });
+  }, [resolveToMappedBlockId, sendIframeCommand]);
+
+  const applyBlockPatch = useCallback(async (blockId: string, patch: StylePatch, isIntermediate = false) => {
     try {
       if (!blockId) return;
       const mappedBlockId = resolveToMappedBlockId(blockId) || String(blockId);
@@ -161,10 +224,10 @@ export function useBlockOperations({
           externalStylesMap,
           filePath,
           resolvePath: resolvePathForFramework,
-          readFile: readFile as any,
-          writeFile: writeFile as any,
+          readFile,
+          writeFile,
         });
-        if (!result.ok) throw new Error((result as any).error || 'Failed to apply changes');
+        if (!result.ok) throw new Error(result.error || 'Failed to apply changes');
         const newContent = result.code || String(fileContent ?? '');
         if (!newContent || typeof newContent !== 'string') throw new Error('Apply result is empty or invalid');
         updateStagedPatches((prev) => ({
@@ -173,20 +236,12 @@ export function useBlockOperations({
         }));
         updateHasStagedChanges(true);
         updateMonacoEditorWithScroll(newContent);
+        syncPatchToPreview(mappedBlockId, patch);
         return;
       }
 
-      const manager = astManagerRef.current;
-      if (!manager) {
-        if (projectRoot) {
-          const newManager = new AstBidirectionalManager(filePath, projectRoot);
-          const initResult = await newManager.initializeFromCode(String(fileContent ?? ''));
-          if (!initResult.ok) throw new Error('Failed to initialize AstBidirectionalManager');
-          astManagerRef.current = newManager;
-          return await applyBlockPatch(mappedBlockId, patch, isIntermediate);
-        }
-        return;
-      }
+      const manager = (await ensureAstManager()) || astManagerRef.current;
+      if (!manager) return;
 
       let updateResult = manager.updateCodeAST(mappedBlockId, { type: 'style', patch });
       if (!updateResult.ok) {
@@ -194,7 +249,10 @@ export function useBlockOperations({
         const refreshResult = await manager.updateCodeASTFromCode(String(currentCode ?? ''), true);
         if (refreshResult?.ok) updateResult = manager.updateCodeAST(mappedBlockId, { type: 'style', patch });
       }
-      if (!updateResult.ok) return;
+      if (!updateResult.ok) {
+        syncPatchToPreview(mappedBlockId, patch);
+        return;
+      }
 
       const generateResult = manager.generateCodeFromCodeAST();
       if (!generateResult.ok) throw new Error(generateResult.error || 'Failed to generate code from codeAST');
@@ -203,6 +261,7 @@ export function useBlockOperations({
       if (isIntermediate) {
         updateMonacoEditorWithScroll(newContent);
         await manager.updateCodeASTFromCode(newContent || '', true);
+        syncPatchToPreview(mappedBlockId, patch);
         const previousValue = derivePreviousStylePatch(mappedBlockId, patch);
         addToHistoryDebounced({ type: 'patch', blockId: mappedBlockId, patch, previousValue }, true);
         return;
@@ -210,6 +269,7 @@ export function useBlockOperations({
 
       isUpdatingFromConstructorRef.current = true;
       updateMonacoEditorWithScroll(newContent);
+      syncPatchToPreview(mappedBlockId, patch);
       updateStagedPatches((prev) => ({
         ...prev,
         [mappedBlockId]: { ...(prev?.[mappedBlockId] || {}), ...patch },
@@ -230,6 +290,7 @@ export function useBlockOperations({
     }
   }, [
     addToHistoryDebounced,
+    ensureAstManager,
     astManagerRef,
     blockMapForFile,
     derivePreviousStylePatch,
@@ -244,6 +305,7 @@ export function useBlockOperations({
     resolveToMappedBlockId,
     setChangesLog,
     setError,
+    syncPatchToPreview,
     updateHasStagedChanges,
     updateMonacoEditorWithScroll,
     updateStagedPatches,
@@ -274,10 +336,10 @@ export function useBlockOperations({
         externalStylesMap,
         filePath,
         resolvePath: resolvePathForFramework,
-        readFile: readFile as any,
-        writeFile: writeFile as any,
+        readFile,
+        writeFile,
       });
-      if (!result.ok) throw new Error((result as any).error || 'Failed to apply changes');
+      if (!result.ok) throw new Error(result.error || 'Failed to apply changes');
       let finalContent = result.code || String(fileContent ?? '');
       if (!finalContent || typeof finalContent !== 'string') throw new Error('Apply result is empty or invalid');
       for (const importMeta of imports) finalContent = ensureComponentImportInCode(finalContent, importMeta);
@@ -292,7 +354,12 @@ export function useBlockOperations({
         ...ops.map((o) => ({
           ts: Date.now() + Math.random(),
           filePath,
-          blockId: o.type === 'insert' ? (o as any).targetId : (o as any).blockId,
+          blockId:
+            o.type === 'insert'
+              ? o.targetId
+              : o.type === 'reparent'
+                ? (o.sourceId || o.blockId || '')
+                : o.blockId,
           patch: { op: o.type },
         })),
         ...prev,
@@ -333,11 +400,11 @@ export function useBlockOperations({
     writeFile,
   ]);
 
-  const applyAndCommitPatch = useCallback(async (blockId: string, patch: any) => {
+  const applyAndCommitPatch = useCallback(async (blockId: string, patch: StylePatch) => {
     await applyBlockPatch(blockId, patch);
   }, [applyBlockPatch]);
 
-  const ensureSnippetHasMrpakId = useCallback((snippet: any, mrpakId: string) => {
+  const ensureSnippetHasMrpakId = useCallback((snippet: string, mrpakId: string) => {
     const s = String(snippet || '').trim();
     if (!s) return s;
     if (/\bdata-no-code-ui-id\s*=/.test(s) || /\bdata-mrpak-id\s*=/.test(s)) return s;
@@ -348,7 +415,7 @@ export function useBlockOperations({
     return `mrpak:temp:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
   }, []);
 
-  const stageDeleteBlock = useCallback((blockId: any) => {
+  const stageDeleteBlock = useCallback((blockId: string) => {
     if (!blockId) return;
     const mappedBlockId = resolveToMappedBlockId(blockId) || blockId;
     const now = Date.now();
@@ -373,7 +440,7 @@ export function useBlockOperations({
           updateMonacoEditorWithScroll(generateResult.code);
           updateStagedOps((prev) => [
             ...prev,
-            { type: 'delete', blockId: mappedBlockId, fileType, filePath } as any,
+            { type: 'delete', blockId: mappedBlockId, fileType, filePath },
           ]);
           updateHasStagedChanges(true);
           addToHistory({ type: 'delete', blockId: mappedBlockId, parentId: '', snippet: '', fileType, filePath });
@@ -388,7 +455,7 @@ export function useBlockOperations({
 
     updateStagedOps((prev) => [
       ...prev,
-      { type: 'delete', blockId: mappedBlockId, fileType, filePath } as any,
+      { type: 'delete', blockId: mappedBlockId, fileType, filePath },
     ]);
     updateHasStagedChanges(true);
     addToHistory({
@@ -415,13 +482,13 @@ export function useBlockOperations({
     updateStagedOps,
   ]);
 
-  const stageInsertBlock = useCallback(({ targetId, mode, snippet, skipIframeInsert = false }: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => {
-    if (!targetId) return;
+  const stageInsertBlock = useCallback(({ targetId, mode, snippet, skipIframeInsert = false }: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }): string | null => {
+    if (!targetId) return null;
     const operationKey = `${targetId}:${mode}:${snippet}`;
     const now = Date.now();
     if (lastInsertOperationRef.current) {
       const { key, timestamp } = lastInsertOperationRef.current;
-      if (key === operationKey && (now - timestamp) < 500) return;
+      if (key === operationKey && (now - timestamp) < 500) return null;
     }
     lastInsertOperationRef.current = { key: operationKey, timestamp: now };
 
@@ -438,7 +505,7 @@ export function useBlockOperations({
         blockId: newId,
         fileType,
         filePath,
-      } as any,
+      },
     ]);
     updateHasStagedChanges(true);
     addToHistory({
@@ -458,6 +525,7 @@ export function useBlockOperations({
         html: String(snippetWithId || ''),
       });
     }
+    return newId;
   }, [
     addToHistory,
     ensureSnippetHasMrpakId,
@@ -471,7 +539,15 @@ export function useBlockOperations({
     updateStagedOps,
   ]);
 
-  const stageReparentBlock = useCallback(({ sourceId, targetParentId, targetBeforeId = null }: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => {
+  const stageReparentBlock = useCallback(async ({
+    sourceId,
+    targetParentId,
+    targetBeforeId = null,
+  }: {
+    sourceId: string;
+    targetParentId: string;
+    targetBeforeId?: string | null;
+  }) => {
     if (!sourceId || !targetParentId || sourceId === targetParentId) return;
     const operationKey = `${sourceId}:${targetParentId}:${targetBeforeId ?? ''}`;
     const now = Date.now();
@@ -480,9 +556,44 @@ export function useBlockOperations({
       if (key === operationKey && (now - timestamp) < 500) return;
     }
     lastReparentOperationRef.current = { key: operationKey, timestamp: now };
+
+    sendIframeCommand({
+      type: MRPAK_CMD.REPARENT,
+      sourceId,
+      targetParentId,
+      ...(targetBeforeId ? { targetBeforeId } : {}),
+    });
+
+    if (fileType === 'react' || fileType === 'react-native') {
+      try {
+        const manager = (await ensureAstManager()) || astManagerRef.current;
+        if (manager) {
+          const updateResult = manager.updateCodeAST(sourceId, {
+            type: 'reparent',
+            sourceId,
+            targetParentId,
+            targetBeforeId,
+          });
+          if (updateResult.ok) {
+            const generateResult = manager.generateCodeFromCodeAST();
+            if (generateResult.ok && generateResult.code) {
+              isUpdatingFromConstructorRef.current = true;
+              updateMonacoEditorWithScroll(generateResult.code);
+              setTimeout(() => {
+                isUpdatingFromConstructorRef.current = false;
+              }, 100);
+            }
+          }
+        }
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        setError(`Failed to move block: ${errorMessage}`);
+      }
+    }
+
     updateStagedOps((prev) => [
       ...prev,
-      { type: 'reparent', sourceId, targetParentId, targetBeforeId, fileType, filePath } as any,
+      { type: 'reparent', sourceId, targetParentId, targetBeforeId, fileType, filePath },
     ]);
     updateHasStagedChanges(true);
     addToHistory({
@@ -494,15 +605,19 @@ export function useBlockOperations({
       fileType,
       filePath,
     });
-    if (!targetBeforeId) sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
   }, [
     addToHistory,
+    ensureAstManager,
+    astManagerRef,
     filePath,
     fileType,
+    isUpdatingFromConstructorRef,
     lastReparentOperationRef,
     layersTree?.nodes,
     sendIframeCommand,
+    setError,
     updateHasStagedChanges,
+    updateMonacoEditorWithScroll,
     updateStagedOps,
   ]);
 
@@ -512,7 +627,7 @@ export function useBlockOperations({
     const previousText = textSnapshots[mappedBlockId] || textSnapshots[blockId] || '';
     updateStagedOps((prev) => [
       ...prev,
-      { type: 'setText', blockId: mappedBlockId, text: String(text ?? ''), fileType, filePath } as any,
+      { type: 'setText', blockId: mappedBlockId, text: String(text ?? ''), fileType, filePath },
     ]);
     updateHasStagedChanges(true);
     addToHistory({
@@ -550,8 +665,8 @@ export function useBlockOperations({
       }
 
       const hasMapEntry = (id: string) => {
-        const entry = blockMapForFile?.[id];
-        return !!(entry && Number.isFinite((entry as any).start) && Number.isFinite((entry as any).end));
+        const entry = blockMapForFile?.[id] as BlockMapEntry | undefined;
+        return !!(entry && Number.isFinite(entry.start) && Number.isFinite(entry.end));
       };
 
       const resolveToExtractableId = (rawId: string) => {
@@ -633,8 +748,9 @@ export function useBlockOperations({
       setSelectedBlockIds([]);
       setSelectedBlock(null);
       setLivePosition({ left: null, top: null, width: null, height: null });
-    } catch (e: any) {
-      setError(`Extract block error: ${e?.message || e}`);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(`Extract block error: ${errorMessage}`);
     }
   }, [
     blockMapForFile,

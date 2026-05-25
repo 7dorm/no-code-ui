@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ActivityIndicator, ScrollView } from 'react-native';
+import { styles } from './styles';
 import WebView from '../../WebView';
-import BlockEditorPanel, { useBlockEditorSidebarController } from '../../BlockEditorPanel';
+import { useBlockEditorSidebarController } from '../../BlockEditorPanel';
 import { instrumentJsx } from '../../blockEditor/JsxInstrumenter';
 import { MRPAK_CMD } from '../../blockEditor/EditorProtocol';
 import { applyStylePatch, applyHtmlOp, applyJsxDelete, applyJsxInsert, applyJsxReparent, applyJsxSetText, applyExternalStylePatch, replaceStyleReferenceInJsx } from '../../blockEditor/PatchEngine';
 import { upsertLayerName } from '../../blockEditor/LayerNamesStore';
-import { MonacoEditorWrapper } from '../../shared/ui/monaco-editor-wrapper';
-import { getFileType, getMonacoLanguage } from '../../shared/lib/file-type-detector';
+import { getFileType } from '../../shared/lib/file-type-detector';
 import { readFile, readFileBase64 } from '../../shared/api/electron-api';
 import { syncCodeChangesToEditor, createEditorCommandsFromChanges } from '../../blockEditor/AstSync';
 import { AstBidirectionalManager } from '../../blockEditor/AstBidirectional';
 import { findProjectRoot, resolvePathSync } from './lib/path-resolver';
 import { extractImports, detectComponents, wrapImportedComponentUsages } from './lib/react-processor';
 import { createFramework, isFrameworkSupported } from '../../frameworks/FrameworkFactory';
-import { BlockEditorSidebar } from '../../shared/ui/BlockEditorSidebar';
 import type {
   BlockMap,
   DeleteOperationDedup,
@@ -51,6 +50,10 @@ import { useFileWatchSync } from './hooks/useFileWatchSync';
 import { useDependencyWatchers } from './hooks/useDependencyWatchers';
 import { usePreviewGeneration } from './hooks/usePreviewGeneration';
 import { useSplitEditorHtml } from './hooks/useSplitEditorHtml';
+import { RenderFileContent } from './components/RenderFileContent';
+import { RenderFileHeader } from './components/RenderFileHeader';
+import { RenderFileToolbar } from './components/RenderFileToolbar';
+import { RenderFileSplitMode } from './components/RenderFileSplitMode';
 const IMPORTED_COMPONENT_BOUNDARY_HELPER = `
 function MrpakImportedBoundary({
   __mrpakComponent: Component,
@@ -120,26 +123,26 @@ function RenderFile({
   const [fileType, setFileType] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [unsavedContent, setUnsavedContent] = useState<string | null>(null); // РќРµСЃРѕС…СЂР°РЅРµРЅРЅС‹Рµ РёР·РјРµРЅРµРЅРёСЏ
-  const [isModified, setIsModified] = useState<boolean>(false); // Р¤Р»Р°Рі РёР·РјРµРЅРµРЅРёР№
-  const [showSaveIndicator, setShowSaveIndicator] = useState<boolean>(false); // РРЅРґРёРєР°С‚РѕСЂ СЃРѕС…СЂР°РЅРµРЅРёСЏ
-  const monacoEditorRef = useRef<any>(null);
-  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // РўР°Р№РјРµСЂ РґР»СЏ Р°РІС‚РѕСЃРѕС…СЂР°РЅРµРЅРёСЏ
-  const isUpdatingFromConstructorRef = useRef<boolean>(false); // Р¤Р»Р°Рі РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ СЂРµРєСѓСЂСЃРёРё РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РёР· РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂР°
-  const isUpdatingFromFileRef = useRef<boolean>(false); // Р¤Р»Р°Рі РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ СЂРµРєСѓСЂСЃРёРё РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РёР· С„Р°Р№Р»Р°
+  const [unsavedContent, setUnsavedContent] = useState<string | null>(null); // Unsaved changes
+  const [isModified, setIsModified] = useState<boolean>(false); // Modification flag
+  const [showSaveIndicator, setShowSaveIndicator] = useState<boolean>(false); // Save indicator
+  const monacoEditorRef = useRef<{ getValue?: () => string } | null>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Auto-save timer
+  const isUpdatingFromConstructorRef = useRef<boolean>(false); // Flag to prevent recursion when updating from constructor
+  const isUpdatingFromFileRef = useRef<boolean>(false); // Flag to prevent recursion when updating from file
 
-  // РҐСѓРєРё РґР»СЏ React Рё React Native С„Р°Р№Р»РѕРІ (РІСЃРµРіРґР° РІС‹Р·С‹РІР°СЋС‚СЃСЏ)
+  // Hooks for React and React Native files (always called)
   const [reactHTML, setReactHTML] = useState<string>('');
   const [isProcessingReact, setIsProcessingReact] = useState<boolean>(false);
   const [reactNativeHTML, setReactNativeHTML] = useState<string>('');
   const [isProcessingReactNative, setIsProcessingReactNative] = useState<boolean>(false);
   const [previewOpenError, setPreviewOpenError] = useState<string | null>(null);
-  const [renderVersion, setRenderVersion] = useState<number>(0); // СѓРІРµР»РёС‡РёРІР°РµРј, С‡С‚РѕР±С‹ С„РѕСЂСЃРёСЂРѕРІР°С‚СЊ РїРµСЂРµСЂРёСЃРѕРІРєСѓ WebView
+  const [renderVersion, setRenderVersion] = useState<number>(0); // Increment to force WebView re-render
 
-  // РџСѓС‚Рё Рє Р·Р°РІРёСЃРёРјС‹Рј С„Р°Р№Р»Р°Рј РґР»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ РёР·РјРµРЅРµРЅРёР№
+  // Paths to dependency files for change tracking
   const [dependencyPaths, setDependencyPaths] = useState<string[]>([]);
 
-  // РҐСѓРєРё РґР»СЏ HTML С„Р°Р№Р»РѕРІ (РІСЃРµРіРґР° РІС‹Р·С‹РІР°СЋС‚СЃСЏ)
+  // Hooks for HTML files (always called)
   const [processedHTML, setProcessedHTML] = useState<string>('');
   const [htmlDependencyPaths, setHtmlDependencyPaths] = useState<string[]>([]);
   const [isProcessingHTML, setIsProcessingHTML] = useState<boolean>(false);
@@ -181,23 +184,26 @@ function RenderFile({
     setPreviewOpenError(null);
   }, [filePath]);
 
-  // РЎРѕСЃС‚РѕСЏРЅРёРµ СЂРµРґР°РєС‚РѕСЂР° Р±Р»РѕРєРѕРІ
+  // Block editor state
   const [blockMap, setBlockMap] = useState<BlockMap>({});
-  // blockMap РґР»СЏ РёСЃС…РѕРґРЅРѕРіРѕ С„Р°Р№Р»Р° (РґР»СЏ Р·Р°РїРёСЃРё РїР°С‚С‡РµР№ РІ РёСЃС…РѕРґРЅС‹Р№ РєРѕРґ, Р±РµР· Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ РѕР±СЂР°Р±РѕС‚Р°РЅРЅРѕРіРѕ РїСЂРµРІСЊСЋ)
+  // blockMap for source file (for writing patches to source code, independent of processed preview)
   const [blockMapForFile, setBlockMapForFile] = useState<BlockMap>({});
-  const [selectedBlock, setSelectedBlock] = useState<{ id: string; meta?: any } | null>(null); // { id, meta? }
+  const [selectedBlock, setSelectedBlock] = useState<{ id: string; meta?: unknown } | null>(null); // { id, meta? }
   const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([]);
-  const [changesLog, setChangesLog] = useState<Array<{ ts: number; filePath: string; blockId: any; patch: any }>>([]); // [{ ts, filePath, blockId, patch }]
+  const [changesLog, setChangesLog] = useState<Array<{ ts: number; filePath: string; blockId: string; patch: StylePatch | { op: string } }>>([]); // [{ ts, filePath, blockId, patch }]
   const [editorHTML, setEditorHTML] = useState<string>('');
   const [stagedPatches, setStagedPatches] = useState<Record<string, StylePatch>>({}); // { [blockId]: patchObject }
   const [hasStagedChanges, setHasStagedChanges] = useState<boolean>(false);
   const [layersTree, setLayersTree] = useState<LayersTree | null>(null); // { nodes: {id:...}, rootIds: [] }
   const [layerNames, setLayerNames] = useState<LayerNames>({}); // { [mrpakId]: "Name" }
   const [projectRoot, setProjectRoot] = useState<string | null>(null);
-  const [iframeCommand, setIframeCommand] = useState<any>(null); // { type, ...payload, ts }
+  const [iframeCommand, setIframeCommand] = useState<Record<string, unknown> | null>(null); // { type, ...payload, seq }
+  const iframeCommandQueueRef = useRef<Record<string, unknown>[]>([]);
+  const iframeCommandSeqRef = useRef(0);
+  const iframeCommandPumpScheduledRef = useRef(false);
   const [stagedOps, setStagedOps] = useState<StagedOp[]>([]); // [{type:'insert'|'delete', ...}]
   const [stagedComponentImports, setStagedComponentImports] = useState<StagedComponentImport[]>([]);
-  const [styleSnapshots, setStyleSnapshots] = useState<Record<string, { inlineStyle: string; computedStyle?: any }>>({}); // { [mrpakId]: { inlineStyle: string, computedStyle?: object } }
+  const [styleSnapshots, setStyleSnapshots] = useState<Record<string, { inlineStyle: string; computedStyle?: Record<string, unknown> }>>({}); // { [mrpakId]: { inlineStyle: string, computedStyle?: object } }
   const [textSnapshots, setTextSnapshots] = useState<Record<string, string>>({}); // { [mrpakId]: text }
   const [externalStylesMap, setExternalStylesMap] = useState<Record<string, { path: string; type: string }>>({}); // { [varName]: { path: string, type: string } }
   const [livePosition, setLivePosition] = useState<LivePosition>({ left: null, top: null, width: null, height: null });
@@ -225,27 +231,27 @@ function RenderFile({
     setExternalStylesMap,
   });
 
-  // Р”РІРµ РєРѕРїРёРё AST РґР»СЏ bidirectional editing
-  // РњРµРЅРµРґР¶РµСЂ РґР»СЏ bidirectional editing С‡РµСЂРµР· РґРІР° AST
+  // Two AST copies for bidirectional editing
+  // Manager for bidirectional editing through two ASTs
   const astManagerRef = useRef<AstBidirectionalManager | null>(null);
 
-  // Р РµС„С‹ РґР»СЏ Р°РєС‚СѓР°Р»СЊРЅС‹С… Р·РЅР°С‡РµРЅРёР№ staged СЃРѕСЃС‚РѕСЏРЅРёР№ (С‡С‚РѕР±С‹ РёР·Р±РµРіР°С‚СЊ СѓСЃС‚Р°СЂРµРІС€РёС… Р·Р°РјС‹РєР°РЅРёР№)
+  // Refs for actual values of staged states (to avoid stale closures)
   const stagedPatchesRef = useRef<Record<string, StylePatch>>(stagedPatches);
   const stagedOpsRef = useRef<StagedOp[]>(stagedOps);
   const stagedComponentImportsRef = useRef<StagedComponentImport[]>(stagedComponentImports);
   const hasStagedChangesRef = useRef<boolean>(hasStagedChanges);
   const saveFileRef = useRef<((contentToSave?: string | null) => Promise<void>) | null>(null);
 
-  // Р—Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РёСЂРѕРІР°РЅРёСЏ РѕРїРµСЂР°С†РёР№
+  // Protection against operation duplication
   const lastInsertOperationRef = useRef<InsertHistoryOperation | null>(null);
   const lastDeleteOperationRef = useRef<DeleteOperationDedup | null>(null);
-  const lastReparentOperationRef = useRef<any>(null);
+  const lastReparentOperationRef = useRef<{ key: string; timestamp: number } | null>(null);
 
-  // РҐРµР»РїРµСЂС‹ РґР»СЏ СЃРёРЅС…СЂРѕРЅРЅРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ state + ref РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ
+  // Helpers for synchronous update of state + ref simultaneously
   const updateStagedPatches = useCallback((updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>) => {
     setStagedPatches((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      stagedPatchesRef.current = next; // РЎРРќРҐР РћРќРќРћ РѕР±РЅРѕРІР»СЏРµРј ref
+      stagedPatchesRef.current = next; // SYNCHRONOUSLY update ref
       return next;
     });
   }, []);
@@ -253,7 +259,7 @@ function RenderFile({
   const updateStagedOps = useCallback((updater: ((prev: StagedOp[]) => StagedOp[]) | StagedOp[]) => {
     setStagedOps((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      stagedOpsRef.current = next; // РЎРРќРҐР РћРќРќРћ РѕР±РЅРѕРІР»СЏРµРј ref
+      stagedOpsRef.current = next; // SYNCHRONOUSLY update ref
       return next;
     });
   }, []);
@@ -275,22 +281,50 @@ function RenderFile({
 
   const updateHasStagedChanges = useCallback((value: boolean) => {
     setHasStagedChanges(value);
-    hasStagedChangesRef.current = value; // РЎРРќРҐР РћРќРќРћ РѕР±РЅРѕРІР»СЏРµРј ref
+    hasStagedChangesRef.current = value; // SYNCHRONOUSLY update ref
   }, []);
 
-  // Ref РґР»СЏ stageReparentBlock (РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ handleEditorMessage РґРѕ РѕРїСЂРµРґРµР»РµРЅРёСЏ С„СѓРЅРєС†РёРё)
+  // Ref for stageReparentBlock (used in handleEditorMessage before function definition)
   const stageReparentBlockRef = useRef<((params: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => void) | null>(null);
-  // Ref РґР»СЏ stageInsertBlock (РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ handleEditorMessage РґРѕ РѕРїСЂРµРґРµР»РµРЅРёСЏ С„СѓРЅРєС†РёРё)
-  const stageInsertBlockRef = useRef<((params: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => any) | null>(null);
+  // Ref for stageInsertBlock (used in handleEditorMessage before function definition)
+  const stageInsertBlockRef = useRef<
+    ((params: {
+      targetId: string;
+      mode: 'child' | 'sibling';
+      snippet: string;
+      skipIframeInsert?: boolean;
+    }) => string | null) | null
+  >(null);
 
-  // getFileType Рё getMonacoLanguage РёРјРїРѕСЂС‚РёСЂРѕРІР°РЅС‹ РёР· shared/lib/file-type-detector.js
+  // getFileType and getMonacoLanguage imported from shared/lib/file-type-detector.js
 
-  // injectBlockEditorScript С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // injectBlockEditorScript now imported from module
 
-  // РљРѕРјР°РЅРґС‹ РґР»СЏ iframe - РѕРїСЂРµРґРµР»СЏРµРј СЂР°РЅРѕ, С‚Р°Рє РєР°Рє РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ undo/redo
-  const sendIframeCommand = useCallback((cmd: any) => {
-    setIframeCommand({ ...cmd, ts: Date.now() });
+  const pumpIframeCommands = useCallback(() => {
+    if (iframeCommandPumpScheduledRef.current) return;
+    const run = () => {
+      iframeCommandPumpScheduledRef.current = false;
+      const next = iframeCommandQueueRef.current.shift();
+      if (!next) return;
+      iframeCommandSeqRef.current += 1;
+      setIframeCommand({ ...next, seq: iframeCommandSeqRef.current });
+      if (iframeCommandQueueRef.current.length > 0) {
+        iframeCommandPumpScheduledRef.current = true;
+        window.setTimeout(run, 0);
+      }
+    };
+    iframeCommandPumpScheduledRef.current = true;
+    window.setTimeout(run, 0);
   }, []);
+
+  // Commands for iframe - define early as used in undo/redo
+  const sendIframeCommand = useCallback(
+    (cmd: Record<string, unknown>) => {
+      iframeCommandQueueRef.current.push(cmd);
+      pumpIframeCommands();
+    },
+    [pumpIframeCommands]
+  );
   const {
     undoStack,
     redoStack,
@@ -431,6 +465,7 @@ function RenderFile({
     stageReparentBlockRef,
     setError,
     stageInsertBlockRef,
+    sendIframeCommand,
     updateStagedComponentImports,
     updateHasStagedChanges,
     setFileContent,
@@ -456,7 +491,7 @@ function RenderFile({
     [projectRoot, filePath]
   );
 
-  // РЎРѕР·РґР°РµРј framework СЌРєР·РµРјРїР»СЏСЂ РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ РєРѕРјРїРѕРЅРµРЅС‚Рµ
+  // Create framework instance for use in component
   const framework = useMemo(() => {
     if (!fileType || !filePath || !isFrameworkSupported(fileType)) {
       return null;
@@ -466,7 +501,7 @@ function RenderFile({
   stageInsertBlockRef.current = stageInsertBlock;
   stageReparentBlockRef.current = stageReparentBlock;
 
-  // РћР±СЂР°Р±РѕС‚РєР° РёР·РјРµРЅРµРЅРёР№ РІ СЂРµРґР°РєС‚РѕСЂРµ СЃ Р°РІС‚РѕСЃРѕС…СЂР°РЅРµРЅРёРµРј
+  // Handle editor changes with auto-save
   useEffect(() => {
     saveFileRef.current = saveFile;
   }, [saveFile]);
@@ -498,7 +533,7 @@ function RenderFile({
     astManagerRef,
   });
 
-  // РџРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј С‚РёРї С„Р°Р№Р»Р° РїРѕСЃР»Рµ Р·Р°РіСЂСѓР·РєРё СЃРѕРґРµСЂР¶РёРјРѕРіРѕ
+  // Redefine file type after loading content
   useEffect(() => {
     if (fileContent && filePath) {
       const refinedType = getFileType(filePath, fileContent);
@@ -507,7 +542,7 @@ function RenderFile({
         setFileType(refinedType);
       }
     }
-  }, [fileContent, filePath]); // fileType РЅРµ РІРєР»СЋС‡Р°РµРј РІ deps, С‡С‚РѕР±С‹ РёР·Р±РµР¶Р°С‚СЊ С†РёРєР»РѕРІ
+  }, [fileContent, filePath]); // fileType not included in deps to avoid cycles
 
   useFileWatchSync({
     filePath,
@@ -593,10 +628,10 @@ function RenderFile({
     setFileContent,
   });
 
-  // РР·РІР»РµРєР°РµРј РІСЃРµ РёРјРїРѕСЂС‚С‹ РёР· РєРѕРґР°
-  // extractImports С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // Extract all imports from code
+  // extractImports now imported from module
 
-  // findProjectRoot Рё resolvePath С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓСЋС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // findProjectRoot and resolvePath now imported from module
 
   useSplitEditorHtml({
     viewMode,
@@ -611,27 +646,27 @@ function RenderFile({
     setBlockMapForFile,
   });
 
-  // resolvePathSync С‚РµРїРµСЂСЊ РёРјРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ РёР· РјРѕРґСѓР»СЏ
+  // resolvePathSync now imported from module
 
-  // Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РїРѕРёСЃРєР° РјРѕРґСѓР»СЏ РїРѕ СЂР°Р·Р»РёС‡РЅС‹Рј РїСѓС‚СЏРј
-  // РЎРёРЅС…СЂРѕРЅРЅР°СЏ РІРµСЂСЃРёСЏ, РёСЃРїРѕР»СЊР·СѓРµС‚ СѓР¶Рµ СЂР°Р·СЂРµС€РµРЅРЅС‹Рµ РїСѓС‚Рё РёР· pathMap
+  // Helper function for finding module by various paths
+  // Synchronous version, uses already resolved paths from pathMap
   const findModulePath = (
     importPath: string,
     basePath: string,
     pathMap: Record<string, string>,
     dependencyModules: Record<string, string>
   ) => {
-    // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РїРѕ РѕСЂРёРіРёРЅР°Р»СЊРЅРѕРјСѓ РїСѓС‚Рё (РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё, РєРѕС‚РѕСЂС‹Рµ СѓР¶Рµ СЂР°Р·СЂРµС€РµРЅС‹)
+    // Try to find by original path (including @ paths that are already resolved)
     if (pathMap[importPath]) {
       return pathMap[importPath];
     }
 
-    // РС‰РµРј РІ dependencyModules
+    // Search in dependencyModules
     if (dependencyModules[importPath]) {
       return dependencyModules[importPath];
     }
 
-    // Р Р°Р·СЂРµС€Р°РµРј РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ СЃРёРЅС…СЂРѕРЅРЅРѕ (РґР»СЏ РїСѓС‚РµР№ Р±РµР· @)
+    // Resolve relative path synchronously (for paths without @)
     if (!importPath.startsWith('@/') && !importPath.startsWith('http')) {
       const resolvedPath = resolvePathSync(basePath, importPath);
 
@@ -643,7 +678,7 @@ function RenderFile({
         pathMapKeys: Object.keys(pathMap).filter(k => k.includes(importPath) || k.includes(resolvedPath.split('/').pop() || '')).slice(0, 5)
       });
 
-      // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё
+      // Try to find by resolved path
       if (pathMap[resolvedPath]) {
         return pathMap[resolvedPath];
       }
@@ -652,28 +687,28 @@ function RenderFile({
         return dependencyModules[resolvedPath];
       }
 
-      // РР·РІР»РµРєР°РµРј РёРјСЏ С„Р°Р№Р»Р° РёР· СЂР°Р·СЂРµС€РµРЅРЅРѕРіРѕ РїСѓС‚Рё РґР»СЏ Р±РѕР»РµРµ РіРёР±РєРѕРіРѕ РїРѕРёСЃРєР°
+      // Extract file name from resolved path for more flexible search
       const fileName = resolvedPath.split('/').pop()?.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       const pathWithoutExt = resolvedPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
-      const lastPart = resolvedPath.split('/').slice(-2).join('/'); // РџРѕСЃР»РµРґРЅРёРµ 2 С‡Р°СЃС‚Рё РїСѓС‚Рё
+      const lastPart = resolvedPath.split('/').slice(-2).join('/'); // Last 2 parts of path
 
-      // РўР°РєР¶Рµ РїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё РІ РєР»СЋС‡Р°С…
-      // РќРѕСЂРјР°Р»РёР·СѓРµРј РїСѓС‚Рё РґР»СЏ СЃСЂР°РІРЅРµРЅРёСЏ (СѓР±РёСЂР°РµРј РЅР°С‡Р°Р»СЊРЅС‹Рµ/РєРѕРЅРµС‡РЅС‹Рµ СЃР»РµС€Рё)
+      // Also try to find by resolved path in keys
+      // Normalize paths for comparison (remove leading/trailing slashes)
       const normalizedResolved = resolvedPath.replace(/^\/+|\/+$/g, '');
       const normalizedPathWithoutExt = pathWithoutExt.replace(/^\/+|\/+$/g, '');
       const normalizedLastPart = lastPart.replace(/^\/+|\/+$/g, '');
 
-      // РС‰РµРј РїРѕ РІСЃРµРј Р·РЅР°С‡РµРЅРёСЏРј РІ pathMap (Р°Р±СЃРѕР»СЋС‚РЅС‹Рј РїСѓС‚СЏРј)
+      // Search by all values in pathMap (absolute paths)
       for (const [key, value] of Object.entries(pathMap)) {
         const normalizedKey = key.replace(/^\/+|\/+$/g, '');
         const normalizedValue = String(value).replace(/^\/+|\/+$/g, '');
 
-        // РўРѕС‡РЅРѕРµ СЃРѕРІРїР°РґРµРЅРёРµ
+        // Exact match
         if (normalizedKey === normalizedResolved || normalizedKey === normalizedPathWithoutExt) {
           return value;
         }
 
-        // РџСЂРѕРІРµСЂСЏРµРј, Р·Р°РєР°РЅС‡РёРІР°РµС‚СЃСЏ Р»Рё РєР»СЋС‡ РёР»Рё Р·РЅР°С‡РµРЅРёРµ РЅР° СЂР°Р·СЂРµС€РµРЅРЅС‹Р№ РїСѓС‚СЊ
+        // Check if key or value ends with resolved path
         if (normalizedKey.endsWith('/' + normalizedResolved) ||
             normalizedResolved.endsWith('/' + normalizedKey) ||
             normalizedKey.endsWith('/' + normalizedPathWithoutExt) ||
@@ -683,7 +718,7 @@ function RenderFile({
           return value;
         }
 
-        // РџСЂРѕРІРµСЂСЏРµРј Р·РЅР°С‡РµРЅРёРµ (Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ)
+        // Check value (absolute path)
         if (normalizedValue.endsWith('/' + normalizedResolved) ||
             normalizedResolved.endsWith('/' + normalizedValue) ||
             normalizedValue.endsWith('/' + normalizedPathWithoutExt) ||
@@ -694,13 +729,13 @@ function RenderFile({
           return value;
         }
 
-        // РџСЂРѕРІРµСЂСЏРµРј РїРѕ РёРјРµРЅРё С„Р°Р№Р»Р°
+        // Check by file name
         if (normalizedKey.includes('/' + fileName) || normalizedValue.includes('/' + fileName + '.')) {
           return value;
         }
       }
 
-      // РџСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РІ dependencyModules РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё
+      // Try to find in dependencyModules by resolved path
       for (const [key, value] of Object.entries(dependencyModules)) {
         const normalizedKey = String(key).replace(/^\/+|\/+$/g, '');
         if (normalizedKey === normalizedResolved ||
@@ -715,7 +750,7 @@ function RenderFile({
         }
       }
 
-      // РџРѕСЃР»РµРґРЅСЏСЏ РїРѕРїС‹С‚РєР°: РёС‰РµРј РїРѕ РІСЃРµРј Р·РЅР°С‡РµРЅРёСЏРј РІ pathMap, РєРѕС‚РѕСЂС‹Рµ Р·Р°РєР°РЅС‡РёРІР°СЋС‚СЃСЏ РЅР° РёРјСЏ С„Р°Р№Р»Р°
+      // Last attempt: search by all values in pathMap that end with file name
       for (const [key, value] of Object.entries(pathMap)) {
         const valueStr = String(value);
         if (valueStr.includes(fileName + '.js') || valueStr.includes(fileName + '.jsx') ||
@@ -723,7 +758,7 @@ function RenderFile({
             valueStr.endsWith('/' + fileName) || valueStr.endsWith('/' + fileName + '.js') ||
             valueStr.endsWith('/' + fileName + '.jsx') || valueStr.endsWith('/' + fileName + '.ts') ||
             valueStr.endsWith('/' + fileName + '.tsx')) {
-          // РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ СЌС‚Рѕ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ РЅСѓР¶РЅС‹Р№ С„Р°Р№Р» РїРѕ РїРѕСЃР»РµРґРЅРёРј С‡Р°СЃС‚СЏРј РїСѓС‚Рё
+          // Check that this is actually the needed file by last parts of path
           const valueParts = valueStr.split('/');
           const resolvedParts = resolvedPath.split('/');
           if (valueParts.length >= 2 && resolvedParts.length >= 2) {
@@ -737,7 +772,7 @@ function RenderFile({
         }
       }
 
-      // Р•С‰Рµ РѕРґРЅР° РїРѕРїС‹С‚РєР°: РёС‰РµРј РїРѕ РІСЃРµРј РєР»СЋС‡Р°Рј, РєРѕС‚РѕСЂС‹Рµ СЃРѕРґРµСЂР¶Р°С‚ РїРѕСЃР»РµРґРЅРёРµ С‡Р°СЃС‚Рё РїСѓС‚Рё
+      // Another attempt: search by all keys that contain last parts of path
       const resolvedParts = resolvedPath.split('/');
       if (resolvedParts.length >= 2) {
         const targetLast2 = resolvedParts.slice(-2).join('/');
@@ -747,12 +782,12 @@ function RenderFile({
           const keyStr = String(key);
           const valueStr = String(value);
 
-          // РџСЂРѕРІРµСЂСЏРµРј, СЃРѕРґРµСЂР¶РёС‚ Р»Рё РєР»СЋС‡ РёР»Рё Р·РЅР°С‡РµРЅРёРµ РїРѕСЃР»РµРґРЅРёРµ С‡Р°СЃС‚Рё РїСѓС‚Рё
+          // Check if key or value contains last parts of path
           if (keyStr.includes(targetLast2) || keyStr.includes(targetLast2NoExt) ||
               valueStr.includes(targetLast2) || valueStr.includes(targetLast2NoExt) ||
               keyStr.endsWith(targetLast2) || keyStr.endsWith(targetLast2NoExt) ||
               valueStr.endsWith(targetLast2) || valueStr.endsWith(targetLast2NoExt)) {
-            // РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ СЌС‚Рѕ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ РЅСѓР¶РЅС‹Р№ С„Р°Р№Р»
+            // Check that this is actually the needed file
             const valueParts = valueStr.split('/');
             if (valueParts.length >= 2) {
               const valueLast2 = valueParts.slice(-2).join('/');
@@ -767,15 +802,15 @@ function RenderFile({
       }
     }
 
-    // Р•СЃР»Рё РїСѓС‚СЊ СЃ @, РїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РµРіРѕ СЂР°Р·СЂРµС€РµРЅРЅСѓСЋ РІРµСЂСЃРёСЋ
+    // If path has @, try to find its resolved version
     if (importPath.startsWith('@/')) {
-      // РС‰РµРј РІСЃРµ РєР»СЋС‡Рё, РєРѕС‚РѕСЂС‹Рµ РјРѕРіСѓС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІРѕРІР°С‚СЊ СЌС‚РѕРјСѓ @ РїСѓС‚Рё
+      // Search all keys that might match this @ path
       for (const [key, value] of Object.entries(pathMap)) {
         if (key.includes(importPath.substring(2)) || value.includes(importPath.substring(2))) {
           return value;
         }
       }
-      // РўР°РєР¶Рµ РёС‰РµРј РІ dependencyModules
+      // Also search in dependencyModules
       for (const [key, value] of Object.entries(dependencyModules)) {
         if (key.includes(importPath.substring(2)) || value.includes(importPath.substring(2))) {
           return value;
@@ -789,11 +824,11 @@ function RenderFile({
       resolvedPath: !importPath.startsWith('@/') && !importPath.startsWith('http') ? resolvePathSync(basePath, importPath) : 'N/A'
     });
 
-    // Р’РѕР·РІСЂР°С‰Р°РµРј РѕСЂРёРіРёРЅР°Р»СЊРЅС‹Р№ РїСѓС‚СЊ РєР°Рє fallback
+    // Return original path as fallback
     return importPath;
   };
 
-  // Р РµРєСѓСЂСЃРёРІРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ Р·Р°РіСЂСѓР·РєРё РІСЃРµС… Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+  // Recursive function to load all dependencies
   const isCoreReactImport = (importPath: string) => /^(react|react-dom|react-native)(\/|$)/.test(String(importPath || '').trim());
   const isHttpImport = (importPath: string) => /^https?:\/\//i.test(String(importPath || '').trim());
   const isProjectAliasImport = (importPath: string) => String(importPath || '').trim().startsWith('@/');
@@ -829,7 +864,7 @@ function RenderFile({
       alreadyLoaded: loadedDeps.has(importPath)
     });
 
-    // Р Р°Р·СЂРµС€Р°РµРј РїСѓС‚СЊ (С‚РµРїРµСЂСЊ Р°СЃРёРЅС…СЂРѕРЅРЅРѕ РґР»СЏ РїРѕРґРґРµСЂР¶РєРё @ РїСѓС‚РµР№)
+    // Resolve path (now async for @ path support)
     const resolvedPath = await resolvePathMemo(basePath, importPath);
 
     console.log(`[LoadAllDependencies] Resolved path:`, {
@@ -838,16 +873,16 @@ function RenderFile({
       resolvedPath
     });
 
-    // РСЃРїРѕР»СЊР·СѓРµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РєР°Рє РєР»СЋС‡ РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ РґСѓР±Р»РёСЂРѕРІР°РЅРёСЏ
+    // Use absolute path as key to prevent duplication
     if (loadedDeps.has(resolvedPath)) {
-      // Р•СЃР»Рё С„Р°Р№Р» СѓР¶Рµ Р·Р°РіСЂСѓР¶РµРЅ, РґРѕР±Р°РІР»СЏРµРј С‚РѕР»СЊРєРѕ РјР°РїРїРёРЅРі РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРіРѕ РїСѓС‚Рё
+      // If file already loaded, add only relative path mapping
       console.log(`[LoadAllDependencies] Dependency already loaded: ${importPath} (resolved: ${resolvedPath}) from ${baseFileName}`);
       pathMap[importPath] = resolvedPath;
       return { pathMap, actualPathMap };
     }
     loadedDeps.add(resolvedPath);
 
-    // Р—Р°РіСЂСѓР¶Р°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ РїРѕ СЂР°Р·СЂРµС€РµРЅРЅРѕРјСѓ РїСѓС‚Рё
+    // Load dependency by resolved path
     const depResult = await loadDependency(basePath, importPath);
     if (!depResult.success) {
       console.warn(`[LoadAllDependencies] Failed to load dependency from ${baseFileName}:`, {
@@ -870,37 +905,37 @@ function RenderFile({
     const depPath = String(depResult.path ?? resolvedPath);
     const depContent = String(depResult.content ?? '');
 
-    // РЎРѕС…СЂР°РЅСЏРµРј С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р° РґР»СЏ СЂР°Р·СЂРµС€РµРЅРЅРѕРіРѕ РїСѓС‚Рё
+    // Save actual file path for resolved path
     actualPathMap[resolvedPath] = depPath;
     actualPathMap[depPath] = depPath;
 
-    // РЎРѕС…СЂР°РЅСЏРµРј РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё РєР°Рє РѕСЃРЅРѕРІРЅРѕРјСѓ РєР»СЋС‡Сѓ
+    // Save by absolute path as main key
     dependencyMap[resolvedPath] = depContent;
     dependencyPaths.push(depPath);
 
-    // РЎРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі: РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ -> Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ
+    // Save mapping: relative path -> absolute path
     pathMap[importPath] = resolvedPath;
-    // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі СЂР°Р·СЂРµС€РµРЅРЅРѕРіРѕ РїСѓС‚Рё (РµСЃР»Рё РѕРЅ РѕС‚Р»РёС‡Р°РµС‚СЃСЏ РѕС‚ С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°)
+    // Also save mapping of resolved path (if it differs from actual file path)
     if (resolvedPath !== depPath) {
       pathMap[resolvedPath] = depPath;
     }
-    // РЎРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р° Рє СЃР°РјРѕРјСѓ СЃРµР±Рµ
+    // Save mapping of actual file path to itself
     pathMap[depPath] = depPath;
 
-    // Р”Р»СЏ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№ С‚Р°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј СЂР°Р·СЂРµС€РµРЅРЅС‹Р№ РїСѓС‚СЊ РєР°Рє РєР»СЋС‡
-    // Р­С‚Рѕ РїРѕРјРѕР¶РµС‚ РЅР°Р№С‚Рё РјРѕРґСѓР»СЊ, РєРѕРіРґР° РјС‹ СЂР°Р·СЂРµС€Р°РµРј РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ РІ findModulePath
+    // For relative paths also save resolved path as key
+    // This helps find module when we resolve relative path in findModulePath
     if (importPath.startsWith('./') || importPath.startsWith('../')) {
-      // Р Р°Р·СЂРµС€Р°РµРј РїСѓС‚СЊ СЃРёРЅС…СЂРѕРЅРЅРѕ РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ РјР°РїРїРёРЅРіР°
+      // Resolve path synchronously for saving mapping
       const syncResolved = resolvePathSync(basePath, importPath);
       if (syncResolved !== resolvedPath && syncResolved !== depPath && !pathMap[syncResolved]) {
         pathMap[syncResolved] = depPath;
       }
-      // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РїСѓС‚СЊ Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ
+      // Also save path without extension
       const syncResolvedNoExt = syncResolved.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
       if (syncResolvedNoExt !== syncResolved && syncResolvedNoExt !== depPath && !pathMap[syncResolvedNoExt]) {
         pathMap[syncResolvedNoExt] = depPath;
       }
-      // РЎРѕС…СЂР°РЅСЏРµРј РїРѕСЃР»РµРґРЅРёРµ 2 С‡Р°СЃС‚Рё РїСѓС‚Рё (РЅР°РїСЂРёРјРµСЂ, styles/commonStyles)
+      // Save last 2 parts of path (e.g., styles/commonStyles)
       const pathParts = syncResolved.split('/');
       if (pathParts.length >= 2) {
         const last2Parts = pathParts.slice(-2).join('/');
@@ -914,13 +949,13 @@ function RenderFile({
       }
     }
 
-    // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РїСѓС‚СЊ Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ РґР»СЏ С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°
+    // Also save path without extension for actual file path
     const depPathNoExt = depPath.replace(/\.(js|jsx|ts|tsx|png|jpe?g|gif|webp|avif|bmp|svg)$/, '');
     if (depPathNoExt !== depPath && !pathMap[depPathNoExt]) {
       pathMap[depPathNoExt] = depPath;
     }
 
-    // РЎРѕС…СЂР°РЅСЏРµРј РїРѕСЃР»РµРґРЅРёРµ 2 С‡Р°СЃС‚Рё С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°
+    // Save last 2 parts of actual file path
     const depPathParts = depPath.split('/');
     if (depPathParts.length >= 2) {
       const depLast2Parts = depPathParts.slice(-2).join('/');
@@ -940,7 +975,7 @@ function RenderFile({
       savedKeys: Object.keys(pathMap).filter(k => pathMap[k] === depPath).slice(0, 10)
     });
 
-    // РР·РІР»РµРєР°РµРј РёРјРїРѕСЂС‚С‹ РёР· Р·Р°РіСЂСѓР¶РµРЅРЅРѕР№ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
+    // Extract imports from loaded dependency
     const depFileName = depPath.split('/').pop() || depPath.split('\\').pop() || 'unknown';
     const depImports = extractImports(depContent, depFileName);
 
@@ -950,11 +985,11 @@ function RenderFile({
       imports: depImports.map(i => ({ path: i.path, line: i.line }))
     });
 
-    // Р РµРєСѓСЂСЃРёРІРЅРѕ Р·Р°РіСЂСѓР¶Р°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
-    const depBasePath = depPath; // РСЃРїРѕР»СЊР·СѓРµРј С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р° РєР°Рє Р±Р°Р·РѕРІС‹Р№
+    // Recursively load dependencies of dependencies
+    const depBasePath = depPath; // Use actual file path as base
     for (const depImp of depImports) {
-      // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
-      // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
+      // Skip only external libraries (npm packages)
+      // Now process local imports, including @ paths
       if (isCoreReactImport(depImp.path) ||
           isHttpImport(depImp.path) ||
           isBarePackageImport(depImp.path)) {
@@ -969,7 +1004,7 @@ function RenderFile({
         basePath: depBasePath
       });
 
-      // Р РµРєСѓСЂСЃРёРІРЅРѕ Р·Р°РіСЂСѓР¶Р°РµРј СЃ РїСЂР°РІРёР»СЊРЅС‹Рј Р±Р°Р·РѕРІС‹Рј РїСѓС‚РµРј (С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р°)
+      // Recursively load with correct base path (actual file path)
       const result = await loadAllDependencies(depImp.path, depBasePath, loadedDeps, dependencyMap, dependencyPaths, pathMap, actualPathMap);
       if (result) {
         Object.assign(pathMap, result.pathMap);
@@ -983,9 +1018,9 @@ function RenderFile({
     return { pathMap, actualPathMap };
   };
 
-  // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РєРѕРґ React С„Р°Р№Р»Р° СЃ РїРѕРґРґРµСЂР¶РєРѕР№ Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+  // Process React file code with dependency support
   const processReactCode = async (code, basePath) => {
-    // РР·РІР»РµРєР°РµРј РёРјРїРѕСЂС‚С‹
+    // Extract imports
     const fileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
     const imports = extractImports(code, fileName);
     console.log(`[ProcessReactCode] Processing file: ${fileName}`, {
@@ -997,18 +1032,18 @@ function RenderFile({
 
     const dependencies: Record<string, string> = {};
     const dependencyModules: Record<string, string> = {};
-    const dependencyPaths: string[] = []; // РњР°СЃСЃРёРІ РїСѓС‚РµР№ Рє Р·Р°РІРёСЃРёРјС‹Рј С„Р°Р№Р»Р°Рј
-    const loadedDeps = new Set<string>(); // Р”Р»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ С†РёРєР»РёС‡РµСЃРєРёС… Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
-    const pathMap: Record<string, string> = {}; // РњР°РїРїРёРЅРі: РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ -> Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ
-    const actualPathMap: Record<string, string> = {}; // РњР°РїРїРёРЅРі: СЂР°Р·СЂРµС€РµРЅРЅС‹Р№ РїСѓС‚СЊ -> С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р°
+    const dependencyPaths: string[] = []; // Array of paths to dependency files
+    const loadedDeps = new Set<string>(); // To prevent circular dependencies
+    const pathMap: Record<string, string> = {}; // Mapping: relative path -> absolute path
+    const actualPathMap: Record<string, string> = {}; // Mapping: resolved path -> actual file path
     const directCssBlocks: string[] = [];
     const directCssSeenPaths = new Set<string>();
     const externalPackageImports = new Set<string>();
 
-    // Р—Р°РіСЂСѓР¶Р°РµРј РІСЃРµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё СЂРµРєСѓСЂСЃРёРІРЅРѕ
+    // Load all dependencies recursively
     for (const imp of imports) {
-      // РџСЂРѕРїСѓСЃРєР°РµРј С‚РѕР»СЊРєРѕ РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё (npm РїР°РєРµС‚С‹)
-      // РўРµРїРµСЂСЊ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р»РѕРєР°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹, РІРєР»СЋС‡Р°СЏ @ РїСѓС‚Рё
+      // Skip only external libraries (npm packages)
+      // Now process local imports, including @ paths
       if (isCoreReactImport(imp.path) || isHttpImport(imp.path)) {
         console.log(`[ProcessReactCode] Skipping external library: ${imp.path} from ${fileName}`);
         continue;
@@ -1028,7 +1063,7 @@ function RenderFile({
       });
 
       const result = await loadAllDependencies(imp.path, basePath, loadedDeps, dependencies, dependencyPaths, pathMap, actualPathMap);
-      // РћР±СЉРµРґРёРЅСЏРµРј СЂРµР·СѓР»СЊС‚Р°С‚С‹
+      // Merge results
       if (result) {
         Object.assign(pathMap, result.pathMap);
         Object.assign(actualPathMap, result.actualPathMap);
@@ -1049,19 +1084,19 @@ function RenderFile({
       }
     }
 
-    // РСЃРїРѕР»СЊР·СѓРµРј pathMap РґР»СЏ Р·Р°РїРѕР»РЅРµРЅРёСЏ dependencyModules
-    // РћСЃРЅРѕРІРЅРѕР№ РєР»СЋС‡ - Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ, РЅРѕ С‚Р°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№
+    // Use pathMap to populate dependencyModules
+    // Main key is absolute path, but also save relative path mappings
     for (const [relativePath, absolutePath] of Object.entries(pathMap)) {
-      // РЎРѕС…СЂР°РЅСЏРµРј РјР°РїРїРёРЅРі РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРіРѕ РїСѓС‚Рё Рє Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ
+      // Save mapping of relative path to absolute path
       dependencyModules[relativePath] = absolutePath;
-      // РўР°РєР¶Рµ СЃРѕС…СЂР°РЅСЏРµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РєР°Рє РєР»СЋС‡ (РµСЃР»Рё РѕРЅ РµС‰Рµ РЅРµ СЃРѕС…СЂР°РЅРµРЅ)
+      // Also save absolute path as key (if not already saved)
       if (!dependencyModules[absolutePath]) {
         dependencyModules[absolutePath] = absolutePath;
       }
     }
 
-    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РєРѕРґ - СѓРґР°Р»СЏРµРј РёРјРїРѕСЂС‚С‹ React, РЅРѕ СЃРѕС…СЂР°РЅСЏРµРј Р»РѕРєР°Р»СЊРЅС‹Рµ
-    // РЎРЅР°С‡Р°Р»Р° СЃРѕС…СЂР°РЅСЏРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ default export РїРµСЂРµРґ СѓРґР°Р»РµРЅРёРµРј
+    // Process code - remove React imports, but keep local
+    // First save default export info before removal
     let defaultExportInfo: { name: string; type: string } | null = null;
     const defaultExportMatch = code.match(/export\s+default\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/);
     if (defaultExportMatch) {
@@ -1072,11 +1107,11 @@ function RenderFile({
     }
 
     let processedCode = code
-      // РЈРґР°Р»СЏРµРј import React from 'react'
+      // Remove import React from 'react'
       .replace(/import\s+React\s+from\s+['"]react['"];?\s*/gi, '')
-      // РЈРґР°Р»СЏРµРј import { ... } from 'react'
+      // Remove import { ... } from 'react'
       .replace(/import\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '')
-      // РЈРґР°Р»СЏРµРј export default, РѕСЃС‚Р°РІР»СЏРµРј С‚РѕР»СЊРєРѕ РѕРїСЂРµРґРµР»РµРЅРёРµ
+      // Remove export default, keep only definition
       .replace(/export\s+default\s+/g, '')
       .trim();
 
@@ -1086,13 +1121,13 @@ function RenderFile({
       processedCode = `${IMPORTED_COMPONENT_BOUNDARY_HELPER}\n${processedCode}`;
     }
 
-    // РЎРѕР·РґР°РµРј РєРѕРґ РґР»СЏ РјРѕРґСѓР»РµР№ Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+    // Create code for dependency modules
     let modulesCode = '';
     let collectedCss = '';
     let importReplacements = {};
 
-    // РЇРІРЅРѕ РґРѕР±Р°РІР»СЏРµРј CSS, РёРјРїРѕСЂС‚РёСЂРѕРІР°РЅРЅС‹Р№ РЅР°РїСЂСЏРјСѓСЋ РІ С‚РµРєСѓС‰РµРј С„Р°Р№Р»Рµ (side-effect imports),
-    // С‡С‚РѕР±С‹ СЃС‚РёР»Рё РіР°СЂР°РЅС‚РёСЂРѕРІР°РЅРЅРѕ РїРѕРїР°РґР°Р»Рё РІ preview.
+    // Explicitly add CSS imported directly in current file (side-effect imports)
+    // to ensure styles are guaranteed to appear in preview.
     if (directCssBlocks.length > 0) {
       collectedCss += directCssBlocks.join('');
     }
@@ -1149,14 +1184,14 @@ function RenderFile({
       return alias ? `const ${alias} = {};` : '';
     };
 
-    // РЎРѕР±РёСЂР°РµРј СѓРЅРёРєР°Р»СЊРЅС‹Рµ Р°Р±СЃРѕР»СЋС‚РЅС‹Рµ РїСѓС‚Рё РёР· pathMap
+    // Collect unique absolute paths from pathMap
     const uniqueAbsolutePaths = new Set(Object.values(pathMap));
-    const processedDeps = new Set(); // Р”Р»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ СѓР¶Рµ РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… Р°Р±СЃРѕР»СЋС‚РЅС‹С… РїСѓС‚РµР№
+    const processedDeps = new Set(); // To track already processed absolute paths
 
-    // РЎРѕР±РёСЂР°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Р·Р°РІРёСЃРёРјРѕСЃС‚СЏС… РєР°Р¶РґРѕРіРѕ РјРѕРґСѓР»СЏ РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё
+    // Collect dependency information for each module for sorting
     const moduleDependencies = new Map(); // absolutePath -> Set of absolute paths of dependencies
 
-    // РЎРЅР°С‡Р°Р»Р° СЃРѕР±РёСЂР°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РґР»СЏ РєР°Р¶РґРѕРіРѕ РјРѕРґСѓР»СЏ
+    // First collect dependencies for each module
     for (const absolutePath of uniqueAbsolutePaths) {
       if (processedDeps.has(absolutePath)) {
         continue;
@@ -1173,12 +1208,12 @@ function RenderFile({
 
       if (!content) continue;
 
-      // РР·РІР»РµРєР°РµРј РёРјРїРѕСЂС‚С‹ РёР· РјРѕРґСѓР»СЏ
+      // Extract imports from module
       const depImports = extractImports(content, absolutePath);
       const depSet = new Set();
 
       for (const imp of depImports) {
-        // РџСЂРѕРїСѓСЃРєР°РµРј РІРЅРµС€РЅРёРµ Р±РёР±Р»РёРѕС‚РµРєРё
+        // Skip external libraries
         if (isBarePackageImport(imp.path)) {
           externalPackageImports.add(imp.path);
           continue;
@@ -1187,7 +1222,7 @@ function RenderFile({
           continue;
         }
 
-        // РќР°С…РѕРґРёРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
+        // Find absolute path of dependency
         const depResolvedPath = pathMap[imp.path] || dependencyModules[imp.path];
         if (
           depResolvedPath &&
@@ -1201,14 +1236,14 @@ function RenderFile({
       moduleDependencies.set(absolutePath, depSet);
     }
 
-    // РўРѕРїРѕР»РѕРіРёС‡РµСЃРєР°СЏ СЃРѕСЂС‚РёСЂРѕРІРєР° РјРѕРґСѓР»РµР№ РїРѕ Р·Р°РІРёСЃРёРјРѕСЃС‚СЏРј
+    // Topological sort of modules by dependencies
     const sortedModules: string[] = [];
     const visited: Set<string> = new Set();
     const visiting: Set<string> = new Set();
 
     const visit = (modulePath) => {
       if (visiting.has(modulePath)) {
-        // Р¦РёРєР»РёС‡РµСЃРєР°СЏ Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ - РїСЂРѕРїСѓСЃРєР°РµРј
+        // Circular dependency - skip
         return;
       }
       if (visited.has(modulePath)) {
@@ -1227,7 +1262,7 @@ function RenderFile({
       sortedModules.push(modulePath);
     };
 
-    // Р—Р°РїСѓСЃРєР°РµРј С‚РѕРїРѕР»РѕРіРёС‡РµСЃРєСѓСЋ СЃРѕСЂС‚РёСЂРѕРІРєСѓ
+    // Run topological sort
     for (const absolutePath of uniqueAbsolutePaths) {
       if (!visited.has(absolutePath)) {
         visit(absolutePath);
@@ -1236,17 +1271,17 @@ function RenderFile({
 
     console.log('RenderFile: Sorted modules by dependencies:', sortedModules.map(p => p.split('/').pop()));
 
-    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РєР°Р¶РґСѓСЋ Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ РІ РѕС‚СЃРѕСЂС‚РёСЂРѕРІР°РЅРЅРѕРј РїРѕСЂСЏРґРєРµ
-    processedDeps.clear(); // РЎР±СЂР°СЃС‹РІР°РµРј РґР»СЏ РїРѕРІС‚РѕСЂРЅРѕРіРѕ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ
+    // Process each dependency in sorted order
+    processedDeps.clear(); // Reset for reuse
     for (const absolutePath of sortedModules) {
       if (processedDeps.has(absolutePath)) {
         continue;
       }
       processedDeps.add(absolutePath);
 
-      // РџРѕР»СѓС‡Р°РµРј РєРѕРЅС‚РµРЅС‚ РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё
+      // Get content by absolute path
       let content = dependencies[absolutePath];
-      // Р•СЃР»Рё РЅРµ РЅР°Р№РґРµРЅРѕ РїРѕ Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё, РёС‰РµРј РїРѕ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕРјСѓ РёР· pathMap
+      // If not found by absolute path, search by relative from pathMap
       if (!content) {
         for (const [relPath, absPath] of Object.entries(pathMap)) {
           if (absPath === absolutePath) {
@@ -1260,22 +1295,22 @@ function RenderFile({
         continue;
       }
 
-      // РСЃРїРѕР»СЊР·СѓРµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Р№ РїСѓС‚СЊ РєР°Рє РѕСЃРЅРѕРІРЅРѕР№ РєР»СЋС‡ РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё
+      // Use absolute path as main key for processing
       if (isCssModulePath(absolutePath)) {
         collectedCss += `\n/* ${absolutePath} */\n${content}\n`;
         continue;
       }
 
       const importPath = absolutePath;
-      // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ
-      // РЎРЅР°С‡Р°Р»Р° РёР·РІР»РµРєР°РµРј РІСЃРµ СЌРєСЃРїРѕСЂС‚С‹
+      // Process dependencies
+      // First extract all exports
       let moduleExports: Record<string, unknown> = {};
       let hasDefaultExport = false;
       let defaultExportName: string | null = null;
       const namedExports: string[] = [];
 
-      // РџРѕР»СѓС‡Р°РµРј С„Р°РєС‚РёС‡РµСЃРєРёР№ РїСѓС‚СЊ С„Р°Р№Р»Р° РґР»СЏ С‚РµРєСѓС‰РµР№ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё (РґР»СЏ СЂР°Р·СЂРµС€РµРЅРёСЏ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹С… РїСѓС‚РµР№)
-      // РСЃРїРѕР»СЊР·СѓРµРј actualPathMap РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ РїСѓС‚Рё С„Р°Р№Р»Р°
+      // Get actual file path for current dependency (for resolving relative paths)
+      // Use actualPathMap to get actual file path
       const currentDepResolvedPath = dependencyModules[importPath] || importPath;
       const currentDepActualPath = actualPathMap[currentDepResolvedPath] || currentDepResolvedPath;
       const currentDepBasePath = currentDepActualPath.substring(0, currentDepActualPath.lastIndexOf('/'));
@@ -1360,16 +1395,16 @@ function RenderFile({
         continue;
       }
 
-      // РћС‚Р»Р°РґРѕС‡РЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ
+      // Debug information
       console.log('RenderFile: Processing dependency:', {
         importPath,
         currentDepResolvedPath,
         currentDepActualPath,
         currentDepBasePath,
-        pathMapKeys: Object.keys(pathMap).slice(0, 10) // РџРµСЂРІС‹Рµ 10 РєР»СЋС‡РµР№ РґР»СЏ РѕС‚Р»Р°РґРєРё
+        pathMapKeys: Object.keys(pathMap).slice(0, 10) // First 10 keys for debugging
       });
 
-      // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј СЌРєСЃРїРѕСЂС‚С‹
+      // Process exports
       const instrumentedDependency = instrumentJsx(String(content ?? ''), currentDepActualPath);
       let processedDep: string = String(instrumentedDependency.code ?? '');
 
@@ -1377,8 +1412,8 @@ function RenderFile({
       fetch('http://127.0.0.1:7243/ingest/2e43c4f2-f860-4c1d-996d-b01b5a2a2171',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RenderFile.jsx:605',message:'Processing dependency before removing imports',data:{importPath,contentLength:processedDep.length,hasImports:processedDep.includes('import'),hasExports:processedDep.includes('export')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
 
-      // РЎРќРђР§РђР›Рђ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј СЌРєСЃРїРѕСЂС‚С‹, РџРћРўРћРњ СѓРґР°Р»СЏРµРј РёРјРїРѕСЂС‚С‹
-      // Named exports: export const/let/var (РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р”Рћ СѓРґР°Р»РµРЅРёСЏ РёРјРїРѕСЂС‚РѕРІ)
+      // FIRST process exports, THEN remove imports
+      // Named exports: export const/let/var (process BEFORE import removal)
       const namedConstExports: string[] = [];
       processedDep = processedDep.replace(/export\s+(const|let|var)\s+(\w+)\s*=/g, (match: string, keyword: string, name: string) => {
         // #region agent log
@@ -1391,7 +1426,7 @@ function RenderFile({
         return `${keyword} ${name} =`;
       });
 
-      // Named exports: export function (РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј Р”Рћ СѓРґР°Р»РµРЅРёСЏ РёРјРїРѕСЂС‚РѕРІ)
+      // Named exports: export function (process BEFORE import removal)
       const namedFunctionExports: string[] = [];
       processedDep = processedDep.replace(/export\s+function\s+(\w+)/g, (match: string, name: string) => {
         namedFunctionExports.push(name);
@@ -1401,18 +1436,18 @@ function RenderFile({
         return `function ${name}`;
       });
 
-      // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РёРјРїРѕСЂС‚С‹ РёР· Р·Р°РІРёСЃРёРјРѕРіРѕ С„Р°Р№Р»Р° РїРµСЂРµРґ РІСЃС‚СЂР°РёРІР°РЅРёРµРј
-      // РРјРїРѕСЂС‚С‹ React Рё React Native Р±СѓРґСѓС‚ РґРѕСЃС‚СѓРїРЅС‹ РіР»РѕР±Р°Р»СЊРЅРѕ
-      // Р”Р»СЏ Р»РѕРєР°Р»СЊРЅС‹С… РёРјРїРѕСЂС‚РѕРІ Р·Р°РјРµРЅСЏРµРј РёС… РЅР° РєРѕРґ РґРѕСЃС‚СѓРїР° Рє РјРѕРґСѓР»СЏРј
+      // Process imports from dependency file before embedding
+      // React and React Native imports will be available globally
+      // For local imports replace them with module access code
       processedDep = processedDep
-        // РЈРґР°Р»СЏРµРј import React from 'react'
+        // Remove import React from 'react'
         .replace(/import\s+React\s+from\s+['"]react['"];?\s*/gi, '')
-        // РЈРґР°Р»СЏРµРј import { ... } from 'react'
+        // Remove import { ... } from 'react'
         .replace(/import\s*\{[^}]*\}\s*from\s+['"]react['"];?\s*/gi, '')
-        // РЈРґР°Р»СЏРµРј import { ... } from 'react-native'
+        // Remove import { ... } from 'react-native'
         .replace(/import\s*\{[^}]*\}\s*from\s+['"]react-native['"];?\s*/gi, '')
         .replace(/import\s+['"][^'"]+['"];?\s*/g, '')
-        // Р—Р°РјРµРЅСЏРµРј РІСЃРµ РѕСЃС‚Р°Р»СЊРЅС‹Рµ РёРјРїРѕСЂС‚С‹ РЅР° РєРѕРґ РґРѕСЃС‚СѓРїР° Рє РјРѕРґСѓР»СЏРј
+        // Replace all remaining imports with module access code
         .replace(/import\s+(.*?)\s+from\s+['"](.*?)['"];?\s*/g, (match: string, importSpec: string, depImportPath: string) => {
 
           const currentDepFileName = currentDepActualPath.split('/').pop() || currentDepActualPath.split('\\').pop() || 'unknown';
@@ -3211,7 +3246,7 @@ function RenderFile({
         );
 
         let packageJsonPath = '';
-        let packageRead: any = null;
+        let packageRead: { success?: boolean; content?: string } | null = null;
         for (const candidate of packageCandidates) {
           const readRes = await readFile(candidate);
           if (readRes?.success) {
@@ -3254,7 +3289,7 @@ function RenderFile({
           return false;
         }
 
-        let parsed: any = null;
+        let parsed: Record<string, unknown> | null = null;
         try {
           parsed = JSON.parse(String(packageRead.content || '{}'));
         } catch {
@@ -3367,6 +3402,19 @@ function RenderFile({
     [fileContent, handleAddProjectDependency, selectedBlock?.id, updateMonacoEditorWithScroll, updateStagedComponentImports, updateHasStagedChanges]
   );
 
+  const insertBlockWithSelection = useCallback(
+    (params: { targetId: string; mode: 'child' | 'sibling'; snippet: string }) => {
+      const newId = stageInsertBlock(params);
+      if (newId) {
+        setSelectedBlock({ id: newId });
+        setSelectedBlockIds([newId]);
+        sendIframeCommand({ type: MRPAK_CMD.SELECT, id: newId });
+      }
+      return newId;
+    },
+    [stageInsertBlock, sendIframeCommand, setSelectedBlock, setSelectedBlockIds]
+  );
+
   const blockEditorSidebarProps = useBlockEditorSidebarController({
     fileType: activeBlockEditorType,
     selectedBlock,
@@ -3379,7 +3427,8 @@ function RenderFile({
     layerNames,
     onRenameLayer: handleRenameLayer,
     onSendCommand: sendIframeCommand,
-    onInsertBlock: stageInsertBlock,
+    onInsertBlock: insertBlockWithSelection,
+    externalDropTargetState,
     onDeleteBlock: stageDeleteBlock,
     onReparentBlock: stageReparentBlock,
     onSetText: stageSetText,
@@ -3401,13 +3450,7 @@ function RenderFile({
   });
 
   const renderContentMetaOverlay = useCallback((label: string, componentName?: string | null) => (
-    <View style={styles.contentMetaOverlay} pointerEvents="none">
-      <View style={styles.fileTypeBadge}>
-        <Text style={styles.fileTypeText}>
-          {componentName ? `${label} • ${componentName}` : label}
-        </Text>
-      </View>
-    </View>
+    <RenderFileToolbar label={label} componentName={componentName} />
   ), []);
 
   const splitSidebarStyles = useMemo(() => ({
@@ -3426,18 +3469,6 @@ function RenderFile({
     }
     return isInternalSourceFilePath(filePath);
   }, [filePath, fileType]);
-
-  const renderBlockEditorPreview = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => (
-    <BlockEditorPanel
-      fileType={editorType}
-      html={html}
-      onMessage={handleEditorMessageStable}
-      outgoingMessage={iframeCommand}
-    />
-  ), [
-    handleEditorMessageStable,
-    iframeCommand,
-  ]);
 
   const renderPreviewFallbackOverlay = useCallback(() => {
     const canUseAggressiveMode =
@@ -3465,161 +3496,86 @@ function RenderFile({
     );
   }, [aggressivePreviewMode, previewOpenError, shouldOfferAggressiveMode]);
 
-  const renderBlockEditorSplitMode = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => {
-    const hasAnyVisiblePanel = showSplitSidebar || showSplitPreview || showSplitCode;
-    const previewWidth = showSplitCode ? `${splitLeftWidth * 100}%` : '100%';
-    const codeWidth = showSplitPreview ? `${(1 - splitLeftWidth) * 100}%` : '100%';
-    const dropTargetNode = externalDropTargetState?.targetId
-      ? layersTree?.nodes?.[externalDropTargetState.targetId]
-      : null;
-    const dropTargetLabel = dropTargetNode
-      ? `${dropTargetNode.componentName || dropTargetNode.tagName || 'block'} (${externalDropTargetState?.targetId})`
-      : (externalDropTargetState?.targetId || 'not selected');
-    const showExternalDropHint =
-      (Boolean(externalComponentDrag) && externalDropTargetState?.source === 'component') ||
-      (Boolean(externalFileDrag) && externalDropTargetState?.source === 'file');
+  const handleQuickSave = useCallback(() => {
+    if (hasStagedChanges) {
+      void commitStagedPatches();
+      return;
+    }
+    if (isModified) {
+      void saveFile();
+    }
+  }, [commitStagedPatches, hasStagedChanges, isModified, saveFile]);
 
-    return (
-      <View style={styles.splitModeRoot}>
-        <View style={styles.splitContainer} data-split-container="true" ref={setSplitContainerNode}>
-          {showSplitSidebar && (
-            <View style={[styles.splitSidebarPane, { width: splitSidebarWidth }]}>
-              <BlockEditorSidebar {...blockEditorSidebarProps} styles={splitSidebarStyles} />
-            </View>
-          )}
-          {showSplitSidebar && (showSplitPreview || showSplitCode) && (
-            <View
-              style={[styles.splitDivider, isResizing && resizeTarget === 'sidebar' && styles.splitDividerActive]}
-              onMouseDown={handleSplitResizeStart('sidebar')}
-              onTouchStart={handleSplitResizeStart('sidebar')}
-            />
-          )}
-          <View style={styles.splitMainPanels} data-split-main-panels="true" ref={setSplitMainPanelsNode}>
-            {showSplitPreview && (
-              <View style={[styles.splitLeft, { width: previewWidth, maxWidth: showSplitCode ? '80%' : '100%', minWidth: showSplitCode ? '20%' : 0 }]}>
-                <View style={styles.blockEditorPreviewContainer}>
-                  <View style={styles.previewViewportHost}>
-                    <View
-                      style={[
-                        styles.previewViewportFrame,
-                        previewViewportFrameStyle,
-                        canvasDevice === 'mobile' && styles.previewViewportFrameMobile,
-                      ]}
-                    >
-                      {renderBlockEditorPreview(editorType, html)}
-                      {renderPreviewFallbackOverlay()}
-                      {showExternalDropHint && (
-                        <View style={styles.dropTargetIndicator} pointerEvents="none">
-                          <Text style={styles.dropTargetIndicatorText}>
-                            Insert parent: {dropTargetLabel}
-                          </Text>
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        style={[
-                          styles.quickSaveButton,
-                          !(hasStagedChanges || isModified) && styles.quickSaveButtonDisabled,
-                        ]}
-                        disabled={!(hasStagedChanges || isModified)}
-                        onPress={() => {
-                          if (hasStagedChanges) {
-                            void commitStagedPatches();
-                            return;
-                          }
-                          if (isModified) {
-                            void saveFile();
-                          }
-                        }}
-                      >
-                        <Text style={styles.quickSaveButtonText}>Save changes</Text>
-                      </TouchableOpacity>
-                      {hasStagedChanges && (
-                        <View style={styles.saveIndicator} pointerEvents="none">
-                          <Text style={styles.saveIndicatorText}>* Unsaved changes</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </View>
-            )}
-            {showSplitPreview && showSplitCode && (
-              <View
-                style={[styles.splitDivider, isResizing && resizeTarget === 'main' && styles.splitDividerActive]}
-                onMouseDown={handleSplitResizeStart('main')}
-                onTouchStart={handleSplitResizeStart('main')}
-              />
-            )}
-            {showSplitCode && (
-              <View style={[styles.splitRight, { width: codeWidth, maxWidth: showSplitPreview ? '80%' : '100%', minWidth: showSplitPreview ? '20%' : 0 }]}>
-                <View style={styles.editorContainer}>
-                  <MonacoEditorWrapper
-                    value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
-                    language={getMonacoLanguage(fileType, filePath)}
-                    filePath={filePath}
-                    onChange={handleEditorChange}
-                    onSave={saveFile}
-                    editorRef={monacoEditorRef}
-                    onCodeCtrlClick={handleMonacoCtrlClick}
-                  />
-                  {isModified && (
-                    <View style={styles.saveIndicator} pointerEvents="none">
-                      <Text style={styles.saveIndicatorText}>* Unsaved changes (Ctrl+S)</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-            {!hasAnyVisiblePanel && (
-              <View style={styles.splitEmptyState}>
-                <Text style={styles.splitEmptyStateText}>Enable at least one panel</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        {isResizing && (
-          <View
-            style={[
-              styles.splitResizeOverlay,
-              resizeTarget === 'sidebar' ? styles.splitResizeOverlaySidebar : styles.splitResizeOverlayMain,
-            ]}
-            onMouseMove={handleSplitResize}
-            onMouseUp={handleSplitResizeEnd}
-            onTouchMove={handleSplitResize}
-            onTouchEnd={handleSplitResizeEnd}
-          />
-        )}
-      </View>
-    );
-  }, [
+  const renderSplitMode = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => (
+    <RenderFileSplitMode
+      editorType={editorType}
+      html={html}
+      blockEditorSidebarProps={blockEditorSidebarProps}
+      splitSidebarStyles={splitSidebarStyles}
+      showSplitSidebar={showSplitSidebar}
+      showSplitPreview={showSplitPreview}
+      showSplitCode={showSplitCode}
+      splitSidebarWidth={splitSidebarWidth}
+      splitLeftWidth={splitLeftWidth}
+      isResizing={isResizing}
+      resizeTarget={resizeTarget}
+      setSplitContainerNode={setSplitContainerNode}
+      setSplitMainPanelsNode={setSplitMainPanelsNode}
+      handleSplitResizeStart={handleSplitResizeStart}
+      handleSplitResize={handleSplitResize}
+      handleSplitResizeEnd={handleSplitResizeEnd}
+      previewViewportFrameStyle={previewViewportFrameStyle}
+      canvasDevice={canvasDevice}
+      onEditorMessage={handleEditorMessageStable}
+      iframeCommand={iframeCommand}
+      previewFallbackOverlay={renderPreviewFallbackOverlay()}
+      externalComponentDrag={externalComponentDrag}
+      externalFileDrag={externalFileDrag}
+      externalDropTargetState={externalDropTargetState}
+      layersTree={layersTree}
+      hasStagedChanges={hasStagedChanges}
+      isModified={isModified}
+      onQuickSave={handleQuickSave}
+      unsavedContent={unsavedContent}
+      fileContent={fileContent}
+      fileType={fileType}
+      filePath={filePath}
+      onEditorChange={handleEditorChange}
+      onSave={saveFile}
+      monacoEditorRef={monacoEditorRef}
+      onCodeCtrlClick={handleMonacoCtrlClick}
+    />
+  ), [
     blockEditorSidebarProps,
+    canvasDevice,
+    externalComponentDrag,
+    externalDropTargetState,
+    externalFileDrag,
     fileContent,
     filePath,
     fileType,
-    canvasDevice,
-    commitStagedPatches,
-    externalComponentDrag,
-    externalFileDrag,
-    externalDropTargetState,
     handleEditorChange,
-    handleSplitResizeStart,
+    handleEditorMessageStable,
+    handleQuickSave,
+    handleMonacoCtrlClick,
     handleSplitResize,
     handleSplitResizeEnd,
+    handleSplitResizeStart,
     hasStagedChanges,
+    iframeCommand,
     isModified,
     isResizing,
     layersTree,
-    resizeTarget,
-    renderBlockEditorPreview,
+    monacoEditorRef,
+    previewViewportFrameStyle,
     renderPreviewFallbackOverlay,
+    resizeTarget,
     saveFile,
     setSplitContainerNode,
     setSplitMainPanelsNode,
     showSplitCode,
     showSplitPreview,
     showSplitSidebar,
-    shouldOfferAggressiveMode,
-    previewViewportFrameStyle,
     splitLeftWidth,
     splitSidebarStyles,
     splitSidebarWidth,
@@ -3628,44 +3584,29 @@ function RenderFile({
 
   if (!filePath) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.placeholderText}>
-          Select a file to display
-        </Text>
-        <Text style={styles.hintText}>
-          Supported: HTML, React (JSX/TSX), JavaScript, TypeScript, CSS, JSON
-        </Text>
-      </View>
+      <RenderFileHeader
+        mode="placeholder"
+        title="Select a file to display"
+        subtitle="Supported: HTML, React (JSX/TSX), JavaScript, TypeScript, CSS, JSON"
+      />
     );
   }
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#ffffff" />
-        <Text style={styles.loadingText}>Loading file...</Text>
-      </View>
+      <RenderFileHeader mode="loading" title="Loading file..." />
     );
   }
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>!</Text>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      </View>
+      <RenderFileHeader mode="error" title={error} />
     );
   }
 
   if (!fileContent) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.placeholderText}>
-          File content is not loaded
-        </Text>
-      </View>
+      <RenderFileHeader mode="placeholder" title="File content is not loaded" />
     );
   }
 
@@ -3722,7 +3663,7 @@ function RenderFile({
             </View>
           </View>
         ) : viewMode === 'split' ? (
-          renderBlockEditorSplitMode('html', editorHTML || htmlToRender)
+          renderSplitMode('html', editorHTML || htmlToRender)
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>
@@ -3806,7 +3747,7 @@ function RenderFile({
             </View>
           </View>
         ) : viewMode === 'split' ? (
-          renderBlockEditorSplitMode('react', editorHTML || reactHTML)
+          renderSplitMode('react', editorHTML || reactHTML)
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>
@@ -3885,7 +3826,7 @@ function RenderFile({
             </View>
           </View>
         ) : viewMode === 'split' ? (
-          renderBlockEditorSplitMode('react-native', editorHTML || reactNativeHTML)
+          renderSplitMode('react-native', editorHTML || reactNativeHTML)
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>
@@ -3910,508 +3851,20 @@ function RenderFile({
   }
   // Р РµРЅРґРµСЂРёРЅРі С‚РµРєСЃС‚РѕРІС‹С… С„Р°Р№Р»РѕРІ (JS, TS, CSS, JSON, Markdown Рё РґСЂ.)
   console.log('RenderFile: Rendering text file, type:', fileType, 'content length:', fileContent?.length);
-  const monacoLanguage = getMonacoLanguage(fileType, filePath);
-  const languageNames = {
-    'javascript': 'JavaScript',
-    'typescript': 'TypeScript',
-    'css': 'CSS',
-    'json': 'JSON',
-    'markdown': 'Markdown',
-    'html': 'HTML',
-    'python': 'Python',
-    'java': 'Java',
-    'cpp': 'C/C++',
-    'csharp': 'C#',
-    'go': 'Go',
-    'rust': 'Rust',
-    'php': 'PHP',
-    'ruby': 'Ruby',
-    'shell': 'Shell',
-    'xml': 'XML',
-    'yaml': 'YAML',
-    'sql': 'SQL',
-    'dockerfile': 'Dockerfile',
-    'makefile': 'Makefile',
-    'lua': 'Lua',
-    'perl': 'Perl',
-    'swift': 'Swift',
-    'kotlin': 'Kotlin',
-    'vue': 'Vue',
-    'plaintext': 'Text',
-  };
-
   return (
-    <View style={styles.textContainer}>
-      {renderContentMetaOverlay(languageNames[monacoLanguage as keyof typeof languageNames] || 'Text')}
-      <View style={styles.editorContainer}>
-        <MonacoEditorWrapper
-          value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
-          language={monacoLanguage}
-          filePath={filePath}
-          onChange={handleEditorChange}
-          onSave={saveFile}
-          editorRef={monacoEditorRef}
-          onCodeCtrlClick={handleMonacoCtrlClick}
-        />
-        {isModified && (
-          <View style={styles.saveIndicator}>
-            <Text style={styles.saveIndicatorText}>* Unsaved changes (Ctrl+S to save)</Text>
-          </View>
-        )}
-      </View>
-    </View>
+    <RenderFileContent
+      fileType={fileType}
+      filePath={filePath}
+      fileContent={fileContent}
+      unsavedContent={unsavedContent}
+      isModified={isModified}
+      monacoEditorRef={monacoEditorRef}
+      onEditorChange={handleEditorChange}
+      onSave={saveFile}
+      onCodeCtrlClick={handleMonacoCtrlClick}
+      renderContentMetaOverlay={renderContentMetaOverlay}
+    />
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    minHeight: 200,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#ffffff',
-    opacity: 0.7,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  hintText: {
-    fontSize: 12,
-    color: '#ffffff',
-    opacity: 0.5,
-    textAlign: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#ffffff',
-    opacity: 0.8,
-  },
-  errorContainer: {
-    backgroundColor: 'rgba(255, 0, 0, 0.2)',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 0, 0, 0.4)',
-    alignItems: 'center',
-    maxWidth: '100%',
-  },
-  errorIcon: {
-    fontSize: 32,
-    marginBottom: 12,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#ffffff',
-    textAlign: 'center',
-  },
-  htmlContainer: {
-    flex: 1,
-    width: '100%',
-    minHeight: 400,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  webview: {
-    flex: 1,
-    width: '100%',
-    minHeight: 0,
-    backgroundColor: '#ffffff',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-  },
-  contentMetaOverlay: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    maxWidth: '70%',
-  },
-  fileTypeBadge: {
-    backgroundColor: 'rgba(15, 23, 42, 0.86)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  fileTypeText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'none',
-  },
-  componentNameText: {
-    color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 6,
-    padding: 2,
-  },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: '#667eea',
-  },
-  tabText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  tabTextActive: {
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  editorContainer: {
-    flex: 1,
-    width: '100%',
-    minHeight: 600,
-    backgroundColor: '#1e1e1e',
-  },
-  blockEditorPreviewContainer: {
-    flex: 1,
-    position: 'relative',
-    minHeight: 0,
-  },
-  previewViewportHost: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    overflow: 'auto',
-    backgroundColor: '#0f1115',
-  },
-  previewViewportFrame: {
-    position: 'relative',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    overflow: 'hidden',
-    boxShadow: '0 12px 30px rgba(0,0,0,0.28)',
-  },
-  previewViewportFrameMobile: {
-    borderRadius: 18,
-  },
-  previewFallbackOverlay: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
-    zIndex: 1200,
-    alignItems: 'center',
-  },
-  previewFallbackCard: {
-    width: '100%',
-    maxWidth: 560,
-    backgroundColor: 'rgba(12, 18, 31, 0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(96, 165, 250, 0.45)',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    boxShadow: '0 10px 24px rgba(0,0,0,0.28)',
-  },
-  previewFallbackTitle: {
-    color: '#e2e8f0',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  previewFallbackText: {
-    color: 'rgba(226, 232, 240, 0.82)',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  previewFallbackButton: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    backgroundColor: '#2563eb',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  previewFallbackButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  splitModeRoot: {
-    flex: 1,
-    backgroundColor: '#1e1e1e',
-    position: 'relative',
-  },
-  splitContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    width: '100%',
-    backgroundColor: '#1e1e1e',
-    overflow: 'hidden',
-  },
-  splitSidebarPane: {
-    minWidth: 240,
-    maxWidth: 520,
-    height: '100%',
-    overflow: 'hidden',
-    backgroundColor: '#0f172a',
-  },
-  splitMainPanels: {
-    flex: 1,
-    flexDirection: 'row',
-    minWidth: 0,
-  },
-  splitLeft: {
-    minWidth: 300,
-    backgroundColor: '#1e1e1e',
-    overflow: 'hidden',
-    height: '100%',
-  },
-  splitRight: {
-    minWidth: 300,
-    backgroundColor: '#1e1e1e',
-    overflow: 'hidden',
-    height: '100%',
-  },
-  splitDivider: {
-    width: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    cursor: 'col-resize',
-    position: 'relative',
-    zIndex: 10,
-  },
-  splitDividerActive: {
-    backgroundColor: 'rgba(102, 126, 234, 0.5)',
-  },
-  splitResizeOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 2000,
-  },
-  splitResizeOverlayMain: {
-    cursor: 'col-resize',
-  },
-  splitResizeOverlaySidebar: {
-    cursor: 'col-resize',
-  },
-  splitEmptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  splitEmptyStateText: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  changesContainer: {
-    flex: 1,
-    width: '100%',
-    minHeight: 600,
-    backgroundColor: '#1e1e1e',
-    padding: 16,
-  },
-  changesTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  changesStagedHint: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    marginBottom: 10,
-    lineHeight: 16,
-  },
-  changesEmpty: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
-  },
-  changesScroll: {
-    flex: 1,
-  },
-  changeItem: {
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 10,
-  },
-  changeItemTitle: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  changeItemText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontFamily: 'monospace',
-    marginBottom: 4,
-  },
-  textContainer: {
-    flex: 1,
-    width: '100%',
-    minHeight: 400,
-    backgroundColor: '#1e1e1e',
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 16,
-  },
-  codeScrollView: {
-    flex: 1,
-  },
-  codeContainer: {
-    padding: 0,
-  },
-  codeWrapper: {
-    backgroundColor: '#1e1e1e',
-    padding: 16,
-    borderRadius: 4,
-  },
-  codeText: {
-    fontFamily: 'Monaco, "Courier New", monospace',
-    fontSize: 14,
-    color: '#d4d4d4',
-    lineHeight: 20,
-  },
-  binaryContainer: {
-    flex: 1,
-    width: '100%',
-    minHeight: 400,
-    backgroundColor: '#1e1e1e',
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 16,
-  },
-  binaryInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  binaryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  binaryPath: {
-    fontSize: 12,
-    color: '#888',
-    fontFamily: 'monospace',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  binaryHint: {
-    fontSize: 14,
-    color: '#d4d4d4',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: 20,
-  },
-  imagePreview: {
-    marginTop: 20,
-    marginBottom: 20,
-    padding: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 8,
-    maxWidth: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveIndicator: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(255, 193, 7, 0.9)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    zIndex: 1000,
-  },
-  quickSaveButton: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: 'rgba(16, 185, 129, 0.92)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    zIndex: 1001,
-  },
-  quickSaveButtonDisabled: {
-    backgroundColor: 'rgba(100, 116, 139, 0.65)',
-  },
-  quickSaveButtonText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  dropTargetIndicator: {
-    position: 'absolute',
-    top: 10,
-    left: 170,
-    right: 10,
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.65)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    zIndex: 1001,
-  },
-  dropTargetIndicatorText: {
-    fontSize: 12,
-    color: '#e2e8f0',
-  },
-  saveIndicatorText: {
-    fontSize: 12,
-    color: '#000000',
-    fontWeight: '600',
-  },
-  saveSuccessIndicator: {
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
-  },
-  saveSuccessText: {
-    color: '#ffffff',
-  },
-});
-
 export default RenderFile;
-
-
-
-

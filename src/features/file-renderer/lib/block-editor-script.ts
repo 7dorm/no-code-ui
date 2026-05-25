@@ -1,4 +1,4 @@
-﻿import { MRPAK_MSG, MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
+import { MRPAK_MSG, MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
 
 /**
  * Р“РµРЅРµСЂРёСЂСѓРµС‚ СЃРєСЂРёРїС‚ РґР»СЏ Р±Р»РѕС‡РЅРѕРіРѕ СЂРµРґР°РєС‚РѕСЂР°, РєРѕС‚РѕСЂС‹Р№ РёРЅР¶РµРєС‚РёСЂСѓРµС‚СЃСЏ РІ HTML
@@ -114,12 +114,30 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
             return selected ? [selected] : [];
           };
+          const getStyleTargetNodes = (el) => {
+            if (!el) return [];
+            try {
+              if (el.getAttribute && el.getAttribute('data-mrpak-component-boundary') === '1') {
+                const directChild = el.firstElementChild;
+                if (directChild) return [directChild];
+                const descendants = Array.from(el.querySelectorAll('*')).filter((node) => {
+                  if (!node || !node.getBoundingClientRect) return false;
+                  const rect = node.getBoundingClientRect();
+                  return rect.width > 0.5 && rect.height > 0.5;
+                });
+                if (descendants.length > 0) return [descendants[0]];
+              }
+            } catch (e) {}
+            return [el];
+          };
           const applyToSelectedGroup = (cb) => {
             const nodes = getSelectedGroupNodes();
             nodes.forEach((node, index) => {
-              try {
-                cb(node, index);
-              } catch (e) {}
+              getStyleTargetNodes(node).forEach((target) => {
+                try {
+                  cb(target, index);
+                } catch (e) {}
+              });
             });
           };
           const getIdFileBasename = (id) => {
@@ -171,6 +189,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_REQ_TEXT = '${MRPAK_CMD.REQUEST_TEXT_SNAPSHOT}';
           const CMD_START_DRAG = '${MRPAK_CMD.START_DRAG}';
           const CMD_END_DRAG = '${MRPAK_CMD.END_DRAG}';
+          const CMD_UPDATE_EXTERNAL_POINTER = '${MRPAK_CMD.UPDATE_EXTERNAL_POINTER}';
           const CMD_SET_RESIZE_TARGET = '${MRPAK_CMD.SET_RESIZE_TARGET}';
           let selected = null;
           let selectedGroup = [];
@@ -608,6 +627,45 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const pct = pxToPercent(value, axisSize);
             return pct + '%';
           };
+          const NUMERIC_CSS_PROPS = /^(left|top|right|bottom|width|height|minWidth|maxWidth|minHeight|maxHeight|margin|marginTop|marginRight|marginBottom|marginLeft|padding|paddingTop|paddingRight|paddingBottom|paddingLeft|fontSize|lineHeight|letterSpacing|borderRadius|borderWidth|borderTopWidth|borderRightWidth|borderBottomWidth|borderLeftWidth|gap|rowGap|columnGap|flexBasis)$/i;
+          const UNITLESS_CSS_PROPS = /^(opacity|zIndex|flex|flexGrow|flexShrink|order|fontWeight)$/i;
+          const normalizeStyleValueForDom = (key, value) => {
+            if (value === null || value === undefined) return '';
+            const keyName = String(key || '');
+            if (UNITLESS_CSS_PROPS.test(keyName)) return String(value);
+            if (typeof value === 'number' && Number.isFinite(value)) {
+              return NUMERIC_CSS_PROPS.test(keyName) ? (value + 'px') : String(value);
+            }
+            const s = String(value).trim();
+            if (/^-?\d+(\.\d+)?$/.test(s) && NUMERIC_CSS_PROPS.test(keyName)) {
+              return s + 'px';
+            }
+            return s;
+          };
+          const applyStylePatchToDom = (node, patch) => {
+            if (!node || !patch) return;
+            for (const k in patch) {
+              if (!Object.prototype.hasOwnProperty.call(patch, k)) continue;
+              const cssValue = normalizeStyleValueForDom(k, patch[k]);
+              if (k.includes('-')) {
+                if (cssValue === '') node.style.removeProperty(k);
+                else node.style.setProperty(k, cssValue);
+              } else {
+                try {
+                  if (cssValue === '') node.style[k] = '';
+                  else node.style[k] = cssValue;
+                } catch (e) {}
+              }
+            }
+          };
+          const ensureOffsetParent = (el) => {
+            const parent = el && el.parentElement;
+            if (!parent || parent === document.body || parent === document.documentElement) return;
+            try {
+              const pos = window.getComputedStyle(parent).position;
+              if (pos === 'static') parent.style.position = 'relative';
+            } catch (e) {}
+          };
           const getMovePatchKeys = (mode) => {
             if (mode === 'relative') {
               return { x: 'marginLeft', y: 'marginTop' };
@@ -615,15 +673,16 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             return { x: 'left', y: 'top' };
           };
           const getElementMoveMode = (el) => {
-            if (!el || !el.getAttribute) {
+            const probe = (getStyleTargetNodes(el)[0]) || el;
+            if (!probe || !probe.getAttribute) {
               return moveMode;
             }
-            const saved = el.getAttribute('data-move-mode');
+            const saved = probe.getAttribute('data-move-mode');
             if (saved === 'relative' || saved === 'absolute' || saved === 'grid8') {
               return saved;
             }
             try {
-              const position = window.getComputedStyle(el).position;
+              const position = window.getComputedStyle(probe).position;
               if (position === 'relative') return 'relative';
               if (position === 'absolute' || position === 'fixed') return 'absolute';
             } catch (e) {}
@@ -1255,6 +1314,21 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 source: externalDrag.source || 'library'
               });
             }
+          };
+
+          const toIframeClientPoint = (clientX, clientY) => {
+            let x = Number(clientX);
+            let y = Number(clientY);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+            try {
+              const frameEl = window.frameElement;
+              if (frameEl && frameEl.getBoundingClientRect) {
+                const rect = frameEl.getBoundingClientRect();
+                x = x - rect.left;
+                y = y - rect.top;
+              }
+            } catch (e) {}
+            return { x, y };
           };
 
           const updateExternalDropCandidate = (x, y) => {
@@ -2105,36 +2179,28 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 );
                 if (drag.finalPosition === 'relative' || activeMoveMode === 'relative') {
                   const moveKeys = getMovePatchKeys('relative');
+                  const relativePatch = {
+                    position: 'relative',
+                    left: '',
+                    top: '',
+                    [moveKeys.x]: finalLeftValue,
+                    [moveKeys.y]: finalTopValue,
+                  };
                   applyToSelectedGroup((node) => {
-                    node.style.position = 'relative';
-                    node.style.left = '';
-                    node.style.top = '';
-                    node.style[moveKeys.x] = String(finalLeftValue);
-                    node.style[moveKeys.y] = String(finalTopValue);
+                    applyStylePatchToDom(node, relativePatch);
                   });
                   post(MSG_APPLY, {
                     id,
-                    patch: {
-                      position: 'relative',
-                      left: '',
-                      top: '',
-                      [moveKeys.x]: finalLeftValue,
-                      [moveKeys.y]: finalTopValue,
-                    },
+                    patch: relativePatch,
                     isIntermediate: false
                   });
                 } else {
+                  const absolutePatch = { position: 'absolute', left: finalLeftValue, top: finalTopValue };
                   applyToSelectedGroup((node) => {
-                    node.style.position = 'absolute';
-                    node.style.left = String(finalLeftValue);
-                    node.style.top = String(finalTopValue);
+                    ensureOffsetParent(node);
+                    applyStylePatchToDom(node, absolutePatch);
                   });
-
-                  const patch = { position: 'absolute' };
-                  patch.left = finalLeftValue;
-                  patch.top = finalTopValue;
-                  
-                  post(MSG_APPLY, { id, patch, isIntermediate: false });
+                  post(MSG_APPLY, { id, patch: absolutePatch, isIntermediate: false });
                 }
               }
             } else {
@@ -2354,22 +2420,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   activeMoveMode
                 );
                 const moveKeys = getMovePatchKeys('relative');
+                const relativePatch = {
+                  position: 'relative',
+                  left: '',
+                  top: '',
+                  [moveKeys.x]: leftValue,
+                  [moveKeys.y]: topValue,
+                };
                 applyToSelectedGroup((node) => {
-                  node.style.position = 'relative';
-                  node.style.left = '';
-                  node.style.top = '';
-                  node.style[moveKeys.x] = String(leftValue);
-                  node.style[moveKeys.y] = String(topValue);
+                  applyStylePatchToDom(node, relativePatch);
                 });
                 post(MSG_APPLY, {
                   id,
-                  patch: {
-                    position: 'relative',
-                    left: '',
-                    top: '',
-                    [moveKeys.x]: leftValue,
-                    [moveKeys.y]: topValue,
-                  },
+                  patch: relativePatch,
                   isIntermediate: false
                 });
               } else {
@@ -2398,17 +2461,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   getMoveAxisReferenceSize('absolute', 'y', contentWidth, contentHeight),
                   'absolute'
                 );
+                const absolutePatch = { position: 'absolute', left: leftValue, top: topValue };
                 applyToSelectedGroup((node) => {
-                  node.style.position = 'absolute';
-                  node.style.left = String(leftValue);
-                  node.style.top = String(topValue);
+                  ensureOffsetParent(node);
+                  applyStylePatchToDom(node, absolutePatch);
                 });
 
-                const patch= { position: 'absolute' };
-                patch.left = leftValue;
-                patch.top = topValue;
-                
-                post(MSG_APPLY, { id, patch, isIntermediate: false });
+                post(MSG_APPLY, { id, patch: absolutePatch, isIntermediate: false });
               }
             } else {
               const resizeTarget = drag.resizeTarget || resizeTargetMode;
@@ -2671,32 +2730,20 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   hasPatch: !!data.patch
                 });
                 const elements = getElementsById(String(data.id));
-                const el = elements[0];
+                const styleTargets = [];
+                elements.forEach((node) => {
+                  getStyleTargetNodes(node).forEach((target) => styleTargets.push(target));
+                });
+                const el = styleTargets[0];
                 if (!el) {
                   console.warn('[iframe CMD_SET_STYLE] Р­Р»РµРјРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ:', data.id);
                   return;
                 }
                 const patch = data.patch || {};
                 console.log('[iframe CMD_SET_STYLE] РџСЂРёРјРµРЅСЏСЋ РїР°С‚С‡:', patch);
-                elements.forEach((node) => {
-                  for (const k in patch) {
-                    const v = patch[k];
-                    if (k.includes('-')) {
-                      if (v === null || v === undefined || v === '') {
-                        node.style.removeProperty(k);
-                      } else {
-                        node.style.setProperty(k, String(v));
-                      }
-                    } else {
-                      try {
-                        if (v === null || v === undefined || v === '') {
-                          node.style[k] = '';
-                        } else {
-                          node.style[k] = String(v);
-                        }
-                      } catch(e) {}
-                    }
-                  }
+                styleTargets.forEach((node) => {
+                  if (patch.position === 'absolute') ensureOffsetParent(node);
+                  applyStylePatchToDom(node, patch);
                 });
                 console.log('[iframe CMD_SET_STYLE] РЎС‚РёР»Рё РїСЂРёРјРµРЅРµРЅС‹, С‚РµРєСѓС‰РёР№ style:', el.getAttribute('style'));
                 
@@ -2804,7 +2851,17 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 const srcEl = document.querySelector(byIdSelector(String(data.sourceId)));
                 const dstEl = document.querySelector(byIdSelector(String(data.targetParentId)));
                 if (srcEl && dstEl && srcEl !== dstEl) {
-                  dstEl.appendChild(srcEl);
+                  const beforeId = data.targetBeforeId ? String(data.targetBeforeId) : '';
+                  if (beforeId) {
+                    const beforeEl = document.querySelector(byIdSelector(beforeId));
+                    if (beforeEl && beforeEl.parentElement === dstEl) {
+                      dstEl.insertBefore(srcEl, beforeEl);
+                    } else {
+                      dstEl.appendChild(srcEl);
+                    }
+                  } else {
+                    dstEl.appendChild(srcEl);
+                  }
                   buildTree();
                   selectEl(srcEl);
                 }
@@ -2863,8 +2920,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 updateExternalDropCandidate(externalPointer.x || 0, externalPointer.y || 0);
                 return;
               }
+              if (data.type === CMD_UPDATE_EXTERNAL_POINTER) {
+                if (!externalDrag) return;
+                const point = toIframeClientPoint(data.x, data.y);
+                if (!point) return;
+                updateExternalDropCandidate(point.x, point.y);
+                return;
+              }
               if (data.type === CMD_END_DRAG) {
-                if (externalDrag && dropTarget) {
+                let insertTargetId = dropTarget;
+                if (!insertTargetId && data.fallbackTargetId) {
+                  insertTargetId = String(data.fallbackTargetId);
+                }
+                if (!insertTargetId && lastSelectedId) {
+                  insertTargetId = String(lastSelectedId);
+                }
+                if (externalDrag && insertTargetId) {
                   const insertPayload =
                     externalDrag.source === 'component'
                       ? {
@@ -2892,7 +2963,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                         };
 
                   post(MSG_APPLY, {
-                    id: dropTarget,
+                    id: insertTargetId,
                     patch: {
                       __insertFromLibrary: insertPayload,
                     },

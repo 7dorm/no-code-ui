@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { loadLayerNames } from '../../../blockEditor/LayerNamesStore';
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
 import { findProjectRoot } from '../lib/path-resolver';
+import { resolveProjectRootSync } from '../utils';
 import type { LayerNames } from '../types';
 
 type UseAstOperationsParams = {
@@ -32,19 +33,7 @@ export function useAstOperations({
         return;
       }
       try {
-        let root = projectPath;
-
-        if (!root && filePath) {
-          const normalizedPath = filePath.replace(/\\/g, '/');
-          const lastSlash = normalizedPath.lastIndexOf('/');
-          if (lastSlash > 0) {
-            root = normalizedPath.substring(0, lastSlash);
-            if (root.endsWith('/src')) {
-              root = root.substring(0, root.length - 4);
-            }
-          }
-        }
-
+        let root = resolveProjectRootSync(filePath, projectPath);
         if (!root) {
           root = await findProjectRoot(filePath);
         }
