@@ -225,9 +225,12 @@ export function EditorWorkspace({
       const scroll = monacoEditorRef.current.getScrollTop();
       monacoEditorRef.current.setValue(newContent);
       monacoEditorRef.current.setScrollTop(scroll);
-      isUpdatingFromFileRef.current = false;
+      setUnsavedContent(newContent);
+      setTimeout(() => {
+        isUpdatingFromFileRef.current = false;
+      }, 100);
     }
-  }, []);
+  }, [setUnsavedContent]);
 
   const {
     resolveToMappedBlockId,
@@ -254,6 +257,7 @@ export function EditorWorkspace({
     lastDeleteOperationRef,
     lastReparentOperationRef,
     setUnsavedContent,
+    unsavedContent,
     setIsModified,
     setRenderVersion,
     setShowSaveIndicator,
@@ -283,7 +287,7 @@ export function EditorWorkspace({
 
   usePreviewGeneration({
     filePath,
-    previewSourceCode: fileContent || '',
+    previewSourceCode: unsavedContent !== null ? unsavedContent : (fileContent || ''),
     selectedComponentName,
     setIsProcessingReact,
     setReactHTML,
@@ -967,6 +971,16 @@ export function EditorWorkspace({
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('html', editorHTML || htmlToRender)
+        ) : viewMode === 'code' ? (
+          <View style={styles.editorContainer}>
+            <MonacoEditorWrapper
+              value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+              language={monacoLanguage}
+              filePath={filePath}
+              onChange={handleEditorChange}
+              onSave={saveFile}
+            />
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>
@@ -1062,6 +1076,16 @@ export function EditorWorkspace({
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react', editorHTML || reactHTML)
+        ) : viewMode === 'code' ? (
+          <View style={styles.editorContainer}>
+            <MonacoEditorWrapper
+              value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+              language={monacoLanguage}
+              filePath={filePath}
+              onChange={handleEditorChange}
+              onSave={saveFile}
+            />
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>
@@ -1152,6 +1176,16 @@ export function EditorWorkspace({
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react-native', editorHTML || reactNativeHTML)
+        ) : viewMode === 'code' ? (
+          <View style={styles.editorContainer}>
+            <MonacoEditorWrapper
+              value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+              language={monacoLanguage}
+              filePath={filePath}
+              onChange={handleEditorChange}
+              onSave={saveFile}
+            />
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>

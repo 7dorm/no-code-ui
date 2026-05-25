@@ -106,14 +106,11 @@ export class AstBidirectionalManager {
     let codeToParse = code;
     if (isJavaScriptFile(this.filePath)) {
       try {
-        // Проверяем, есть ли уже ID в коде
-        const hasIds = /data-no-code-ui-id|data-mrpak-id/.test(code);
-        if (!hasIds) {
-          // Инструментируем код через AST, чтобы добавить ID
-          const instResult = instrumentJsxWithAst(code, this.filePath, { projectRoot: this.projectRoot });
-          codeToParse = instResult.code;
-          console.log('[AstBidirectional] Code instrumented during initialization');
-        }
+        // Всегда инструментируем код, чтобы добавить ID ко всем элементам
+        // (instrumentJsxWithAst корректно пропускает элементы, у которых уже есть ID)
+        const instResult = instrumentJsxWithAst(code, this.filePath, { projectRoot: this.projectRoot });
+        codeToParse = instResult.code;
+        console.log('[AstBidirectional] Code instrumented during initialization');
       } catch (error: unknown) {
         console.warn('[AstBidirectional] Failed to instrument code during initialization:', error);
         // Продолжаем с исходным кодом
@@ -627,14 +624,10 @@ export class AstBidirectionalManager {
     let codeToParse = newCode;
     if (isJavaScriptFile(this.filePath)) {
       try {
-        // Проверяем, есть ли уже ID в коде
-        const hasIds = /data-no-code-ui-id|data-mrpak-id/.test(newCode);
-        if (!hasIds) {
-          // Инструментируем код через AST, чтобы добавить ID
-          const instResult = instrumentJsxWithAst(newCode, this.filePath, { projectRoot: this.projectRoot });
-          codeToParse = instResult.code;
-          console.log('[AstBidirectional] Code instrumented during updateCodeASTFromCode');
-        }
+        // Всегда инструментируем код
+        const instResult = instrumentJsxWithAst(newCode, this.filePath, { projectRoot: this.projectRoot });
+        codeToParse = instResult.code;
+        console.log('[AstBidirectional] Code instrumented during updateCodeASTFromCode');
       } catch (error: unknown) {
         console.warn('[AstBidirectional] Failed to instrument code during updateCodeASTFromCode:', error);
         // Продолжаем с исходным кодом

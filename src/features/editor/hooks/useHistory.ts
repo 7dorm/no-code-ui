@@ -34,10 +34,11 @@ export function useHistory({ filePath, applyBlockPatchRef, stageInsertBlockRef, 
   const pendingHistoryOperationRef = useRef<HistoryOperation | null>(null);
 
   const addToHistory = useCallback((operation: HistoryOperation | SetTextHistoryOperation | ReparentHistoryOperation) => {
-    setUndoStack([...undoStack, operation]);
+    const currentStack = useEditorStore.getState().undoStack;
+    setUndoStack([...currentStack, operation]);
     setRedoStack([]);
     console.log('📝 [History] Added operation:', operation.type);
-  }, [undoStack, setUndoStack, setRedoStack]);
+  }, [setUndoStack, setRedoStack]);
 
   const addToHistoryDebounced = useCallback((operation: HistoryOperation, isIntermediate: boolean = false) => {
     if (isIntermediate) {

@@ -33,6 +33,7 @@ type UseBlockOperationsParams = {
   setShowSaveIndicator: (show: boolean) => void;
   onProjectFilesChanged?: () => void;
   setError: (error: string | null) => void;
+  unsavedContent: string | null;
 };
 
 export function useBlockOperations({
@@ -55,6 +56,7 @@ export function useBlockOperations({
   setShowSaveIndicator,
   onProjectFilesChanged,
   setError,
+  unsavedContent,
 }: UseBlockOperationsParams) {
   const {
     fileType,
@@ -236,8 +238,18 @@ export function useBlockOperations({
       }
       if (!isFrameworkSupported(fileType as string)) return;
       const framework = createFramework(fileType as string, filePath);
+      
+      let baseCode = String(fileContent ?? '');
+      if (unsavedContent !== null) {
+        baseCode = unsavedContent;
+      } else if (monacoEditorRef?.current) {
+        try {
+          baseCode = String(monacoEditorRef.current.getValue() ?? '');
+        } catch {}
+      }
+
       const result = await framework.commitPatches({
-        originalCode: String(fileContent ?? ''),
+        originalCode: baseCode,
         stagedPatches: currentStagedPatches,
         stagedOps: ops,
         blockMapForFile: blockMapForFile || {},
