@@ -19,6 +19,7 @@ function WebView({
   onLoadEnd,
   onMessage,
   outgoingMessage,
+  selectedBlockId,
   allowExternalScripts = false, // Для React файлов нужна загрузка внешних скриптов
   ...props 
 }: {
@@ -34,14 +35,20 @@ function WebView({
   onLoadEnd?: () => void;
   onMessage?: (event: { nativeEvent: { data: unknown } }) => void;
   outgoingMessage?: unknown;
+  selectedBlockId?: string | null;
   allowExternalScripts?: boolean;
   [key: string]: unknown;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onMessageRef = useRef(onMessage);
+  const outgoingMessageRef = useRef(outgoingMessage);
   const pendingOutgoingRef = useRef<unknown[]>([]);
   const [loading, setLoading] = useState(startInLoadingState);
+
+  useEffect(() => {
+    outgoingMessageRef.current = outgoingMessage;
+  }, [outgoingMessage]);
 
   const postOutgoingToIframe = (message: unknown) => {
     if (!message) return;
@@ -91,96 +98,79 @@ function WebView({
       allowExternalScripts 
     });
     
-    // Очищаем контейнер
-    (container as HTMLElement).innerHTML = '';
-    setLoading(startInLoadingState);
-
-    // Создаем iframe
+    // Double-buffering logic to avoid white flash
     const iframe = document.createElement('iframe');
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';
     iframe.style.backgroundColor = '#ffffff';
-    iframe.style.display = 'block';
     iframe.style.overflow = 'auto';
     iframe.setAttribute('scrolling', 'yes');
+    // Hide initially and position absolute so it overlays or renders silently
+    iframe.style.opacity = '0';
+    iframe.style.position = 'absolute';
+    iframe.style.top = '0';
+    iframe.style.left = '0';
     
-    // Настройка sandbox в зависимости от типа контента
-    // Для обычных HTML файлов НЕ используем sandbox - это позволяет им работать без ограничений
-    // Для React/React Native файлов используем sandbox с разрешениями для внешних скриптов
     if (source.html && allowExternalScripts) {
-      // Для React/React Native файлов нужна загрузка внешних скриптов (CDN)
-      // Устанавливаем sandbox атрибут как строку
       const sandboxValues = [];
-      if (javaScriptEnabled) {
-        sandboxValues.push('allow-scripts');
-      }
-      sandboxValues.push('allow-same-origin'); // Нужен для загрузки внешних скриптов
-      sandboxValues.push('allow-forms');
-      sandboxValues.push('allow-popups');
-      sandboxValues.push('allow-modals');
+      if (javaScriptEnabled) sandboxValues.push('allow-scripts');
+      sandboxValues.push('allow-same-origin', 'allow-forms', 'allow-popups', 'allow-modals');
       iframe.setAttribute('sandbox', sandboxValues.join(' '));
-      console.log('WebView: Using sandbox with external scripts support:', sandboxValues.join(' '));
     } else {
-      // Для обычных HTML файлов НЕ устанавливаем sandbox вообще
-      // Это позволяет HTML работать полностью без ограничений
-      console.log('WebView: No sandbox (plain HTML mode - full access)');
-      // Явно удаляем sandbox, если он был установлен ранее
       iframe.removeAttribute('sandbox');
     }
-    
+
     // Обработчики событий
-    const handleLoad = () => {
+    const handleLoad = (e?: Event) => {
+      try {
+        if (!iframe.src || iframe.src === 'about:blank' || iframe.src === window.location.href) {
+          return;
+        }
+      } catch (e) {}
+
       console.log('WebView iframe: load event fired - iframe загружен!');
-      console.log('WebView: iframe readyState:', iframe.contentDocument?.readyState || 'N/A');
       setLoading(false);
       
+      // Once loaded, show the new iframe
+      iframe.style.opacity = '1';
+      iframe.style.position = 'relative'; 
+      
+      // Restore scroll position from old iframe if possible
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        try {
+          const oldY = iframeRef.current.contentWindow.scrollY || iframeRef.current.contentDocument?.documentElement?.scrollTop || 0;
+          const oldX = iframeRef.current.contentWindow.scrollX || iframeRef.current.contentDocument?.documentElement?.scrollLeft || 0;
+          if (oldY > 0 || oldX > 0) {
+            iframe.contentWindow?.scrollTo(oldX, oldY);
+          }
+        } catch (err) {}
+      }
+
+      // Remove the old iframe if it exists
+      if (iframeRef.current && iframeRef.current !== iframe) {
+        try {
+          // just remove it from DOM
+          iframeRef.current.remove();
+        } catch (err) {}
+      }
+      iframeRef.current = iframe;
+
+      // Resend the last outgoing message (e.g. selection state) to the new iframe
       if (iframe.contentWindow) {
-        console.log('WebView: iframe contentWindow доступен');
-        try {
-          if (iframe.contentDocument) {
-            const body = iframe.contentDocument.body;
-            if (body) {
-              console.log('WebView: iframe body найден, innerHTML length:', body.innerHTML?.length || 0);
-              console.log('WebView: iframe body has content:', body.innerHTML?.length > 0 ? 'YES' : 'NO');
-            } else {
-              console.warn('WebView: iframe body не найден');
-            }
-          } else {
-            console.log('WebView: contentDocument недоступен (нормально для sandboxed iframe)');
-          }
-        } catch (e) {
-          const message = e instanceof Error ? e.message : String(e);
-          console.log(
-            'WebView: Не удалось проверить contentDocument (нормально для sandboxed iframe):',
-            message
-          );
+        if (selectedBlockId) {
+          try {
+            iframe.contentWindow.postMessage({ type: 'mrpak:select', id: selectedBlockId }, '*');
+          } catch (e) {}
+        } else if (outgoingMessageRef.current) {
+          try {
+            iframe.contentWindow.postMessage(outgoingMessageRef.current, '*');
+          } catch (e) {}
         }
-      } else {
-        console.warn('WebView: iframe contentWindow недоступен');
       }
-      
-      // Проверяем, действительно ли контент загружен
-      setTimeout(() => {
-        try {
-          if (iframe.contentDocument?.body) {
-            const hasContent = iframe.contentDocument.body.innerHTML.trim().length > 0;
-            console.log('WebView: Контент в iframe:', hasContent ? 'ЕСТЬ' : 'ОТСУТСТВУЕТ');
-            if (hasContent) {
-              console.log('WebView: Размер контента:', iframe.contentDocument.body.innerHTML.length, 'символов');
-            }
-          }
-        } catch (e) {
-          console.log('WebView: Не удалось проверить контент (нормально для sandboxed iframe)');
-        }
-      }, 100);
-      
-      if (onLoad) {
-        onLoad({ nativeEvent: {} });
-      }
-      if (onLoadEnd) {
-        onLoadEnd();
-      }
+
+      if (onLoad) onLoad({ nativeEvent: {} });
+      if (onLoadEnd) onLoadEnd();
       flushPendingOutgoing();
     };
 
@@ -193,95 +183,48 @@ function WebView({
       }
     };
 
-    // Добавляем обработчики событий
-    iframe.addEventListener('load', handleLoad, { once: true });
-    iframe.addEventListener('error', handleError, { once: true });
+    iframe.addEventListener('load', handleLoad);
+    iframe.addEventListener('error', handleError);
 
-    // Сообщения из iframe -> родитель
     const handleMessage = (event: MessageEvent) => {
       try {
-        // Фильтруем только сообщения от текущего iframe
-        if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) {
-          return;
-        }
+        if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
         if (onMessageRef.current) {
           onMessageRef.current({ nativeEvent: { data: event.data } });
         }
-      } catch (e) {
-        // Ничего не делаем
-      }
+      } catch (e) {}
     };
     window.addEventListener('message', handleMessage);
 
-    // Добавляем iframe в DOM сначала (пустой)
     container.appendChild(iframe);
-    iframeRef.current = iframe;
-    console.log('WebView: iframe added to DOM');
 
-    // Устанавливаем контент после добавления в DOM
-    // Используем requestAnimationFrame для гарантии, что iframe готов
     requestAnimationFrame(() => {
       if (source.html) {
-        console.log('WebView: Setting HTML content, length:', source.html.length);
-        console.log('WebView: First 200 chars:', source.html.substring(0, 200));
-        
-        // Используем data URI вместо srcDoc для большей совместимости
-        // srcDoc может не работать в некоторых случаях, особенно с большими HTML документами
         try {
-          // Создаем data URI с правильной кодировкой
-          const htmlContent = source.html;
-          const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-          
-          console.log('WebView: Создан data URI, длина HTML:', htmlContent.length);
-          console.log('WebView: Длина data URI:', dataUri.length);
-          
-          // Проверяем размер - если слишком большой, используем blob URL
-          if (dataUri.length > 2 * 1024 * 1024) { // Больше 2MB
-            console.log('WebView: HTML слишком большой для data URI, используем Blob URL');
-            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-            const blobUrl = URL.createObjectURL(blob);
-            iframe.src = blobUrl;
-            console.log('WebView: Использован Blob URL');
-          } else {
-            iframe.src = dataUri;
-            console.log('WebView: Использован data URI');
-          }
-          
+          const blob = new Blob([source.html], { type: 'text/html;charset=utf-8' });
+          const blobUrl = URL.createObjectURL(blob);
+          iframe.src = blobUrl;
+          (iframe as any)._mrpakBlobUrl = blobUrl;
         } catch (error) {
-          console.error('WebView: Ошибка при установке контента:', error);
-          // Фоллбэк на srcDoc
           try {
             iframe.srcdoc = source.html;
-            console.log('WebView: Использован srcDoc как fallback');
-          } catch (srcDocError) {
-            console.error('WebView: Ошибка при использовании srcDoc:', srcDocError);
-          }
+          } catch (srcDocError) {}
         }
       } else if (source.uri) {
-        console.log('WebView: Setting URI:', source.uri);
         iframe.src = source.uri;
-        // Для внешних URI используем sandbox
         const sandboxValues = [];
-        if (javaScriptEnabled) {
-          sandboxValues.push('allow-scripts');
-        }
-        sandboxValues.push('allow-forms');
-        sandboxValues.push('allow-popups');
-        sandboxValues.push('allow-modals');
-        if (sandboxValues.length > 0) {
-          iframe.setAttribute('sandbox', sandboxValues.join(' '));
-        }
+        if (javaScriptEnabled) sandboxValues.push('allow-scripts');
+        sandboxValues.push('allow-forms', 'allow-popups', 'allow-modals');
+        if (sandboxValues.length > 0) iframe.setAttribute('sandbox', sandboxValues.join(' '));
       }
     });
 
     return () => {
-      console.log('WebView: cleanup');
-      if (container) {
-        container.innerHTML = '';
-      }
-      if (iframeRef.current) {
-        iframeRef.current.removeEventListener('load', handleLoad);
-        iframeRef.current.removeEventListener('error', handleError);
+      // Cleanup happens when component unmounts, not on every source change
+      // So we don't clear container.innerHTML here anymore to allow double buffering across renders!
+      // But we must clear Blob URL to avoid memory leaks.
+      if ((iframe as any)._mrpakBlobUrl) {
+         URL.revokeObjectURL((iframe as any)._mrpakBlobUrl);
       }
       window.removeEventListener('message', handleMessage);
     };

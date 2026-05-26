@@ -67,7 +67,7 @@ export function useStyleLibrary({
   const loadStyleLibraryEntries = useCallback(async () => {
     try {
       const currentDir = getCurrentFileDir();
-      if (!currentDir) {
+      if (currentDir === null || currentDir === undefined) {
         setStyleLibraryEntries([]);
         return;
       }
@@ -85,7 +85,7 @@ export function useStyleLibrary({
       const cssPaths = new Set<string>();
       const collected: StyleLibraryEntry[] = [];
       for (const styleDir of styleDirs) {
-        const dirPath = `${currentDir}/${styleDir.name}`;
+        const dirPath = currentDir ? `${currentDir}/${styleDir.name}` : styleDir.name;
         const filesResult = await readDirectory(dirPath);
         if (!filesResult?.success || !Array.isArray(filesResult.items)) continue;
         for (const item of filesResult.items) {
@@ -119,7 +119,7 @@ export function useStyleLibrary({
 
   const ensureNextStylesDir = useCallback(async (): Promise<string | null> => {
     const currentDir = getCurrentFileDir();
-    if (!currentDir) return null;
+    if (currentDir === null || currentDir === undefined) return null;
 
     const dirResult = await readDirectory(currentDir);
     if (!dirResult?.success || !Array.isArray(dirResult.items)) return null;
@@ -132,9 +132,10 @@ export function useStyleLibrary({
     let n = 1;
     while (names.has(`styles${n}`)) n += 1;
     const stylesDirName = `styles${n}`;
-    const createRes = await createFolder(`${currentDir}/${stylesDirName}`);
+    const newDirPath = currentDir ? `${currentDir}/${stylesDirName}` : stylesDirName;
+    const createRes = await createFolder(newDirPath);
     if (!createRes?.success) return null;
-    return `${currentDir}/${stylesDirName}`;
+    return newDirPath;
   }, [getCurrentFileDir]);
 
   const importCssIntoCurrentFile = useCallback(async (relativeImportPath: string) => {

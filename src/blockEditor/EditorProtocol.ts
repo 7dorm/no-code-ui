@@ -11,6 +11,8 @@ export const MRPAK_MSG = {
   DROP_TARGET: 'MRPAK_DROP_TARGET',
   READY: 'MRPAK_READY',
   ERROR: 'MRPAK_ERROR',
+  CANVAS_ZOOM: 'MRPAK_CANVAS_ZOOM',
+  CANVAS_PAN: 'MRPAK_CANVAS_PAN',
 };
 
 // Команды из UI -> iframe (локальные изменения, без записи в файлы)

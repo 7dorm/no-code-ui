@@ -43,6 +43,8 @@ export function usePreviewGeneration({
   } = useEditorStore();
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    
     if (fileType === 'react' && previewSourceCode && filePath) {
       const generateHTML = async () => {
         setIsProcessingReact(true);
@@ -69,12 +71,25 @@ export function usePreviewGeneration({
           setIsProcessingReact(false);
         }
       };
-      void generateHTML();
+      
+      // Debounce HTML generation to prevent excessive iframe reloads during visual editing
+      timer = setTimeout(() => {
+        const state = useEditorStore.getState();
+        if (state.skipPreviewGeneration) {
+          useEditorStore.setState({ skipPreviewGeneration: false });
+          return;
+        }
+        void generateHTML();
+      }, 500);
     } else {
       setReactHTML('');
       setIsProcessingReact(false);
       setDependencyPaths([]);
     }
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [fileType, previewSourceCode, filePath, viewMode, projectRoot, selectedComponentName, aggressivePreviewMode, setBlockMap, setBlockMapForFile, setDependencyPaths, setIsProcessingReact, setPreviewOpenError, setReactHTML]);
 
   useEffect(() => {

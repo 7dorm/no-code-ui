@@ -180,6 +180,8 @@ export function useBlockOperations({
 
       isUpdatingFromConstructorRef.current = true;
       updateMonacoEditorWithScroll(newContent);
+      // Send the patch to the iframe so it updates instantly without reload
+      sendIframeCommand({ type: MRPAK_CMD.APPLY, id: mappedBlockId, patch, isIntermediate: false });
       updateStagedPatches((prev) => ({
         ...prev,
         [mappedBlockId]: { ...(prev?.[mappedBlockId] || {}), ...patch },
@@ -266,6 +268,11 @@ export function useBlockOperations({
 
       const writeRes = await writeFile(filePath, finalContent, { backup: true });
       if (!writeRes?.success) throw new Error(writeRes?.error || 'File write error');
+
+      const isOnlyStylePatches = entries.length > 0 && ops.length === 0 && imports.length === 0;
+      if (isOnlyStylePatches) {
+        useEditorStore.getState().setSkipPreviewGeneration(true);
+      }
 
       setFileContent(finalContent);
       setRenderVersion((v) => v + 1);
@@ -471,7 +478,7 @@ export function useBlockOperations({
       fileType,
       filePath,
     });
-    if (!targetBeforeId) sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
+    sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId, targetBeforeId });
   }, [
     addToHistory,
     filePath,

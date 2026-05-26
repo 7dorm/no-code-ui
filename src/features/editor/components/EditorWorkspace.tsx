@@ -13,6 +13,7 @@ import { ensureComponentImportInCode, isInternalSourceFilePath } from '../utils'
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
 import { upsertLayerName } from '../../../blockEditor/LayerNamesStore';
 import { createFramework, isFrameworkSupported } from '../../../frameworks/FrameworkFactory';
+import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
 
 // Hooks
 import { useHistory } from '../hooks/useHistory';
@@ -176,12 +177,14 @@ export function EditorWorkspace({
     aggressivePreviewMode,
   ]);
 
+  const storeViewMode = useEditorStore((s) => s.viewMode);
+
   // Sync back viewMode modifications to parent component if needed
   useEffect(() => {
     if (onViewModeChange) {
-      onViewModeChange(useEditorStore.getState().viewMode);
+      onViewModeChange(storeViewMode);
     }
-  }, [useEditorStore((s) => s.viewMode), onViewModeChange]);
+  }, [storeViewMode, onViewModeChange]);
 
   const {
     undo,
@@ -213,6 +216,11 @@ export function EditorWorkspace({
     setError,
     setUnsavedContent,
     setShowSaveIndicator,
+  });
+
+  const { handleMonacoCtrlClick, revealSelectedBlockInCode } = useMonacoEditor({
+    monacoEditorRef,
+    isUpdatingFromFileRef,
   });
 
   const {
@@ -399,7 +407,7 @@ export function EditorWorkspace({
   const handleRenameLayer = useCallback(
     async (mrpakId: string, name: string) => {
       try {
-        if (!projectRoot || !filePath) return;
+        if ((projectRoot === null || projectRoot === undefined) || !filePath) return;
         setLayerNames({ ...layerNames, [mrpakId]: String(name ?? '') });
         await upsertLayerName({ projectRoot, targetFilePath: filePath, mrpakId, name });
       } catch (e) {
@@ -714,11 +722,7 @@ export function EditorWorkspace({
     );
   }, [aggressivePreviewMode, previewOpenError, shouldOfferAggressiveMode]);
 
-  const handleMonacoCtrlClick = useCallback((mrpakId: string) => {
-    setSelectedBlock({ id: mrpakId });
-    setSelectedBlockIds([mrpakId]);
-    sendIframeCommand({ type: MRPAK_CMD.SELECT_BLOCK, blockId: mrpakId });
-  }, [setSelectedBlock, setSelectedBlockIds, sendIframeCommand]);
+  // handleMonacoCtrlClick is now provided by useMonacoEditor
 
   const renderBlockEditorSplitMode = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => {
     const hasAnyVisiblePanel = showSplitSidebar || showSplitPreview || showSplitCode;
@@ -927,7 +931,7 @@ export function EditorWorkspace({
 
   // Render HTML Files
   if (fileType === 'html' && fileContent) {
-    if (isProcessingHTML) {
+    if (!processedHTML && isProcessingHTML) {
       return (
         <View style={styles.htmlContainer}>
           <View style={styles.fileTypeBadge}>
@@ -1017,7 +1021,7 @@ export function EditorWorkspace({
 
   // Render React Files (JSX/TSX)
   if (fileType === 'react' && fileContent) {
-    if (isProcessingReact || !reactHTML) {
+    if (!reactHTML && isProcessingReact) {
       return (
         <View style={styles.htmlContainer}>
           <View style={styles.fileTypeBadge}>
@@ -1117,7 +1121,7 @@ export function EditorWorkspace({
 
   // Render React Native Files
   if (fileType === 'react-native' && fileContent) {
-    if (isProcessingReactNative || !reactNativeHTML) {
+    if (!reactNativeHTML && isProcessingReactNative) {
       return (
         <View style={styles.htmlContainer}>
           <View style={styles.fileTypeBadge}>

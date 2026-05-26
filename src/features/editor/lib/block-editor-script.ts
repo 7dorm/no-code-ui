@@ -1530,11 +1530,23 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             selectEl(el);
           }, true);
 
-          // Shift+Drag: РїРµСЂРµРЅРѕСЃ (MVP -> position:absolute + left/top/width/height)
-          // Р­С‚РѕС‚ РѕР±СЂР°Р±РѕС‚С‡РёРє С‚Р°РєР¶Рµ Р±Р»РѕРєРёСЂСѓРµС‚ РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹ (С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР°)
+          // Shift+Drag: перенос (MVP -> position:absolute + left/top/width/height)
+          // Этот обработчик также блокирует интерактивные элементы (только в режиме редактора)
           document.addEventListener('wheel', (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
+            
+            if (ev.ctrlKey || ev.metaKey) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              const zoomDelta = ev.deltaY > 0 ? 0.9 : 1.1;
+              post(MSG_CANVAS_ZOOM, { delta: zoomDelta, x: ev.clientX, y: ev.clientY });
+              return;
+            }
+
             if (externalDrag) {
               try {
                 ev.preventDefault();
@@ -1575,9 +1587,39 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           }, { passive: false, capture: true });
 
           let drag = null;
+          let canvasPanning = false;
+          let canvasPanStartX = 0;
+          let canvasPanStartY = 0;
+          let isSpacePressed = false;
+
+          document.addEventListener('keydown', (ev) => {
+            if (ev.code === 'Space' && !isInteractive(ev.target)) {
+              isSpacePressed = true;
+            }
+          });
+          document.addEventListener('keyup', (ev) => {
+            if (ev.code === 'Space') {
+              isSpacePressed = false;
+            }
+          });
+
           document.addEventListener('mousedown', (ev) => {
             if (!isActiveInstance()) return;
-            if (!EDIT_MODE) return; // Р’ preview СЂРµР¶РёРјРµ РЅРµ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј
+            if (!EDIT_MODE) return; // В preview режиме не обрабатываем
+
+            // Обработка панорамирования холста (Средняя кнопка мыши или Space+Click или Alt+Click)
+            if (ev.button === 1 || ev.altKey || isSpacePressed) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              canvasPanning = true;
+              canvasPanStartX = ev.clientX;
+              canvasPanStartY = ev.clientY;
+              return;
+            }
+
             if (externalDrag) return;
             
             let t = ev.target;
@@ -2321,6 +2363,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           document.addEventListener('mouseup', (ev) => {
             if (!isActiveInstance()) return;
+
+            if (canvasPanning) {
+              canvasPanning = false;
+              return;
+            }
+
             // reparent drag (Ctrl/Cmd + drag)
             if (dragging && dragging.mode === 'reparent') {
               if (dropTarget && dragging.sourceId && dropTarget !== dragging.sourceId) {
@@ -2814,8 +2862,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   const beforeId = data.targetBeforeId ? String(data.targetBeforeId) : '';
                   if (beforeId) {
                     const beforeEl = document.querySelector(byIdSelector(beforeId));
-                    if (beforeEl && beforeEl.parentElement === dstEl) {
-                      dstEl.insertBefore(srcEl, beforeEl);
+                    if (beforeEl && beforeEl.parentElement) {
+                      beforeEl.parentElement.insertBefore(srcEl, beforeEl);
                     } else {
                       dstEl.appendChild(srcEl);
                     }

@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import WebView from './WebView';
 import {
@@ -202,7 +202,7 @@ export function useBlockEditorSidebarController({
     setWidth(value);
     setWidthMode('value');
     if (selectedBlock?.id && value !== null) {
-      onApplyPatch(selectedBlock.id, { 
+      onApplyPatch(selectedBlock.id, {
         width: toDimensionValue(value, widthUnit),
       });
     }
@@ -212,7 +212,7 @@ export function useBlockEditorSidebarController({
     setHeight(value);
     setHeightMode('value');
     if (selectedBlock?.id && value !== null) {
-      onApplyPatch(selectedBlock.id, { 
+      onApplyPatch(selectedBlock.id, {
         height: toDimensionValue(value, heightUnit),
       });
     }
@@ -261,7 +261,7 @@ export function useBlockEditorSidebarController({
       setLeftMode('value');
       setTopMode('value');
     }
-    
+
     if (selectedBlock?.id) {
       const patch: StylePatch = { position: newMoveMode === 'grid8' ? 'absolute' : newMoveMode };
       console.log('[handleMoveModeChange] Sending patch:', { blockId: selectedBlock.id, patch });
@@ -509,7 +509,7 @@ export function useBlockEditorSidebarController({
     if (selectedBlock?.id) {
       // В React-режиме нужно искать в DOM через data-no-code-ui-id
       const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
-                      document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
+        document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
       if (element) {
         const savedMoveMode = element.getAttribute('data-move-mode');
         if (savedMoveMode === 'absolute' || savedMoveMode === 'relative' || savedMoveMode === 'grid8') {
@@ -600,9 +600,9 @@ export function useBlockEditorSidebarController({
   // Отдельный useEffect только для локальных data-атрибутов iframe.
   useEffect(() => {
     if (!selectedBlock?.id || !isMoveModeInitialized) return;
-    
+
     const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
-                    document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
+      document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
     if (element) {
       element.setAttribute('data-move-mode', moveMode);
       element.setAttribute('data-move-unit', moveMode === 'grid8' ? 'px' : moveUnit);
@@ -781,14 +781,14 @@ export function useBlockEditorSidebarController({
 
   const stageLocalStyles = () => {
     if (!canApply) return;
-    
+
     // Защита от двойного клика (debounce 300ms)
     const now = Date.now();
     if (now - lastStageTimeRef.current < 300) {
       return;
     }
     lastStageTimeRef.current = now;
-    
+
     const stylePatch = diffAgainstBaseline(buildCurrentStylePatch());
     // Stage для записи
     if (onStagePatch) {
@@ -806,7 +806,7 @@ export function useBlockEditorSidebarController({
   const [insertStyleMode, setInsertStyleMode] = useState('kv');
   const [insertStyleRows, setInsertStyleRows] = useState([{ key: '', value: '' }]);
   const [insertStyleText, setInsertStyleText] = useState('');
-  
+
   // Защита от двойного клика
   const lastInsertTimeRef = useRef(0);
   const lastDeleteTimeRef = useRef(0);
@@ -835,31 +835,31 @@ export function useBlockEditorSidebarController({
       const attrs = styleAttr ? ` style="${styleAttr}"` : '';
       const tag = insertTag || 'div';
       const body = insertText || '';
-      
+
       // Для plain HTML используем inline onclick, чтобы не требовать внешних функций
       const isButton = tag.toLowerCase() === 'button';
       const onClickAttr = isButton
         ? ` onclick="(function(ev){try{ev&&ev.preventDefault&&ev.preventDefault();console.log('Button clicked');}catch(e){}})(event)"`
         : '';
-      
+
       return `<${tag}${attrs}${onClickAttr}>${body}</${tag}>`;
     }
 
     // react / react-native
     const styleObj = toReactStyleObjectText(patch);
     const styleAttr = styleObj ? ` style={{${styleObj}}}` : '';
-    
+
     if (fileType === 'react-native') {
       if (insertTag === 'Text') {
         return `<Text${styleAttr}>${insertText || 'Новый текст'}</Text>`;
       }
-      
+
       // TouchableOpacity: вшиваем inline onPress, чтобы не создавать лишних обработчиков в коде
       const isButton = insertTag === 'TouchableOpacity';
       const onPressAttr = isButton
         ? ` onPress={() => { try { console.log('Button pressed'); } catch(e) {} }}`
         : '';
-      
+
       // View/TouchableOpacity: вложим Text для читаемости
       return `<${insertTag}${styleAttr}${onPressAttr}><Text>${insertText || 'Новый блок'}</Text></${insertTag}>`;
     }
@@ -869,7 +869,7 @@ export function useBlockEditorSidebarController({
     const onClickAttr = isButton
       ? ` onClick={(e) => { try { e?.preventDefault?.(); console.log('Button clicked'); } catch(_) {} }}`
       : '';
-    
+
     return `<${insertTag}${styleAttr}${onClickAttr}>${insertText || 'Новый блок'}</${insertTag}>`;
   };
 
@@ -1025,7 +1025,7 @@ export function useBlockEditorSidebarController({
             try {
               event.dataTransfer.effectAllowed = 'move';
               event.dataTransfer.setData('text/plain', sourceId);
-            } catch (_) {}
+            } catch (_) { }
           }}
           onDragOver={(event: React.DragEvent<HTMLDivElement>) => {
             if (!dragSourceId || dragSourceId === String(id)) return;
@@ -1049,47 +1049,47 @@ export function useBlockEditorSidebarController({
             setDragSourceId(null);
           }}
         >
-        <TouchableOpacity
-          style={[
-            blockEditorPanelStyles.layerRow,
-            isSelected && blockEditorPanelStyles.layerRowSelected,
-            isDrop && blockEditorPanelStyles.layerRowDropTarget,
-            dragHighlightStyle as unknown as object,
-          ]}
-          onPress={(event: unknown) => {
-            const eventLike = event as {
-              nativeEvent?: { ctrlKey?: boolean; metaKey?: boolean };
-              ctrlKey?: boolean;
-              metaKey?: boolean;
-            };
-            const nativeEvent = eventLike?.nativeEvent || eventLike;
-            if ((nativeEvent?.ctrlKey || nativeEvent?.metaKey) && node?.sourceFilePath && onOpenFile) {
-              onOpenFile(node.sourceFilePath);
-              return;
-            }
-            if (reparentMode) {
-              setReparentTargetId(id);
-            } else if (onSendCommand) {
-              onSendCommand({ type: 'MRPAK_CMD_SELECT', id });
-            }
-          }}
-        >
-          <Text style={blockEditorPanelStyles.layerRowText} numberOfLines={1}>{displayTitle}</Text>
-          {reparentMode && (
-            <Text style={blockEditorPanelStyles.reparentMark}>
-              {reparentTargetId === id ? '✓' : ''}
-            </Text>
-          )}
           <TouchableOpacity
-            style={blockEditorPanelStyles.layerEditBtn}
-            onPress={() => {
-              setEditingLayerId(id);
-              setEditingLayerName(customName || '');
+            style={[
+              blockEditorPanelStyles.layerRow,
+              isSelected && blockEditorPanelStyles.layerRowSelected,
+              isDrop && blockEditorPanelStyles.layerRowDropTarget,
+              dragHighlightStyle as unknown as object,
+            ]}
+            onPress={(event: unknown) => {
+              const eventLike = event as {
+                nativeEvent?: { ctrlKey?: boolean; metaKey?: boolean };
+                ctrlKey?: boolean;
+                metaKey?: boolean;
+              };
+              const nativeEvent = eventLike?.nativeEvent || eventLike;
+              if ((nativeEvent?.ctrlKey || nativeEvent?.metaKey) && node?.sourceFilePath && onOpenFile) {
+                onOpenFile(node.sourceFilePath);
+                return;
+              }
+              if (reparentMode) {
+                setReparentTargetId(id);
+              } else if (onSendCommand) {
+                onSendCommand({ type: 'MRPAK_CMD_SELECT', id });
+              }
             }}
           >
-            <Text style={styles.layerEditBtnText}>✎</Text>
+            <Text style={blockEditorPanelStyles.layerRowText} numberOfLines={1}>{displayTitle}</Text>
+            {reparentMode && (
+              <Text style={blockEditorPanelStyles.reparentMark}>
+                {reparentTargetId === id ? '✓' : ''}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={blockEditorPanelStyles.layerEditBtn}
+              onPress={() => {
+                setEditingLayerId(id);
+                setEditingLayerName(customName || '');
+              }}
+            >
+              <Text style={styles.layerEditBtnText}>✎</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
         </div>
 
         {editingLayerId === id && (
@@ -1270,31 +1270,129 @@ export function useBlockEditorSidebarController({
   };
 }
 
+import { useState, useRef, useEffect, useMemo, memo } from 'react';
+
 function BlockEditorPanelComponent({
   fileType,
   html,
+  selectedBlock,
   onMessage,
   outgoingMessage,
-}: Pick<BlockEditorPanelProps, 'fileType' | 'html' | 'onMessage' | 'outgoingMessage'>) {
+}: Pick<BlockEditorPanelProps, 'fileType' | 'html' | 'selectedBlock' | 'onMessage' | 'outgoingMessage'>) {
   const webSource = useMemo(() => ({ html }), [html]);
   const webViewKey = useMemo(
-    () => `block-editor-webview-${fileType}-${html ? html.length : 0}`,
-    [fileType, html]
+    () => `block-editor-webview-${fileType}`,
+    [fileType]
   );
+
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panStartRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleGlobalMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (data && data.type === 'MRPAK_CANVAS_ZOOM') {
+         setZoom(z => {
+           let newZ = z * data.delta;
+           return Math.min(Math.max(newZ, 0.1), 5);
+         });
+      } else if (data && data.type === 'MRPAK_CANVAS_PAN') {
+         setPan(p => ({ x: p.x + data.dx, y: p.y + data.dy }));
+      }
+    };
+    window.addEventListener('message', handleGlobalMessage);
+    return () => window.removeEventListener('message', handleGlobalMessage);
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+        setZoom(z => Math.min(Math.max(z * zoomDelta, 0.1), 5));
+      }
+    };
+
+    let localIsPanning = false;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 1 || e.altKey) {
+        e.preventDefault();
+        localIsPanning = true;
+        setIsPanning(true);
+        panStartRef.current = { x: e.clientX, y: e.clientY };
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!localIsPanning) return;
+      e.preventDefault();
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+      setPan(p => ({ x: p.x + dx, y: p.y + dy }));
+    };
+
+    const handleMouseUp = () => {
+      if (localIsPanning) {
+        localIsPanning = false;
+        setIsPanning(false);
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    el.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove, { passive: false });
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   return (
     <View style={blockEditorPanelStyles.preview}>
-      <WebView
-        key={webViewKey}
-        source={webSource}
-        style={blockEditorPanelStyles.webview}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        startInLoadingState={false}
-        allowExternalScripts={true}
-        onMessage={onMessage}
-        outgoingMessage={outgoingMessage}
-      />
+      <div 
+        ref={containerRef}
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          overflow: 'hidden', 
+          cursor: isPanning ? 'grabbing' : 'default',
+          position: 'relative'
+        }}
+      >
+        <div style={{
+          width: '100%',
+          height: '100%',
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: '50% 50%',
+          transition: 'transform 0.05s linear',
+          willChange: 'transform'
+        }}>
+          <WebView
+            key={webViewKey}
+            source={webSource}
+            style={blockEditorPanelStyles.webview}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={false}
+            allowExternalScripts={true}
+            onMessage={onMessage}
+            outgoingMessage={outgoingMessage}
+            selectedBlockId={selectedBlock?.id || null}
+          />
+        </div>
+      </div>
     </View>
   );
 }
@@ -1304,9 +1402,10 @@ const BlockEditorPanel = memo(
   (prevProps, nextProps) =>
     prevProps.fileType === nextProps.fileType &&
     prevProps.html === nextProps.html &&
+    prevProps.selectedBlock?.id === nextProps.selectedBlock?.id &&
     prevProps.onMessage === nextProps.onMessage &&
-    (prevProps.outgoingMessage as { seq?: number } | null)?.seq ===
-      (nextProps.outgoingMessage as { seq?: number } | null)?.seq
+    (prevProps.outgoingMessage as { ts?: number } | null)?.ts ===
+    (nextProps.outgoingMessage as { ts?: number } | null)?.ts
 );
 
 export default BlockEditorPanel;

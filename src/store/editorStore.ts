@@ -60,6 +60,8 @@ interface EditorState {
   stagedPatches: Record<string, StylePatch>;
   setStagedPatches: (patches: Record<string, StylePatch>) => void;
   updateStagedPatches: (updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>) => void;
+  skipPreviewGeneration: boolean;
+  setSkipPreviewGeneration: (skip: boolean) => void;
 
   // UI interaction data
   livePosition: LivePosition;
@@ -155,8 +157,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   stagedPatches: {},
   setStagedPatches: (patches) => set({ stagedPatches: patches }),
   updateStagedPatches: (updater) => set((state) => ({
-    stagedPatches: typeof updater === 'function' ? updater(state.stagedPatches) : updater
+    stagedPatches: typeof updater === 'function' ? updater(state.stagedPatches) : updater,
   })),
+  skipPreviewGeneration: false,
+  setSkipPreviewGeneration: (skip) => set({ skipPreviewGeneration: skip }),
 
   // UI interaction data
   livePosition: { left: null, top: null, width: null, height: null },

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
 import { getFileType } from '../../../shared/lib/file-type-detector';
@@ -64,10 +64,13 @@ export function useFileWatchSync({
     setExternalDropTargetState,
   } = useEditorStore();
 
+  const lastInitializedFileRef = useRef<string | null>(null);
+
   useEffect(() => {
     let currentFilePath = filePath;
 
     if (!filePath) {
+      lastInitializedFileRef.current = null;
       setFileContent(null);
       setFileType(null);
       setError(null);
@@ -80,29 +83,32 @@ export function useFileWatchSync({
       return;
     }
 
-    const initialType = getFileType(filePath);
-    setFileType(initialType);
-    onViewModeChange('preview');
-    setBlockMap({});
-    setBlockMapForFile({});
-    setSelectedBlock(null);
-    setChangesLog([]);
-    setEditorHTML('');
-    updateStagedPatches({});
-    updateStagedComponentImports([]);
-    setHasStagedChanges(false);
-    updateStagedOps([]);
-    setLayersTree(null);
-    setLayerNames({});
-    setProjectRoot(null);
-    // Send iframe command null sets it to null
-    useEditorStore.setState({ iframeCommand: null });
-    setExternalDropTargetState(null);
-    setUnsavedContent(null);
-    setIsModified(false);
-    setRenderVersion((v) => v + 1);
-    clearHistory();
-    loadFile(filePath);
+    if (lastInitializedFileRef.current !== filePath) {
+      lastInitializedFileRef.current = filePath;
+      const initialType = getFileType(filePath);
+      setFileType(initialType);
+      onViewModeChange('preview');
+      setBlockMap({});
+      setBlockMapForFile({});
+      setSelectedBlock(null);
+      setChangesLog([]);
+      setEditorHTML('');
+      updateStagedPatches({});
+      updateStagedComponentImports([]);
+      setHasStagedChanges(false);
+      updateStagedOps([]);
+      setLayersTree(null);
+      setLayerNames({});
+      setProjectRoot(null);
+      // Send iframe command null sets it to null
+      useEditorStore.setState({ iframeCommand: null });
+      setExternalDropTargetState(null);
+      setUnsavedContent(null);
+      setIsModified(false);
+      setRenderVersion((v) => v + 1);
+      clearHistory();
+      loadFile(filePath);
+    }
 
     watchFile(filePath).then(() => {});
 

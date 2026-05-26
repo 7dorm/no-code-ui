@@ -655,7 +655,7 @@ export class AstBidirectionalManager {
    * Сохраняет constructorAST в файл
    */
   async saveConstructorAST(blockMap: Record<string, unknown>) {
-    if (!this.projectRoot || !this.constructorAST) {
+    if ((this.projectRoot === null || this.projectRoot === undefined) || !this.constructorAST) {
       return { ok: false, error: 'projectRoot or constructorAST not set' };
     }
 

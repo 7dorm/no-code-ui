@@ -139,7 +139,7 @@ function serializeAstNode(node: any, options: any = {}) {
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
 export async function saveAstTree({ projectRoot, targetFilePath, ast, map }: any) {
-  if (!projectRoot || !targetFilePath) {
+  if ((projectRoot === null || projectRoot === undefined) || !targetFilePath) {
     return { ok: false, error: 'projectRoot and targetFilePath are required' };
   }
 
