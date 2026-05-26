@@ -478,11 +478,11 @@ export function resolveSourceFilePathFromDependencies(
 export function enrichLayersTree(
   tree: LayersTree,
   filePath: string,
-  dependencyPaths: string[]
+  dependencyPaths: string[] = []
 ): LayersTree {
   const rootBasename = getPathBasename(filePath);
   const dependencyByBasename = new Map<string, string[]>();
-  dependencyPaths.forEach((depPath) => {
+  (dependencyPaths || []).forEach((depPath) => {
     const basename = getPathBasename(depPath);
     if (!basename) return;
     const list = dependencyByBasename.get(basename) || [];

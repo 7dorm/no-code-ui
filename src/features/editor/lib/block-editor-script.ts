@@ -482,8 +482,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 height: rect.height + mt + mb,
               });
               setRect(overlay.padding, {
-                left: rect.left + dx + bl,
-                top: rect.top + dy + bt,
+                left: rect.left + bl,
+                top: rect.top + bt,
                 width: rect.width - bl - br,
                 height: rect.height - bt - bb,
               });
@@ -513,13 +513,24 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const mode = cs.position === 'relative' ? 'relative' : moveMode;
               const elLeft = mode === 'relative' ? (pxToNum(cs.left) || 0) : ml;
               const elTop = mode === 'relative' ? (pxToNum(cs.top) || 0) : mt;
+              
+              let badgeText = '';
+              const currentResizeTarget = resizeTargetMode || 'size';
+              if (currentResizeTarget === 'margin') {
+                badgeText = 'margin: ' + Math.round(mt) + ' ' + Math.round(mr) + ' ' + Math.round(mb) + ' ' + Math.round(ml);
+              } else if (currentResizeTarget === 'padding') {
+                badgeText = 'padding: ' + Math.round(pt) + ' ' + Math.round(pr) + ' ' + Math.round(pb) + ' ' + Math.round(pl);
+              } else {
+                badgeText = Math.round(rect.width) + ' × ' + Math.round(rect.height);
+              }
+
               const hasVisibleOffset = mode === 'relative' || Math.abs(elLeft) > 0.5 || Math.abs(elTop) > 0.5;
               if (hasVisibleOffset) {
-                const labelText = mode === 'relative' ? ('offset left:' + Math.round(elLeft) + ' top:' + Math.round(elTop)) : ('offset ml:' + Math.round(elLeft) + ' mt:' + Math.round(elTop));
-                setShiftBadge(labelText, rect.left - ml, rect.top - mt - 24);
-              } else {
-                setShiftBadge('', 0, 0);
+                const labelText = mode === 'relative' ? ('left:' + Math.round(elLeft) + ' top:' + Math.round(elTop)) : ('ml:' + Math.round(elLeft) + ' mt:' + Math.round(elTop));
+                badgeText += ' | ' + labelText;
               }
+              setShiftBadge(badgeText, rect.left - ml, rect.top - mt - 24);
+              
               updateResizeOverlayStyles();
             } catch (e) {
               try {

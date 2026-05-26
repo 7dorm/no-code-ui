@@ -307,19 +307,25 @@ export function EditorWorkspace({
     reactNativeHTML,
   });
 
+  const saveFileRef = useRef<typeof saveFile | null>(null);
+  useEffect(() => {
+    saveFileRef.current = saveFile;
+  }, [saveFile]);
+
   const {
     handleEditorMessageStable,
   } = useEditorMessage({
-    filePath,
-    astManagerRef,
-    isUpdatingFromConstructorRef,
-    isUpdatingFromFileRef,
+    commitStagedPatches,
     monacoEditorRef,
-    applyBlockPatch,
+    unsavedContent,
+    saveFileRef: saveFileRef as React.MutableRefObject<typeof saveFile | null>,
+    filePath,
+    dependencyPaths,
+    setError,
     stageInsertBlock,
-    stageDeleteBlock,
     stageReparentBlock,
-    stageSetText,
+    setRenderVersion,
+    applyBlockPatch,
   });
 
   useFileWatchSync({
