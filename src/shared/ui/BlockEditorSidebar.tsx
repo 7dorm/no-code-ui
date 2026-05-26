@@ -1,5 +1,21 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { MRPAK_CMD } from '../../blockEditor/EditorProtocol';
+
+interface StyleLibraryEntry {
+  id: string;
+  name: string;
+  path: string;
+  sourceFileName?: string;
+  className?: string;
+  cssText?: string;
+  stylePatch?: Record<string, unknown>;
+}
+
+interface StyleLibraryColumn {
+  fileName: string;
+  entries: StyleLibraryEntry[];
+}
 
 const htmlInputStyle = {
   width: '100%',
@@ -13,7 +29,7 @@ const htmlInputStyle = {
   outline: 'none',
 };
 
-export function BlockEditorSidebar(props) {
+export function BlockEditorSidebar(props: any) {
   const {
     styles,
     canUndo,
@@ -150,6 +166,8 @@ export function BlockEditorSidebar(props) {
     onApplyStyleLibraryEntry,
     onAddProjectDependency,
     onInsertComponentFromLibrary,
+    onInsertBlock,
+    externalDropTargetState,
     canApply,
     handleApply,
   } = props;
@@ -176,12 +194,12 @@ export function BlockEditorSidebar(props) {
     '#ec4899',
   ];
 
-  const normalizeHex = (value, fallback) => {
+  const normalizeHex = (value: string, fallback: string) => {
     const v = String(value || '').trim();
     if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) return v;
     return fallback;
   };
-  const CollapsibleSection = ({ title, children, defaultOpen = false }) => (
+  const CollapsibleSection = ({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) => (
     <details open={defaultOpen} style={{ marginBottom: 10 }}>
       <summary
         style={{
@@ -198,7 +216,7 @@ export function BlockEditorSidebar(props) {
       <div style={{ paddingTop: 4 }}>{children}</div>
     </details>
   );
-  const SelectField = ({ label, hint, value, onChange, options }) => (
+  const SelectField = ({ label, hint, value, onChange, options }: { label: string; hint?: string; value: string; onChange: (val: string) => void; options: Array<{ value: string; label: string }> }) => (
     <div style={{ marginBottom: 8 }}>
       <div
         style={{
@@ -243,7 +261,7 @@ export function BlockEditorSidebar(props) {
       </select>
     </div>
   );
-  const ColorPaletteRow = ({ selected, onSelect }) => (
+  const ColorPaletteRow = ({ selected, onSelect }: { selected: string; onSelect: (color: string) => void }) => (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
       {colorPalette.map((c) => (
         <TouchableOpacity
@@ -267,7 +285,7 @@ export function BlockEditorSidebar(props) {
       ))}
     </View>
   );
-  const ColorFieldWithPalette = ({ label, hint, value, onChange, fallback = '#000000' }) => (
+  const ColorFieldWithPalette = ({ label, hint, value, onChange, fallback = '#000000' }: { label: string; hint?: string; value: string; onChange: (val: string) => void; fallback?: string }) => (
     <div style={{ marginBottom: 8 }}>
       <div
         style={{
@@ -327,7 +345,7 @@ export function BlockEditorSidebar(props) {
       <ColorPaletteRow selected={value} onSelect={onChange} />
     </div>
   );
-  const HintedTextField = ({ label, hint, value, onChange, placeholder }) => (
+  const HintedTextField = ({ label, hint, value, onChange, placeholder }: { label: string; hint?: string; value: string; onChange: (val: string) => void; placeholder?: string }) => (
     <div style={{ marginBottom: 8 }}>
       <div
         style={{
@@ -368,7 +386,7 @@ export function BlockEditorSidebar(props) {
       />
     </div>
   );
-  const parseShadowParts = (raw) => {
+  const parseShadowParts = (raw: string) => {
     const text = String(raw || '').trim();
     const inset = /\binset\b/.test(text);
     const colorMatch = text.match(/(rgba?\([^)]+\)|hsla?\([^)]+\)|#[0-9a-fA-F]{3,8}|[a-zA-Z]+)\s*$/);
@@ -385,7 +403,7 @@ export function BlockEditorSidebar(props) {
       color: color || '#000000',
     };
   };
-  const parseOutlineParts = (raw) => {
+  const parseOutlineParts = (raw: string) => {
     const text = String(raw || '').trim();
     const parts = text.split(/\s+/).filter(Boolean);
     const width = parts[0] || '1px';
@@ -393,9 +411,13 @@ export function BlockEditorSidebar(props) {
     const color = parts.slice(2).join(' ') || '#60a5fa';
     return { width, style, color };
   };
-  const parseTransformParts = (raw) => {
+  const parseTransformParts = (raw: string): { translateX: string; translateY: string; scale: string; rotate: string } => {
     const text = String(raw || '');
-    const getArg = (fnName) => {
+    const getArg = (fnName: string): string => {
+      const m = text.match(new RegExp(`${fnName}\\(([^)]+)\\)`));
+      return m ? m[1].trim() : '';
+    };
+    const logUnknownStyle = (fnName: string, styleObj: Record<string, unknown>): string => {
       const m = text.match(new RegExp(`${fnName}\\(([^)]+)\\)`));
       return m ? m[1].trim() : '';
     };
@@ -422,7 +444,7 @@ export function BlockEditorSidebar(props) {
     setShadowSpread(shadowInitial.spread);
     setShadowColor(shadowInitial.color);
   }, [shadowInitial]);
-  const applyBoxShadow = (next = {}) => {
+  const applyBoxShadow = (next: Partial<{ inset: boolean; x: string; y: string; blur: string; spread: string; color: string }> = {}) => {
     const inset = next.inset ?? shadowInset;
     const x = (next.x ?? shadowX ?? '0px').trim();
     const y = (next.y ?? shadowY ?? '0px').trim();
@@ -442,7 +464,7 @@ export function BlockEditorSidebar(props) {
     setOutlineStyleArg(outlineInitial.style);
     setOutlineColorArg(outlineInitial.color);
   }, [outlineInitial]);
-  const applyOutline = (next = {}) => {
+  const applyOutline = (next: Partial<{ width: string; style: string; color: string }> = {}) => {
     const widthArg = (next.width ?? outlineWidthArg ?? '1px').trim();
     const styleArg = (next.style ?? outlineStyleArg ?? 'solid').trim();
     const colorArg = (next.color ?? outlineColorArg ?? '').trim();
@@ -462,7 +484,7 @@ export function BlockEditorSidebar(props) {
     setTransformScale(transformInitial.scale);
     setTransformRotate(transformInitial.rotate);
   }, [transformInitial]);
-  const applyTransform = (next = {}) => {
+  const applyTransform = (next: Partial<{ translateX: string; translateY: string; scale: string; rotate: string }> = {}) => {
     const tx = (next.translateX ?? transformTranslateX ?? '').trim();
     const ty = (next.translateY ?? transformTranslateY ?? '').trim();
     const sc = (next.scale ?? transformScale ?? '').trim();
@@ -508,6 +530,48 @@ export function BlockEditorSidebar(props) {
   const [libraryVersion, setLibraryVersion] = React.useState('latest');
   const [iconPreviewWarning, setIconPreviewWarning] = React.useState(false);
   const [libraryActionNote, setLibraryActionNote] = React.useState('');
+  const libraryDragMovedRef = React.useRef(false);
+  const externalDropTargetRef = React.useRef(externalDropTargetState);
+  externalDropTargetRef.current = externalDropTargetState;
+
+  const buildLibrarySnippet = React.useCallback(
+    (rawTag: string) => {
+      const normalizedTag = /^[A-Za-z][A-Za-z0-9_-]*$/.test(String(rawTag || '').trim())
+        ? String(rawTag).trim()
+        : fileType === 'react-native'
+          ? 'View'
+          : 'motion.div';
+      return `<${normalizedTag}></${normalizedTag}>`;
+    },
+    [fileType]
+  );
+
+  const insertLibraryBlock = React.useCallback(
+    (rawTag: string, preferredTargetId?: string | null) => {
+      const targetId = String(preferredTargetId || externalDropTargetRef.current?.targetId || selectedBlock?.id || '').trim();
+      if (!targetId) {
+        setLibraryActionNote('Сначала выберите родительский блок в превью (клик по элементу).');
+        return false;
+      }
+      if (!onInsertBlock) {
+        setLibraryActionNote('Вставка недоступна: редактор не инициализирован.');
+        return false;
+      }
+      const insertedId = onInsertBlock({
+        targetId,
+        mode: 'child',
+        snippet: buildLibrarySnippet(rawTag),
+      });
+      if (insertedId) {
+        setLibraryActionNote(`Добавлен блок <${rawTag}> в выбранный родитель.`);
+        return true;
+      }
+      setLibraryActionNote('Не удалось добавить блок. Повторите попытку.');
+      return false;
+    },
+    [buildLibrarySnippet, onInsertBlock, selectedBlock?.id]
+  );
+
   const supportsCssSpecialValues = fileType !== 'react-native';
   const positionModeOptions =
     supportsCssSpecialValues && moveMode !== 'relative'
@@ -621,7 +685,7 @@ export function BlockEditorSidebar(props) {
     if (!onSendCommand || !componentName || !importPath) return;
     setLibraryDragTag(`icon:${componentName}`);
     onSendCommand({
-      type: 'MRPAK_CMD_START_DRAG',
+      type: MRPAK_CMD.START_DRAG,
       source: 'component',
       componentName,
       importPath,
@@ -705,8 +769,8 @@ export function BlockEditorSidebar(props) {
     }
   };
   const styleLibraryColumns = React.useMemo(() => {
-    const map = new Map<string, any[]>();
-    (styleLibraryEntries || []).forEach((entry: any) => {
+    const map = new Map<string, StyleLibraryEntry[]>();
+    (styleLibraryEntries || []).forEach((entry: StyleLibraryEntry) => {
       const fileKey = String(entry?.sourceFileName || entry?.path || 'styles.css');
       const list = map.get(fileKey) || [];
       list.push(entry);
@@ -715,30 +779,63 @@ export function BlockEditorSidebar(props) {
     return Array.from(map.entries()).map(([fileName, entries]) => ({
       fileName,
       entries: entries.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''))),
-    }));
+    })) as StyleLibraryColumn[];
   }, [styleLibraryEntries]);
 
   const startLibraryDrag = (tag: string) => {
+    libraryDragMovedRef.current = false;
     if (!onSendCommand) return;
     setLibraryDragTag(tag);
-    onSendCommand({ type: 'MRPAK_CMD_START_DRAG', source: 'library', tag });
+    onSendCommand({ type: MRPAK_CMD.START_DRAG, source: 'library', tag });
   };
 
+  const sendExternalPointer = React.useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      libraryDragMovedRef.current = true;
+      if (!onSendCommand) return;
+      const touch = 'touches' in event && event.touches?.length ? event.touches[0] : null;
+      const changedTouch =
+        'changedTouches' in event && event.changedTouches?.length ? event.changedTouches[0] : null;
+      const point = touch || changedTouch || event;
+      const x = 'clientX' in point ? point.clientX : null;
+      const y = 'clientY' in point ? point.clientY : null;
+      if (x == null || y == null) return;
+      onSendCommand({ type: MRPAK_CMD.UPDATE_EXTERNAL_POINTER, x, y });
+    },
+    [onSendCommand]
+  );
+
   React.useEffect(() => {
-    if (!libraryDragTag || !onSendCommand || typeof window === 'undefined') return;
+    if (!libraryDragTag || typeof window === 'undefined') return;
     const finish = () => {
-      onSendCommand({ type: 'MRPAK_CMD_END_DRAG', source: 'library', tag: libraryDragTag });
+      const tag = libraryDragTag.startsWith('icon:') ? null : libraryDragTag;
+      if (tag && libraryDragMovedRef.current) {
+        insertLibraryBlock(tag);
+      }
+      if (onSendCommand) {
+        onSendCommand({
+          type: MRPAK_CMD.END_DRAG,
+          source: 'library',
+          tag: libraryDragTag,
+          fallbackTargetId: selectedBlock?.id ? String(selectedBlock.id) : null,
+        });
+      }
       setLibraryDragTag(null);
     };
+    const onMove = (event: MouseEvent | TouchEvent) => sendExternalPointer(event);
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('touchmove', onMove, true);
     window.addEventListener('mouseup', finish, true);
     window.addEventListener('touchend', finish, true);
     window.addEventListener('blur', finish, true);
     return () => {
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('touchmove', onMove, true);
       window.removeEventListener('mouseup', finish, true);
       window.removeEventListener('touchend', finish, true);
       window.removeEventListener('blur', finish, true);
     };
-  }, [libraryDragTag, onSendCommand]);
+  }, [insertLibraryBlock, libraryDragTag, onSendCommand, selectedBlock?.id, sendExternalPointer]);
 
   return (
     <View style={styles.sidebar}>
@@ -813,7 +910,7 @@ export function BlockEditorSidebar(props) {
 
           {layersTree?.rootIds?.length ? (
             <div style={{ maxHeight: 240, overflow: 'auto' }}>
-              {layersTree.rootIds.map((rid: any) => renderTreeNode(rid, 0))}
+              {layersTree.rootIds.map((rid: string) => renderTreeNode(rid, 0))}
             </div>
           ) : (
             <Text style={styles.hint}>Дерево слоёв загружается…</Text>
@@ -1601,11 +1698,15 @@ export function BlockEditorSidebar(props) {
         ) : sidebarTab === 'library' ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Block Library</Text>
-            <Text style={styles.hint}>Каталог блоков (заглушка, функционал добавим далее).</Text>
+            <Text style={styles.hint}>
+              Клик — вставить в выбранный блок. Зажать и перетащить — вставить в блок под курсором на холсте.
+            </Text>
+            {libraryActionNote ? <Text style={styles.hint}>{libraryActionNote}</Text> : null}
             {blockLibraryItems.map((item) => (
               <View key={`library-${item}`} style={{ marginBottom: '8px', opacity: 0.75 }}>
                 <TouchableOpacity
                   style={styles.layerOpBtn}
+                  onPress={() => insertLibraryBlock(item)}
                   onPressIn={() => startLibraryDrag(item)}
                 >
                   <Text style={styles.layerOpBtnText}>+ {item}</Text>
@@ -1614,9 +1715,7 @@ export function BlockEditorSidebar(props) {
             ))}
             {libraryDragTag ? (
               <Text style={styles.hint}>Перетащите на холст. Колесико: смена target-родителя.</Text>
-            ) : (
-              <Text style={styles.hint}>Зажмите элемент и наведите на холст для вставки в child.</Text>
-            )}
+            ) : null}
 
             {fileType !== 'react-native' ? (
               <View style={{ marginTop: 14 }}>
@@ -1805,7 +1904,7 @@ export function BlockEditorSidebar(props) {
             ) : (
               <div style={{ maxHeight: 420, overflow: 'auto' }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 'max-content' }}>
-                  {styleLibraryColumns.map((column: any) => (
+                  {styleLibraryColumns.map((column: StyleLibraryColumn) => (
                     <div
                       key={`style-col-${column.fileName}`}
                       style={{
@@ -1819,7 +1918,7 @@ export function BlockEditorSidebar(props) {
                       <div style={{ color: 'rgba(255,255,255,0.95)', fontSize: 12, marginBottom: 8, fontWeight: 700 }}>
                         {column.fileName}
                       </div>
-                      {column.entries.map((entry: any) => {
+                      {column.entries.map((entry: StyleLibraryEntry) => {
                         const previewStyle = entry?.stylePatch || {};
                         return (
                           <div

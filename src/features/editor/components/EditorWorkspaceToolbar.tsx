@@ -1,10 +1,20 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
+import { styles } from '../styles';
 
 type RenderFileToolbarProps = {
-  children?: React.ReactNode;
+  label: string;
+  componentName?: string | null;
 };
 
-export function RenderFileToolbar({ children }: RenderFileToolbarProps) {
-  return <View>{children}</View>;
+export function RenderFileToolbar({ label, componentName = null }: RenderFileToolbarProps) {
+  return (
+    <View style={styles.contentMetaOverlay} pointerEvents="none">
+      <View style={styles.fileTypeBadge}>
+        <Text style={styles.fileTypeText}>
+          {componentName ? `${label} • ${componentName}` : label}
+        </Text>
+      </View>
+    </View>
+  );
 }

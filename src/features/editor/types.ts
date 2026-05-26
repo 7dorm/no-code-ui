@@ -1,4 +1,5 @@
-export type StylePatch = Record<string, any>;
+export type StyleValue = string | number | boolean | null;
+export type StylePatch = Record<string, StyleValue | undefined>;
 
 export type PatchHistoryOperation = {
   type: 'patch';
@@ -86,10 +87,27 @@ export type HistoryOperation =
 
 export type StagedOp = StagedOpInsert | StagedOpDelete | StagedOpSetText | StagedOpReparent;
 
-export type BlockMap = Record<string, any>;
+export type BlockMapEntry = {
+  start?: number;
+  end?: number;
+  [key: string]: unknown;
+};
+
+export type BlockMap = Record<string, BlockMapEntry>;
+
+export type LayerNode = {
+  parentId?: string | null;
+  childIds?: string[];
+  tagName?: string;
+  isIsolatedComponent?: boolean;
+  componentName?: string;
+  sourceBasename?: string;
+  sourceFilePath?: string;
+  [key: string]: unknown;
+};
 
 export type LayersTree = {
-  nodes: Record<string, any>;
+  nodes: Record<string, LayerNode>;
   rootIds: string[];
 };
 
@@ -129,7 +147,7 @@ export type StyleLibraryEntry = {
   sourceFileName: string;
   className: string;
   cssText: string;
-  stylePatch: Record<string, any>;
+  stylePatch: StylePatch;
 };
 
 export type StyleTemplate = {

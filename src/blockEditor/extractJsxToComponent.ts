@@ -1,7 +1,15 @@
-import { parse } from '@babel/parser';
+import { parse, type ParserPlugin } from '@babel/parser';
 import generate from '@babel/generator';
-import traverse from '@babel/traverse';
+import traverse, { type NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
+
+type BlockMapEntry = {
+  start?: number;
+  end?: number;
+  [key: string]: unknown;
+};
+
+type BlockMap = Record<string, BlockMapEntry>;
 
 type ExtractParams = {
   code: string;
@@ -9,7 +17,7 @@ type ExtractParams = {
   selectedIds: string[];
   componentName: string;
   fileType: 'react' | 'react-native';
-  blockMap?: Record<string, any>;
+  blockMap?: BlockMap;
 };
 
 type ExtractResult =
@@ -40,9 +48,9 @@ const RN_BUILTIN_TAGS = new Set([
   'ActivityIndicator',
 ]);
 
-function getParserPlugins(filePath: string) {
+function getParserPlugins(filePath: string): ParserPlugin[] {
   const lower = String(filePath || '').toLowerCase();
-  const plugins: any[] = ['jsx'];
+  const plugins: ParserPlugin[] = ['jsx'];
   if (lower.endsWith('.ts') || lower.endsWith('.tsx')) {
     plugins.push(
       'typescript',
@@ -69,7 +77,7 @@ function normalizeSelectedIds(ids: string[]) {
   );
 }
 
-function getIdFromOpeningElement(node: any): string | null {
+function getIdFromOpeningElement(node: t.JSXOpeningElement | null | undefined): string | null {
   if (!node || !node.attributes) return null;
   for (const attr of node.attributes) {
     if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) continue;
@@ -83,17 +91,26 @@ function getIdFromOpeningElement(node: any): string | null {
   return null;
 }
 
-function cloneNode<T>(node: T): T {
-  return t.cloneNode(node as any, true) as any;
+function cloneNode<T extends t.Node>(node: T): T {
+  return t.cloneNode(node, true) as T;
 }
 
-function stripMrpakAttrsFromJsx(node: any) {
+function toExpression(node: t.Node): t.Expression {
+  return t.isExpression(node) ? node : t.identifier('undefined');
+}
+
+function findParentJsxElement(path: NodePath<t.Node>): NodePath<t.JSXElement> | null {
+  const parent = path.findParent((candidatePath) => candidatePath.isJSXElement());
+  return parent && parent.isJSXElement() ? (parent as NodePath<t.JSXElement>) : null;
+}
+
+function stripMrpakAttrsFromJsx(node: t.JSXElement | t.JSXFragment | null) {
   if (!node) return node;
   traverse(
-    t.file(t.program([t.expressionStatement(t.isExpression(node) ? node : t.identifier('undefined'))])),
+    t.file(t.program([t.expressionStatement(toExpression(node))])),
     {
-      JSXOpeningElement(path: any) {
-        path.node.attributes = (path.node.attributes || []).filter((attr: any) => {
+      JSXOpeningElement(path: NodePath<t.JSXOpeningElement>) {
+        path.node.attributes = (path.node.attributes || []).filter((attr) => {
           if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) return true;
           return attr.name.name !== 'data-no-code-ui-id' && attr.name.name !== 'data-mrpak-id';
         });
@@ -105,13 +122,13 @@ function stripMrpakAttrsFromJsx(node: any) {
   return node;
 }
 
-function collectReferencedIdentifiers(node: any): Set<string> {
+function collectReferencedIdentifiers(node: t.Node | null | undefined): Set<string> {
   const refs = new Set<string>();
   if (!node) return refs;
   traverse(
-    t.file(t.program([t.expressionStatement(t.isExpression(node) ? node : t.identifier('undefined'))])),
+    t.file(t.program([t.expressionStatement(toExpression(node))])),
     {
-      Identifier(path: any) {
+      Identifier(path: NodePath<t.Identifier>) {
         if (!path.isReferencedIdentifier()) return;
         const name = String(path.node.name || '');
         if (!name) return;
@@ -127,13 +144,13 @@ function collectReferencedIdentifiers(node: any): Set<string> {
   return refs;
 }
 
-function collectStatementRefs(stmt: any): Set<string> {
+function collectStatementRefs(stmt: t.Statement | null | undefined): Set<string> {
   const refs = new Set<string>();
   if (!stmt) return refs;
   traverse(
     t.file(t.program([stmt])),
     {
-      Identifier(path: any) {
+      Identifier(path: NodePath<t.Identifier>) {
         if (!path.isReferencedIdentifier()) return;
         refs.add(String(path.node.name || ''));
       },
@@ -144,7 +161,7 @@ function collectStatementRefs(stmt: any): Set<string> {
   return refs;
 }
 
-function resolveTargetsFromBlockMap(ids: string[], blockMap?: Record<string, any>) {
+function resolveTargetsFromBlockMap(ids: string[], blockMap?: BlockMap) {
   const result = new Map<string, { start: number; end: number }>();
   if (!blockMap) return result;
   const keys = Object.keys(blockMap);
@@ -165,7 +182,7 @@ function resolveTargetsFromBlockMap(ids: string[], blockMap?: Record<string, any
 }
 
 function buildComponentAst(params: {
-  jsxNode: any;
+  jsxNode: t.JSXElement | t.JSXFragment;
   componentName: string;
   fileType: 'react' | 'react-native';
   importDecls: t.ImportDeclaration[];
@@ -173,7 +190,7 @@ function buildComponentAst(params: {
   propNames: string[];
 }) {
   const { jsxNode, componentName, fileType, importDecls, topLevelDeps, propNames } = params;
-  const programBody: any[] = [];
+  const programBody: t.Statement[] = [];
 
   if (fileType === 'react') {
     const hasReactDefault = importDecls.some(
@@ -192,7 +209,7 @@ function buildComponentAst(params: {
     traverse(
       t.file(t.program([t.expressionStatement(jsxNode)])),
       {
-        JSXOpeningElement(path: any) {
+        JSXOpeningElement(path: NodePath<t.JSXOpeningElement>) {
           const name = path.node?.name;
           if (t.isJSXIdentifier(name)) {
             const tag = String(name.name || '');
@@ -266,7 +283,7 @@ function buildComponentUsage(componentName: string, propNames: string[]) {
   );
 }
 
-function ensureImport(ast: any, componentName: string, importPath: string) {
+function ensureImport(ast: t.File, componentName: string, importPath: string) {
   let hasImport = false;
   let insertIndex = 0;
   for (let i = 0; i < ast.program.body.length; i += 1) {
@@ -298,7 +315,7 @@ export function extractJsxToComponent(params: ExtractParams): ExtractResult {
     return { ok: false, error: 'Не выбраны блоки для выноса.' };
   }
 
-  let ast: any;
+  let ast: t.File;
   try {
     ast = parse(String(code ?? ''), {
       sourceType: 'module',
@@ -307,42 +324,45 @@ export function extractJsxToComponent(params: ExtractParams): ExtractResult {
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (e: any) {
-    return { ok: false, error: `Ошибка парсинга файла: ${e?.message || e}` };
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `Ошибка парсинга файла: ${errorMessage}` };
   }
 
   const targetsByRange = resolveTargetsFromBlockMap(normalizedIds, blockMap);
-  const idToPath = new Map<string, any>();
+  const idToPath = new Map<string, NodePath<t.JSXElement>>();
 
   traverse(ast, {
-    JSXOpeningElement(path: any) {
+    JSXOpeningElement(path: NodePath<t.JSXOpeningElement>) {
       const nodeStart = Number(path.node?.start);
       const nodeEnd = Number(path.node?.end);
 
       for (const [id, entry] of targetsByRange.entries()) {
         if (idToPath.has(id)) continue;
         if (entry.start === nodeStart && entry.end === nodeEnd) {
-          const jsxElementPath = path.findParent((p: any) => t.isJSXElement(p.node));
+          const jsxElementPath = findParentJsxElement(path);
           if (jsxElementPath) idToPath.set(id, jsxElementPath);
         }
       }
 
       const fallbackId = getIdFromOpeningElement(path.node);
       if (fallbackId && normalizedIds.includes(fallbackId) && !idToPath.has(fallbackId)) {
-        const jsxElementPath = path.findParent((p: any) => t.isJSXElement(p.node));
+        const jsxElementPath = findParentJsxElement(path);
         if (jsxElementPath) idToPath.set(fallbackId, jsxElementPath);
       }
     },
   });
 
-  const targetPaths = normalizedIds.map((id) => idToPath.get(id)).filter(Boolean);
+  const targetPaths = normalizedIds
+    .map((id) => idToPath.get(id))
+    .filter((path): path is NodePath<t.JSXElement> => !!path);
   if (targetPaths.length !== normalizedIds.length) {
     const found = new Set(Array.from(idToPath.keys()));
     const missing = normalizedIds.filter((id) => !found.has(id));
     return { ok: false, error: `Не удалось найти выбранные блоки в AST: ${missing.join(', ')}` };
   }
 
-  let extractedJsxNode: any;
+  let extractedJsxNode: t.JSXElement | t.JSXFragment;
   if (targetPaths.length === 1) {
     const replacementTargetPath = targetPaths[0];
     extractedJsxNode = cloneNode(replacementTargetPath.node);
@@ -377,10 +397,10 @@ export function extractJsxToComponent(params: ExtractParams): ExtractResult {
   const initialRefs = collectReferencedIdentifiers(extractedJsxNode);
 
   const firstTarget = targetPaths[0];
-  const enclosingFnPath = firstTarget.findParent((p: any) =>
+  const enclosingFnPath = firstTarget.findParent((p) =>
     p.isFunctionDeclaration() || p.isFunctionExpression() || p.isArrowFunctionExpression()
   );
-  const programPath = firstTarget.findParent((p: any) => p.isProgram());
+  const programPath = firstTarget.findParent((p) => p.isProgram());
 
   const topVarMap = new Map<string, t.Statement>();
   const topFnMap = new Map<string, t.FunctionDeclaration>();
@@ -450,7 +470,7 @@ export function extractJsxToComponent(params: ExtractParams): ExtractResult {
       );
       return;
     }
-    const has = current.specifiers.some((s) => t.isIdentifier((s as any).local) && (s as any).local.name === name);
+    const has = current.specifiers.some((s) => t.isIdentifier(s.local) && s.local.name === name);
     if (!has) current.specifiers.push(cloneNode(meta.specifier));
   };
 
@@ -498,7 +518,7 @@ export function extractJsxToComponent(params: ExtractParams): ExtractResult {
     targetPaths[0].replaceWith(replacementNode);
   } else {
     const parentChildren = targetPaths[0].parentPath.node.children || [];
-    const firstIdx = parentChildren.findIndex((child: any) => child === targetPaths[0].node);
+    const firstIdx = parentChildren.findIndex((child) => child === targetPaths[0].node);
     if (firstIdx >= 0) {
       parentChildren[firstIdx] = replacementNode;
     }

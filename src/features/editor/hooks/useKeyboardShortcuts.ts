@@ -34,8 +34,7 @@ export function useKeyboardShortcuts({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const key = String(e.key || '').toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && key === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
         e.preventDefault();
         e.stopPropagation();
         if (typeof (e as any).stopImmediatePropagation === 'function') (e as any).stopImmediatePropagation();
@@ -68,20 +67,20 @@ export function useKeyboardShortcuts({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (viewMode !== 'split') return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if (viewMode === 'changes') return; // Undo/redo works in preview and split modes
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
         undo();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
         redo();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') {
         e.preventDefault();
         e.stopPropagation();
         redo();

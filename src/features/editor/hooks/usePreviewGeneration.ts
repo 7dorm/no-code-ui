@@ -113,18 +113,18 @@ export function usePreviewGeneration({
   }, [fileType, previewSourceCode, filePath, viewMode, projectRoot, selectedComponentName, aggressivePreviewMode, setBlockMap, setBlockMapForFile, setDependencyPaths, setIsProcessingReactNative, setPreviewOpenError, setReactNativeHTML]);
 
   useEffect(() => {
-    if (fileType === 'html' && fileContent && filePath) {
+    if (fileType === 'html' && previewSourceCode && filePath) {
       const processHTML = async () => {
         setIsProcessingHTML(true);
         try {
           const framework = createFramework('html', filePath);
-          const result = await framework.generateHTML(fileContent, filePath, { viewMode, projectRoot: '' });
+          const result = await framework.generateHTML(previewSourceCode, filePath, { viewMode, projectRoot: '' });
           setProcessedHTML(result.html);
           setHtmlDependencyPaths(result.dependencyPaths);
           setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
         } catch {
-          setProcessedHTML(fileContent);
+          setProcessedHTML(previewSourceCode);
           setHtmlDependencyPaths([]);
           setBlockMapForFile({});
         } finally {
@@ -137,5 +137,5 @@ export function usePreviewGeneration({
       setHtmlDependencyPaths([]);
       setIsProcessingHTML(false);
     }
-  }, [fileType, fileContent, filePath, viewMode, setBlockMap, setBlockMapForFile, setHtmlDependencyPaths, setIsProcessingHTML, setProcessedHTML]);
+  }, [fileType, previewSourceCode, filePath, viewMode, setBlockMap, setBlockMapForFile, setHtmlDependencyPaths, setIsProcessingHTML, setProcessedHTML]);
 }

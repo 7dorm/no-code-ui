@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+type PointerLikeEvent = {
+  clientX?: number;
+  touches?: Array<{ clientX: number }>;
+  preventDefault?: () => void;
+  stopPropagation?: () => void;
+};
+
+type RefLikeNode = {
+  _nativeNode?: HTMLElement;
+  _internalInstanceHandle?: { stateNode?: HTMLElement };
+  _owner?: { stateNode?: HTMLElement };
+  getBoundingClientRect?: () => DOMRect;
+} | HTMLElement;
+
 export function useSplitLayout() {
   const [splitLeftWidth, setSplitLeftWidth] = useState<number>(0.5);
   const [splitSidebarWidth, setSplitSidebarWidth] = useState<number>(320);
@@ -8,7 +22,7 @@ export function useSplitLayout() {
   const splitContainerRef = useRef<HTMLElement | null>(null);
   const splitMainPanelsRef = useRef<HTMLElement | null>(null);
 
-  const handleSplitResizeStart = useCallback((target: 'main' | 'sidebar') => (e: any) => {
+  const handleSplitResizeStart = useCallback((target: 'main' | 'sidebar') => (e: PointerLikeEvent) => {
     setResizeTarget(target);
     setIsResizing(true);
     if (typeof document !== 'undefined') {
@@ -19,20 +33,20 @@ export function useSplitLayout() {
     if (e.stopPropagation) e.stopPropagation();
   }, []);
 
-  const handleSplitResize = useCallback((e: any) => {
+  const handleSplitResize = useCallback((e: PointerLikeEvent) => {
     if (!isResizing || !resizeTarget) return;
 
-    let container = (resizeTarget === 'sidebar' ? splitContainerRef.current : splitMainPanelsRef.current) as any;
+    let container = (resizeTarget === 'sidebar' ? splitContainerRef.current : splitMainPanelsRef.current) as RefLikeNode | null;
 
     if (container) {
       if (typeof (container as HTMLElement).getBoundingClientRect === 'function') {
         // already DOM element
-      } else if ((container as any)._nativeNode) {
-        container = (container as any)._nativeNode;
-      } else if ((container as any)._internalInstanceHandle?.stateNode) {
-        container = (container as any)._internalInstanceHandle.stateNode;
-      } else if ((container as any)._owner?.stateNode) {
-        container = (container as any)._owner.stateNode;
+      } else if (container._nativeNode) {
+        container = container._nativeNode;
+      } else if (container._internalInstanceHandle?.stateNode) {
+        container = container._internalInstanceHandle.stateNode;
+      } else if (container._owner?.stateNode) {
+        container = container._owner.stateNode;
       }
     }
 
@@ -71,14 +85,14 @@ export function useSplitLayout() {
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: any) => {
+    const handleMouseMove = (e: PointerLikeEvent) => {
       handleSplitResize(e);
       if (e.preventDefault) e.preventDefault();
     };
     const handleMouseUp = () => {
       handleSplitResizeEnd();
     };
-    const handleTouchMove = (e: any) => {
+    const handleTouchMove = (e: PointerLikeEvent) => {
       handleSplitResize(e);
       if (e.preventDefault) e.preventDefault();
     };
@@ -103,7 +117,7 @@ export function useSplitLayout() {
     };
   }, [isResizing, handleSplitResize, handleSplitResizeEnd]);
 
-  const setSplitContainerNode = useCallback((ref: any) => {
+  const setSplitContainerNode = useCallback((ref: RefLikeNode | null) => {
     if (!ref) return;
     if (ref._nativeNode) {
       splitContainerRef.current = ref._nativeNode;
@@ -122,7 +136,7 @@ export function useSplitLayout() {
     }, 0);
   }, []);
 
-  const setSplitMainPanelsNode = useCallback((ref: any) => {
+  const setSplitMainPanelsNode = useCallback((ref: RefLikeNode | null) => {
     if (!ref) return;
     if (ref._nativeNode) {
       splitMainPanelsRef.current = ref._nativeNode;
