@@ -1,0 +1,2461 @@
+{
+  "stats": {
+    "totalBlocks": 77,
+    "roots": 7,
+    "filesProcessed": 7,
+    "timeMs": 79
+  },
+  "roots": [
+    {
+      "id": "App_jsx__component__App_4",
+      "name": "App",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx"
+    },
+    {
+      "id": "App_jsx__component__renderScreen_9",
+      "name": "renderScreen",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx"
+    },
+    {
+      "id": "components_Button_jsx__component__Button_15",
+      "name": "Button",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Button.jsx"
+    },
+    {
+      "id": "components_Card_jsx__component__Card_21",
+      "name": "Card",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Card.jsx"
+    },
+    {
+      "id": "components_Header_jsx__component__Header_26",
+      "name": "Header",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Header.jsx"
+    },
+    {
+      "id": "screens_HomeScreen_jsx__component__HomeScreen_34",
+      "name": "HomeScreen",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx"
+    },
+    {
+      "id": "screens_ProfileScreen_jsx__component__ProfileScreen_56",
+      "name": "ProfileScreen",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx"
+    }
+  ],
+  "blocks": {
+    "App_jsx__object__React_0": {
+      "id": "App_jsx__object__React_0",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "import React, { useState } from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "App_jsx__object__useState_1": {
+      "id": "App_jsx__object__useState_1",
+      "type": "object",
+      "name": "useState",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "import React, { useState } from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 16,
+      "endCol": 24,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "named",
+        "importedName": "useState",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "App_jsx__object__StyleSheet_2": {
+      "id": "App_jsx__object__StyleSheet_2",
+      "type": "object",
+      "name": "StyleSheet",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "import { View, StyleSheet } from 'react-native';",
+      "startLine": 2,
+      "endLine": 2,
+      "startCol": 15,
+      "endCol": 25,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-native",
+        "importKind": "named",
+        "importedName": "StyleSheet",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "App_jsx__object__colors_3": {
+      "id": "App_jsx__object__colors_3",
+      "type": "object",
+      "name": "colors",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "import { colors } from './styles/commonStyles';",
+      "startLine": 6,
+      "endLine": 6,
+      "startCol": 9,
+      "endCol": 15,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "./styles/commonStyles",
+        "importKind": "named",
+        "importedName": "colors",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "App_jsx__component__App_4": {
+      "id": "App_jsx__component__App_4",
+      "type": "component",
+      "name": "App",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "() => {\n  const [currentScreen, setCurrentScreen] = useState('home');\n\n  const renderScreen = () => {\n    switch (currentScreen) {\n      case 'home':\n        return <HomeScreen />;\n      case 'profile':\n        return <ProfileScreen />;\n      default:\n        return <HomeScreen />;\n    }\n  };\n\n  return (\n    <View style={styles.container}>\n      {renderScreen()}\n      <View style={styles.navigation}>\n        <Button\n          title=\"Главная\"\n          onPress={() => setCurrentScreen('home')}\n          variant={currentScreen === 'home' ? 'primary' : 'secondary'}\n        />\n        <Button\n          title=\"Профиль\"\n          onPress={() => setCurrentScreen('profile')}\n          variant={currentScreen === 'profile' ? 'primary' : 'secondary'}\n        />\n      </View>\n    </View>\n  );\n}",
+      "startLine": 8,
+      "endLine": 39,
+      "startCol": 12,
+      "endCol": 1,
+      "childrenIds": [
+        "App_jsx__element__View_5"
+      ],
+      "uses": [],
+      "usedIn": [],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": false
+      },
+      "imports": [
+        "react|default|React",
+        "react|named|useState",
+        "react-native|named|View",
+        "react-native|named|StyleSheet",
+        "./screens/HomeScreen|default|HomeScreen",
+        "./screens/ProfileScreen|default|ProfileScreen",
+        "./components/Button|default|Button",
+        "./styles/commonStyles|named|colors"
+      ],
+      "args": {},
+      "usages": []
+    },
+    "App_jsx__element__View_5": {
+      "id": "App_jsx__element__View_5",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "",
+      "startLine": 23,
+      "endLine": 37,
+      "startCol": 4,
+      "endCol": 11,
+      "parentId": "App_jsx__component__App_4",
+      "childrenIds": [
+        "App_jsx__element__View_6"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.container"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "App_jsx__element__View_6": {
+      "id": "App_jsx__element__View_6",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "",
+      "startLine": 25,
+      "endLine": 36,
+      "startCol": 6,
+      "endCol": 13,
+      "parentId": "App_jsx__element__View_5",
+      "childrenIds": [
+        "App_jsx__element__Button_7",
+        "App_jsx__element__Button_8"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.navigation"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "App_jsx__element__Button_7": {
+      "id": "App_jsx__element__Button_7",
+      "type": "component-instance",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "",
+      "startLine": 26,
+      "endLine": 30,
+      "startCol": 8,
+      "endCol": 10,
+      "parentId": "App_jsx__element__View_6",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Главная"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "() => setCurrentScreen('home')"
+        },
+        "variant": {
+          "type": "expression",
+          "value": "currentScreen === 'home' ? 'primary' : 'secondary'"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__component__Button_15"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Button_jsx__component__Button_15"
+    },
+    "App_jsx__element__Button_8": {
+      "id": "App_jsx__element__Button_8",
+      "type": "component-instance",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "",
+      "startLine": 31,
+      "endLine": 35,
+      "startCol": 8,
+      "endCol": 10,
+      "parentId": "App_jsx__element__View_6",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Профиль"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "() => setCurrentScreen('profile')"
+        },
+        "variant": {
+          "type": "expression",
+          "value": "currentScreen === 'profile' ? 'primary' : 'secondary'"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__component__Button_15"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Button_jsx__component__Button_15"
+    },
+    "App_jsx__component__renderScreen_9": {
+      "id": "App_jsx__component__renderScreen_9",
+      "type": "component",
+      "name": "renderScreen",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "() => {\n    switch (currentScreen) {\n      case 'home':\n        return <HomeScreen />;\n      case 'profile':\n        return <ProfileScreen />;\n      default:\n        return <HomeScreen />;\n    }\n  }",
+      "startLine": 11,
+      "endLine": 20,
+      "startCol": 23,
+      "endCol": 3,
+      "childrenIds": [
+        "App_jsx__element__HomeScreen_10",
+        "App_jsx__element__ProfileScreen_11",
+        "App_jsx__element__HomeScreen_12"
+      ],
+      "uses": [],
+      "usedIn": [],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": false
+      },
+      "imports": [
+        "react|default|React",
+        "react|named|useState",
+        "react-native|named|View",
+        "react-native|named|StyleSheet",
+        "./screens/HomeScreen|default|HomeScreen",
+        "./screens/ProfileScreen|default|ProfileScreen",
+        "./components/Button|default|Button",
+        "./styles/commonStyles|named|colors"
+      ],
+      "args": {},
+      "usages": []
+    },
+    "App_jsx__element__HomeScreen_10": {
+      "id": "App_jsx__element__HomeScreen_10",
+      "type": "component-instance",
+      "name": "HomeScreen",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "",
+      "startLine": 14,
+      "endLine": 14,
+      "startCol": 15,
+      "endCol": 29,
+      "parentId": "App_jsx__component__renderScreen_9",
+      "childrenIds": [],
+      "props": {},
+      "uses": [
+        "screens_HomeScreen_jsx__component__HomeScreen_34"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "screens_HomeScreen_jsx__component__HomeScreen_34"
+    },
+    "App_jsx__element__ProfileScreen_11": {
+      "id": "App_jsx__element__ProfileScreen_11",
+      "type": "component-instance",
+      "name": "ProfileScreen",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "",
+      "startLine": 16,
+      "endLine": 16,
+      "startCol": 15,
+      "endCol": 32,
+      "parentId": "App_jsx__component__renderScreen_9",
+      "childrenIds": [],
+      "props": {},
+      "uses": [
+        "screens_ProfileScreen_jsx__component__ProfileScreen_56"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "screens_ProfileScreen_jsx__component__ProfileScreen_56"
+    },
+    "App_jsx__element__HomeScreen_12": {
+      "id": "App_jsx__element__HomeScreen_12",
+      "type": "component-instance",
+      "name": "HomeScreen",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+      "relPath": "App.jsx",
+      "sourceCode": "",
+      "startLine": 18,
+      "endLine": 18,
+      "startCol": 15,
+      "endCol": 29,
+      "parentId": "App_jsx__component__renderScreen_9",
+      "childrenIds": [],
+      "props": {},
+      "uses": [
+        "screens_HomeScreen_jsx__component__HomeScreen_34"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "screens_HomeScreen_jsx__component__HomeScreen_34"
+    },
+    "components_Button_jsx__object__React_13": {
+      "id": "components_Button_jsx__object__React_13",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Button.jsx",
+      "relPath": "components/Button.jsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "components_Button_jsx__object__StyleSheet_14": {
+      "id": "components_Button_jsx__object__StyleSheet_14",
+      "type": "object",
+      "name": "StyleSheet",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Button.jsx",
+      "relPath": "components/Button.jsx",
+      "sourceCode": "import { TouchableOpacity, Text, StyleSheet } from 'react-native';",
+      "startLine": 2,
+      "endLine": 2,
+      "startCol": 33,
+      "endCol": 43,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-native",
+        "importKind": "named",
+        "importedName": "StyleSheet",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "components_Button_jsx__component__Button_15": {
+      "id": "components_Button_jsx__component__Button_15",
+      "type": "component",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Button.jsx",
+      "relPath": "components/Button.jsx",
+      "sourceCode": "({ title, onPress, variant = 'primary', disabled = false }) => {\n  return (\n    <TouchableOpacity\n      style={[\n        styles.button,\n        styles[variant],\n        disabled && styles.disabled\n      ]}\n      onPress={onPress}\n      disabled={disabled}\n      activeOpacity={0.7}\n    >\n      <Text style={[styles.text, styles[`${variant}Text`]]}>\n        {title}\n      </Text>\n    </TouchableOpacity>\n  );\n}",
+      "startLine": 4,
+      "endLine": 21,
+      "startCol": 15,
+      "endCol": 1,
+      "childrenIds": [
+        "components_Button_jsx__element__TouchableOpacity_16"
+      ],
+      "uses": [],
+      "usedIn": [
+        "App_jsx__element__Button_7",
+        "App_jsx__element__Button_8",
+        "screens_HomeScreen_jsx__element__Button_45",
+        "screens_HomeScreen_jsx__element__Button_46",
+        "screens_HomeScreen_jsx__element__Button_47",
+        "screens_ProfileScreen_jsx__element__Button_78",
+        "screens_ProfileScreen_jsx__element__Button_80"
+      ],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": false
+      },
+      "imports": [
+        "react|default|React",
+        "react-native|named|TouchableOpacity",
+        "react-native|named|Text",
+        "react-native|named|StyleSheet"
+      ],
+      "args": {
+        "title": "any",
+        "onPress": "any",
+        "variant": "any",
+        "disabled": "any"
+      },
+      "usages": [
+        {
+          "usageId": "App_jsx__element__Button_7",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+          "relPath": "App.jsx",
+          "startLine": 26,
+          "endLine": 30,
+          "startCol": 8,
+          "endCol": 10,
+          "parentId": "App_jsx__element__View_6",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Главная"
+            },
+            "onPress": {
+              "type": "expression",
+              "value": "() => setCurrentScreen('home')"
+            },
+            "variant": {
+              "type": "expression",
+              "value": "currentScreen === 'home' ? 'primary' : 'secondary'"
+            }
+          }
+        },
+        {
+          "usageId": "App_jsx__element__Button_8",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+          "relPath": "App.jsx",
+          "startLine": 31,
+          "endLine": 35,
+          "startCol": 8,
+          "endCol": 10,
+          "parentId": "App_jsx__element__View_6",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Профиль"
+            },
+            "onPress": {
+              "type": "expression",
+              "value": "() => setCurrentScreen('profile')"
+            },
+            "variant": {
+              "type": "expression",
+              "value": "currentScreen === 'profile' ? 'primary' : 'secondary'"
+            }
+          }
+        },
+        {
+          "usageId": "screens_HomeScreen_jsx__element__Button_45",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+          "relPath": "screens/HomeScreen.jsx",
+          "startLine": 43,
+          "endLine": 47,
+          "startCol": 12,
+          "endCol": 14,
+          "parentId": "screens_HomeScreen_jsx__element__View_44",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Увеличить"
+            },
+            "onPress": {
+              "type": "expression",
+              "value": "handleIncrement"
+            },
+            "variant": {
+              "type": "string",
+              "value": "primary"
+            }
+          }
+        },
+        {
+          "usageId": "screens_HomeScreen_jsx__element__Button_46",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+          "relPath": "screens/HomeScreen.jsx",
+          "startLine": 48,
+          "endLine": 52,
+          "startCol": 12,
+          "endCol": 14,
+          "parentId": "screens_HomeScreen_jsx__element__View_44",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Уменьшить"
+            },
+            "onPress": {
+              "type": "expression",
+              "value": "handleDecrement"
+            },
+            "variant": {
+              "type": "string",
+              "value": "secondary"
+            }
+          }
+        },
+        {
+          "usageId": "screens_HomeScreen_jsx__element__Button_47",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+          "relPath": "screens/HomeScreen.jsx",
+          "startLine": 55,
+          "endLine": 59,
+          "startCol": 10,
+          "endCol": 12,
+          "parentId": "screens_HomeScreen_jsx__element__Card_38",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Сброс"
+            },
+            "onPress": {
+              "type": "expression",
+              "value": "handleReset"
+            },
+            "variant": {
+              "type": "string",
+              "value": "danger"
+            }
+          }
+        },
+        {
+          "usageId": "screens_ProfileScreen_jsx__element__Button_78",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+          "relPath": "screens/ProfileScreen.jsx",
+          "startLine": 62,
+          "endLine": 66,
+          "startCol": 10,
+          "endCol": 12,
+          "parentId": "screens_ProfileScreen_jsx__element__Card_77",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Редактировать профиль"
+            },
+            "onPress": {
+              "type": "expression",
+              "value": "() => alert('Редактирование профиля')"
+            },
+            "variant": {
+              "type": "string",
+              "value": "primary"
+            }
+          }
+        },
+        {
+          "usageId": "screens_ProfileScreen_jsx__element__Button_80",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+          "relPath": "screens/ProfileScreen.jsx",
+          "startLine": 68,
+          "endLine": 72,
+          "startCol": 10,
+          "endCol": 12,
+          "parentId": "screens_ProfileScreen_jsx__element__Card_77",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Выйти"
+            },
+            "onPress": {
+              "type": "expression",
+              "value": "() => alert('Выход из аккаунта')"
+            },
+            "variant": {
+              "type": "string",
+              "value": "danger"
+            }
+          }
+        }
+      ]
+    },
+    "components_Button_jsx__element__TouchableOpacity_16": {
+      "id": "components_Button_jsx__element__TouchableOpacity_16",
+      "type": "element",
+      "name": "TouchableOpacity",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Button.jsx",
+      "relPath": "components/Button.jsx",
+      "sourceCode": "",
+      "startLine": 6,
+      "endLine": 19,
+      "startCol": 4,
+      "endCol": 23,
+      "parentId": "components_Button_jsx__component__Button_15",
+      "childrenIds": [
+        "components_Button_jsx__element__Text_17"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[styles.button, styles[variant], disabled && styles.disabled]"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "onPress"
+        },
+        "disabled": {
+          "type": "expression",
+          "value": "disabled"
+        },
+        "activeOpacity": {
+          "type": "number",
+          "value": "0.7"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "components_Button_jsx__element__Text_17": {
+      "id": "components_Button_jsx__element__Text_17",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Button.jsx",
+      "relPath": "components/Button.jsx",
+      "sourceCode": "",
+      "startLine": 16,
+      "endLine": 18,
+      "startCol": 6,
+      "endCol": 13,
+      "parentId": "components_Button_jsx__element__TouchableOpacity_16",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[styles.text, styles[`${variant}Text`]]"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__variable__title_18"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "components_Card_jsx__object__React_19": {
+      "id": "components_Card_jsx__object__React_19",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Card.jsx",
+      "relPath": "components/Card.jsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "components_Card_jsx__object__StyleSheet_20": {
+      "id": "components_Card_jsx__object__StyleSheet_20",
+      "type": "object",
+      "name": "StyleSheet",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Card.jsx",
+      "relPath": "components/Card.jsx",
+      "sourceCode": "import { View, Text, StyleSheet } from 'react-native';",
+      "startLine": 2,
+      "endLine": 2,
+      "startCol": 21,
+      "endCol": 31,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-native",
+        "importKind": "named",
+        "importedName": "StyleSheet",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "components_Card_jsx__component__Card_21": {
+      "id": "components_Card_jsx__component__Card_21",
+      "type": "component",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Card.jsx",
+      "relPath": "components/Card.jsx",
+      "sourceCode": "({ title, children, style }) => {\n  return (\n    <View style={[styles.card, style]}>\n      {title && (\n        <Text style={styles.title}>{title}</Text>\n      )}\n      {children}\n    </View>\n  );\n}",
+      "startLine": 4,
+      "endLine": 13,
+      "startCol": 13,
+      "endCol": 1,
+      "childrenIds": [
+        "components_Card_jsx__element__View_22"
+      ],
+      "uses": [],
+      "usedIn": [
+        "screens_HomeScreen_jsx__element__Card_38",
+        "screens_HomeScreen_jsx__element__Card_48",
+        "screens_ProfileScreen_jsx__element__Card_60",
+        "screens_ProfileScreen_jsx__element__Card_77"
+      ],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": false
+      },
+      "imports": [
+        "react|default|React",
+        "react-native|named|View",
+        "react-native|named|Text",
+        "react-native|named|StyleSheet"
+      ],
+      "args": {
+        "title": "any",
+        "children": "any",
+        "style": "any"
+      },
+      "usages": [
+        {
+          "usageId": "screens_HomeScreen_jsx__element__Card_38",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+          "relPath": "screens/HomeScreen.jsx",
+          "startLine": 34,
+          "endLine": 60,
+          "startCol": 8,
+          "endCol": 15,
+          "parentId": "screens_HomeScreen_jsx__element__ScrollView_37",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Счетчик"
+            }
+          }
+        },
+        {
+          "usageId": "screens_HomeScreen_jsx__element__Card_48",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+          "relPath": "screens/HomeScreen.jsx",
+          "startLine": 62,
+          "endLine": 69,
+          "startCol": 8,
+          "endCol": 15,
+          "parentId": "screens_HomeScreen_jsx__element__ScrollView_37",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Информация"
+            }
+          }
+        },
+        {
+          "usageId": "screens_ProfileScreen_jsx__element__Card_60",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+          "relPath": "screens/ProfileScreen.jsx",
+          "startLine": 23,
+          "endLine": 59,
+          "startCol": 8,
+          "endCol": 15,
+          "parentId": "screens_ProfileScreen_jsx__element__ScrollView_59",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Личная информация"
+            }
+          }
+        },
+        {
+          "usageId": "screens_ProfileScreen_jsx__element__Card_77",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+          "relPath": "screens/ProfileScreen.jsx",
+          "startLine": 61,
+          "endLine": 73,
+          "startCol": 8,
+          "endCol": 15,
+          "parentId": "screens_ProfileScreen_jsx__element__ScrollView_59",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Действия"
+            }
+          }
+        }
+      ]
+    },
+    "components_Card_jsx__element__View_22": {
+      "id": "components_Card_jsx__element__View_22",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Card.jsx",
+      "relPath": "components/Card.jsx",
+      "sourceCode": "",
+      "startLine": 6,
+      "endLine": 11,
+      "startCol": 4,
+      "endCol": 11,
+      "parentId": "components_Card_jsx__component__Card_21",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[styles.card, style]"
+        }
+      },
+      "uses": [
+        "components_Card_jsx__variable__children_23"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "components_Header_jsx__object__React_24": {
+      "id": "components_Header_jsx__object__React_24",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Header.jsx",
+      "relPath": "components/Header.jsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "components_Header_jsx__object__StyleSheet_25": {
+      "id": "components_Header_jsx__object__StyleSheet_25",
+      "type": "object",
+      "name": "StyleSheet",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Header.jsx",
+      "relPath": "components/Header.jsx",
+      "sourceCode": "import { View, Text, StyleSheet } from 'react-native';",
+      "startLine": 2,
+      "endLine": 2,
+      "startCol": 21,
+      "endCol": 31,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-native",
+        "importKind": "named",
+        "importedName": "StyleSheet",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "components_Header_jsx__component__Header_26": {
+      "id": "components_Header_jsx__component__Header_26",
+      "type": "component",
+      "name": "Header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Header.jsx",
+      "relPath": "components/Header.jsx",
+      "sourceCode": "({ title, subtitle }) => {\n  return (\n    <View style={styles.header}>\n      <Text style={styles.title}>{title}</Text>\n      {subtitle && (\n        <Text style={styles.subtitle}>{subtitle}</Text>\n      )}\n    </View>\n  );\n}",
+      "startLine": 4,
+      "endLine": 13,
+      "startCol": 15,
+      "endCol": 1,
+      "childrenIds": [
+        "components_Header_jsx__element__View_27"
+      ],
+      "uses": [],
+      "usedIn": [
+        "screens_HomeScreen_jsx__element__Header_36",
+        "screens_ProfileScreen_jsx__element__Header_58"
+      ],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": false
+      },
+      "imports": [
+        "react|default|React",
+        "react-native|named|View",
+        "react-native|named|Text",
+        "react-native|named|StyleSheet"
+      ],
+      "args": {
+        "title": "any",
+        "subtitle": "any"
+      },
+      "usages": [
+        {
+          "usageId": "screens_HomeScreen_jsx__element__Header_36",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+          "relPath": "screens/HomeScreen.jsx",
+          "startLine": 29,
+          "endLine": 32,
+          "startCol": 6,
+          "endCol": 8,
+          "parentId": "screens_HomeScreen_jsx__element__View_35",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Главный экран"
+            },
+            "subtitle": {
+              "type": "string",
+              "value": "Тестовое React Native приложение"
+            }
+          }
+        },
+        {
+          "usageId": "screens_ProfileScreen_jsx__element__Header_58",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+          "relPath": "screens/ProfileScreen.jsx",
+          "startLine": 18,
+          "endLine": 21,
+          "startCol": 6,
+          "endCol": 8,
+          "parentId": "screens_ProfileScreen_jsx__element__View_57",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Профиль"
+            },
+            "subtitle": {
+              "type": "expression",
+              "value": "user.name"
+            }
+          }
+        }
+      ]
+    },
+    "components_Header_jsx__element__View_27": {
+      "id": "components_Header_jsx__element__View_27",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Header.jsx",
+      "relPath": "components/Header.jsx",
+      "sourceCode": "",
+      "startLine": 6,
+      "endLine": 11,
+      "startCol": 4,
+      "endCol": 11,
+      "parentId": "components_Header_jsx__component__Header_26",
+      "childrenIds": [
+        "components_Header_jsx__element__Text_28"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.header"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "components_Header_jsx__element__Text_28": {
+      "id": "components_Header_jsx__element__Text_28",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/components/Header.jsx",
+      "relPath": "components/Header.jsx",
+      "sourceCode": "",
+      "startLine": 7,
+      "endLine": 7,
+      "startCol": 6,
+      "endCol": 47,
+      "parentId": "components_Header_jsx__element__View_27",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.title"
+        }
+      },
+      "uses": [
+        "components_Header_jsx__variable__title_29"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__object__React_30": {
+      "id": "screens_HomeScreen_jsx__object__React_30",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "import React, { useState } from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "screens_HomeScreen_jsx__object__useState_31": {
+      "id": "screens_HomeScreen_jsx__object__useState_31",
+      "type": "object",
+      "name": "useState",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "import React, { useState } from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 16,
+      "endCol": 24,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "named",
+        "importedName": "useState",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "screens_HomeScreen_jsx__object__StyleSheet_32": {
+      "id": "screens_HomeScreen_jsx__object__StyleSheet_32",
+      "type": "object",
+      "name": "StyleSheet",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "import { View, Text, ScrollView, StyleSheet } from 'react-native';",
+      "startLine": 2,
+      "endLine": 2,
+      "startCol": 33,
+      "endCol": 43,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-native",
+        "importKind": "named",
+        "importedName": "StyleSheet",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "screens_HomeScreen_jsx__object__commonStyles_33": {
+      "id": "screens_HomeScreen_jsx__object__commonStyles_33",
+      "type": "object",
+      "name": "commonStyles",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "import { commonStyles } from '../styles/commonStyles';",
+      "startLine": 6,
+      "endLine": 6,
+      "startCol": 9,
+      "endCol": 21,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "../styles/commonStyles",
+        "importKind": "named",
+        "importedName": "commonStyles",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "screens_HomeScreen_jsx__component__HomeScreen_34": {
+      "id": "screens_HomeScreen_jsx__component__HomeScreen_34",
+      "type": "component",
+      "name": "HomeScreen",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "() => {\n  const [count, setCount] = useState(0);\n  const [message, setMessage] = useState('Добро пожаловать!');\n\n  const handleIncrement = () => {\n    setCount(count + 1);\n    setMessage(`Счетчик увеличен до ${count + 1}`);\n  };\n\n  const handleDecrement = () => {\n    setCount(count - 1);\n    setMessage(`Счетчик уменьшен до ${count - 1}`);\n  };\n\n  const handleReset = () => {\n    setCount(0);\n    setMessage('Счетчик сброшен');\n  };\n\n  return (\n    <View style={styles.container}>\n      <Header \n        title=\"Главный экран\" \n        subtitle=\"Тестовое React Native приложение\"\n      />\n      <ScrollView style={styles.content}>\n        <Card title=\"Счетчик\">\n          <View style={commonStyles.center}>\n            <Text style={styles.counter}>{count}</Text>\n            <Text style={[commonStyles.textSecondary, commonStyles.spacing]}>\n              {message}\n            </Text>\n          </View>\n          \n          <View style={[commonStyles.row, commonStyles.spacingLarge]}>\n            <Button\n              title=\"Увеличить\"\n              onPress={handleIncrement}\n              variant=\"primary\"\n            />\n            <Button\n              title=\"Уменьшить\"\n              onPress={handleDecrement}\n              variant=\"secondary\"\n            />\n          </View>\n          \n          <Button\n            title=\"Сброс\"\n            onPress={handleReset}\n            variant=\"danger\"\n          />\n        </Card>\n\n        <Card title=\"Информация\">\n          <Text style={commonStyles.text}>\n            Это тестовый экран для проверки работы рендерера.\n          </Text>\n          <Text style={[commonStyles.textSecondary, commonStyles.spacing]}>\n            Компоненты импортированы из отдельных файлов и используют общие стили.\n          </Text>\n        </Card>\n      </ScrollView>\n    </View>\n  );\n}",
+      "startLine": 8,
+      "endLine": 73,
+      "startCol": 19,
+      "endCol": 1,
+      "childrenIds": [
+        "screens_HomeScreen_jsx__element__View_35"
+      ],
+      "uses": [],
+      "usedIn": [
+        "App_jsx__element__HomeScreen_10",
+        "App_jsx__element__HomeScreen_12"
+      ],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": false
+      },
+      "imports": [
+        "react|default|React",
+        "react|named|useState",
+        "react-native|named|View",
+        "react-native|named|Text",
+        "react-native|named|ScrollView",
+        "react-native|named|StyleSheet",
+        "../components/Header|default|Header",
+        "../components/Card|default|Card",
+        "../components/Button|default|Button",
+        "../styles/commonStyles|named|commonStyles"
+      ],
+      "args": {},
+      "usages": [
+        {
+          "usageId": "App_jsx__element__HomeScreen_10",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+          "relPath": "App.jsx",
+          "startLine": 14,
+          "endLine": 14,
+          "startCol": 15,
+          "endCol": 29,
+          "parentId": "App_jsx__component__renderScreen_9",
+          "props": {}
+        },
+        {
+          "usageId": "App_jsx__element__HomeScreen_12",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+          "relPath": "App.jsx",
+          "startLine": 18,
+          "endLine": 18,
+          "startCol": 15,
+          "endCol": 29,
+          "parentId": "App_jsx__component__renderScreen_9",
+          "props": {}
+        }
+      ]
+    },
+    "screens_HomeScreen_jsx__element__View_35": {
+      "id": "screens_HomeScreen_jsx__element__View_35",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 28,
+      "endLine": 71,
+      "startCol": 4,
+      "endCol": 11,
+      "parentId": "screens_HomeScreen_jsx__component__HomeScreen_34",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__element__Header_36",
+        "screens_HomeScreen_jsx__element__ScrollView_37"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.container"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__element__Header_36": {
+      "id": "screens_HomeScreen_jsx__element__Header_36",
+      "type": "component-instance",
+      "name": "Header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 29,
+      "endLine": 32,
+      "startCol": 6,
+      "endCol": 8,
+      "parentId": "screens_HomeScreen_jsx__element__View_35",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Главный экран"
+        },
+        "subtitle": {
+          "type": "string",
+          "value": "Тестовое React Native приложение"
+        }
+      },
+      "uses": [
+        "components_Header_jsx__component__Header_26"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Header_jsx__component__Header_26"
+    },
+    "screens_HomeScreen_jsx__element__ScrollView_37": {
+      "id": "screens_HomeScreen_jsx__element__ScrollView_37",
+      "type": "element",
+      "name": "ScrollView",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 33,
+      "endLine": 70,
+      "startCol": 6,
+      "endCol": 19,
+      "parentId": "screens_HomeScreen_jsx__element__View_35",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__element__Card_38",
+        "screens_HomeScreen_jsx__element__Card_48"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.content"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__element__Card_38": {
+      "id": "screens_HomeScreen_jsx__element__Card_38",
+      "type": "component-instance",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 34,
+      "endLine": 60,
+      "startCol": 8,
+      "endCol": 15,
+      "parentId": "screens_HomeScreen_jsx__element__ScrollView_37",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__element__View_39",
+        "screens_HomeScreen_jsx__element__View_44",
+        "screens_HomeScreen_jsx__element__Button_47"
+      ],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Счетчик"
+        }
+      },
+      "uses": [
+        "components_Card_jsx__component__Card_21"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Card_jsx__component__Card_21"
+    },
+    "screens_HomeScreen_jsx__element__View_39": {
+      "id": "screens_HomeScreen_jsx__element__View_39",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 35,
+      "endLine": 40,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_HomeScreen_jsx__element__Card_38",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__element__Text_40",
+        "screens_HomeScreen_jsx__element__Text_42"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.center"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__element__Text_40": {
+      "id": "screens_HomeScreen_jsx__element__Text_40",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 36,
+      "endLine": 36,
+      "startCol": 12,
+      "endCol": 55,
+      "parentId": "screens_HomeScreen_jsx__element__View_39",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.counter"
+        }
+      },
+      "uses": [
+        "screens_HomeScreen_jsx__variable__count_41"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__element__Text_42": {
+      "id": "screens_HomeScreen_jsx__element__Text_42",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 37,
+      "endLine": 39,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_HomeScreen_jsx__element__View_39",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[commonStyles.textSecondary, commonStyles.spacing]"
+        }
+      },
+      "uses": [
+        "screens_HomeScreen_jsx__variable__message_43"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__element__View_44": {
+      "id": "screens_HomeScreen_jsx__element__View_44",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 42,
+      "endLine": 53,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_HomeScreen_jsx__element__Card_38",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__element__Button_45",
+        "screens_HomeScreen_jsx__element__Button_46"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[commonStyles.row, commonStyles.spacingLarge]"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__element__Button_45": {
+      "id": "screens_HomeScreen_jsx__element__Button_45",
+      "type": "component-instance",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 43,
+      "endLine": 47,
+      "startCol": 12,
+      "endCol": 14,
+      "parentId": "screens_HomeScreen_jsx__element__View_44",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Увеличить"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "handleIncrement"
+        },
+        "variant": {
+          "type": "string",
+          "value": "primary"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__component__Button_15"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Button_jsx__component__Button_15"
+    },
+    "screens_HomeScreen_jsx__element__Button_46": {
+      "id": "screens_HomeScreen_jsx__element__Button_46",
+      "type": "component-instance",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 48,
+      "endLine": 52,
+      "startCol": 12,
+      "endCol": 14,
+      "parentId": "screens_HomeScreen_jsx__element__View_44",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Уменьшить"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "handleDecrement"
+        },
+        "variant": {
+          "type": "string",
+          "value": "secondary"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__component__Button_15"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Button_jsx__component__Button_15"
+    },
+    "screens_HomeScreen_jsx__element__Button_47": {
+      "id": "screens_HomeScreen_jsx__element__Button_47",
+      "type": "component-instance",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 55,
+      "endLine": 59,
+      "startCol": 10,
+      "endCol": 12,
+      "parentId": "screens_HomeScreen_jsx__element__Card_38",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Сброс"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "handleReset"
+        },
+        "variant": {
+          "type": "string",
+          "value": "danger"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__component__Button_15"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Button_jsx__component__Button_15"
+    },
+    "screens_HomeScreen_jsx__element__Card_48": {
+      "id": "screens_HomeScreen_jsx__element__Card_48",
+      "type": "component-instance",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 62,
+      "endLine": 69,
+      "startCol": 8,
+      "endCol": 15,
+      "parentId": "screens_HomeScreen_jsx__element__ScrollView_37",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__element__Text_49",
+        "screens_HomeScreen_jsx__element__Text_51"
+      ],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Информация"
+        }
+      },
+      "uses": [
+        "components_Card_jsx__component__Card_21"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Card_jsx__component__Card_21"
+    },
+    "screens_HomeScreen_jsx__element__Text_49": {
+      "id": "screens_HomeScreen_jsx__element__Text_49",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 63,
+      "endLine": 65,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_HomeScreen_jsx__element__Card_48",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__text__anon_50"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.text"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__text__anon_50": {
+      "id": "screens_HomeScreen_jsx__text__anon_50",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "\n            Это тестовый экран для проверки работы рендерера.\n          ",
+      "startLine": 63,
+      "endLine": 65,
+      "startCol": 42,
+      "endCol": 10,
+      "parentId": "screens_HomeScreen_jsx__element__Text_49",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "screens_HomeScreen_jsx__element__Text_51": {
+      "id": "screens_HomeScreen_jsx__element__Text_51",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "",
+      "startLine": 66,
+      "endLine": 68,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_HomeScreen_jsx__element__Card_48",
+      "childrenIds": [
+        "screens_HomeScreen_jsx__text__anon_52"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[commonStyles.textSecondary, commonStyles.spacing]"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_HomeScreen_jsx__text__anon_52": {
+      "id": "screens_HomeScreen_jsx__text__anon_52",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/HomeScreen.jsx",
+      "relPath": "screens/HomeScreen.jsx",
+      "sourceCode": "\n            Компоненты импортированы из отдельных файлов и используют общие стили.\n          ",
+      "startLine": 66,
+      "endLine": 68,
+      "startCol": 75,
+      "endCol": 10,
+      "parentId": "screens_HomeScreen_jsx__element__Text_51",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "screens_ProfileScreen_jsx__object__React_53": {
+      "id": "screens_ProfileScreen_jsx__object__React_53",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "screens_ProfileScreen_jsx__object__StyleSheet_54": {
+      "id": "screens_ProfileScreen_jsx__object__StyleSheet_54",
+      "type": "object",
+      "name": "StyleSheet",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "import { View, Text, ScrollView, StyleSheet } from 'react-native';",
+      "startLine": 2,
+      "endLine": 2,
+      "startCol": 33,
+      "endCol": 43,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-native",
+        "importKind": "named",
+        "importedName": "StyleSheet",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "screens_ProfileScreen_jsx__object__commonStyles_55": {
+      "id": "screens_ProfileScreen_jsx__object__commonStyles_55",
+      "type": "object",
+      "name": "commonStyles",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "import { commonStyles } from '../styles/commonStyles';",
+      "startLine": 6,
+      "endLine": 6,
+      "startCol": 9,
+      "endCol": 21,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "../styles/commonStyles",
+        "importKind": "named",
+        "importedName": "commonStyles",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "screens_ProfileScreen_jsx__component__ProfileScreen_56": {
+      "id": "screens_ProfileScreen_jsx__component__ProfileScreen_56",
+      "type": "component",
+      "name": "ProfileScreen",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "() => {\n  const user = {\n    name: 'Иван Иванов',\n    email: 'ivan@example.com',\n    role: 'Разработчик',\n    joinDate: '2024-01-15',\n  };\n\n  return (\n    <View style={styles.container}>\n      <Header \n        title=\"Профиль\" \n        subtitle={user.name}\n      />\n      <ScrollView style={styles.content}>\n        <Card title=\"Личная информация\">\n          <View style={commonStyles.spacing}>\n            <Text style={[commonStyles.text, commonStyles.textBold]}>\n              Имя:\n            </Text>\n            <Text style={commonStyles.textSecondary}>\n              {user.name}\n            </Text>\n          </View>\n          \n          <View style={commonStyles.spacing}>\n            <Text style={[commonStyles.text, commonStyles.textBold]}>\n              Email:\n            </Text>\n            <Text style={commonStyles.textSecondary}>\n              {user.email}\n            </Text>\n          </View>\n          \n          <View style={commonStyles.spacing}>\n            <Text style={[commonStyles.text, commonStyles.textBold]}>\n              Роль:\n            </Text>\n            <Text style={commonStyles.textSecondary}>\n              {user.role}\n            </Text>\n          </View>\n          \n          <View style={commonStyles.spacing}>\n            <Text style={[commonStyles.text, commonStyles.textBold]}>\n              Дата регистрации:\n            </Text>\n            <Text style={commonStyles.textSecondary}>\n              {user.joinDate}\n            </Text>\n          </View>\n        </Card>\n\n        <Card title=\"Действия\">\n          <Button\n            title=\"Редактировать профиль\"\n            onPress={() => alert('Редактирование профиля')}\n            variant=\"primary\"\n          />\n          <View style={commonStyles.spacing} />\n          <Button\n            title=\"Выйти\"\n            onPress={() => alert('Выход из аккаунта')}\n            variant=\"danger\"\n          />\n        </Card>\n      </ScrollView>\n    </View>\n  );\n}",
+      "startLine": 8,
+      "endLine": 77,
+      "startCol": 22,
+      "endCol": 1,
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__View_57"
+      ],
+      "uses": [],
+      "usedIn": [
+        "App_jsx__element__ProfileScreen_11"
+      ],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": false
+      },
+      "imports": [
+        "react|default|React",
+        "react-native|named|View",
+        "react-native|named|Text",
+        "react-native|named|ScrollView",
+        "react-native|named|StyleSheet",
+        "../components/Header|default|Header",
+        "../components/Card|default|Card",
+        "../components/Button|default|Button",
+        "../styles/commonStyles|named|commonStyles"
+      ],
+      "args": {},
+      "usages": [
+        {
+          "usageId": "App_jsx__element__ProfileScreen_11",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/App.jsx",
+          "relPath": "App.jsx",
+          "startLine": 16,
+          "endLine": 16,
+          "startCol": 15,
+          "endCol": 32,
+          "parentId": "App_jsx__component__renderScreen_9",
+          "props": {}
+        }
+      ]
+    },
+    "screens_ProfileScreen_jsx__element__View_57": {
+      "id": "screens_ProfileScreen_jsx__element__View_57",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 17,
+      "endLine": 75,
+      "startCol": 4,
+      "endCol": 11,
+      "parentId": "screens_ProfileScreen_jsx__component__ProfileScreen_56",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__Header_58",
+        "screens_ProfileScreen_jsx__element__ScrollView_59"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.container"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Header_58": {
+      "id": "screens_ProfileScreen_jsx__element__Header_58",
+      "type": "component-instance",
+      "name": "Header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 18,
+      "endLine": 21,
+      "startCol": 6,
+      "endCol": 8,
+      "parentId": "screens_ProfileScreen_jsx__element__View_57",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Профиль"
+        },
+        "subtitle": {
+          "type": "expression",
+          "value": "user.name"
+        }
+      },
+      "uses": [
+        "components_Header_jsx__component__Header_26"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Header_jsx__component__Header_26"
+    },
+    "screens_ProfileScreen_jsx__element__ScrollView_59": {
+      "id": "screens_ProfileScreen_jsx__element__ScrollView_59",
+      "type": "element",
+      "name": "ScrollView",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 22,
+      "endLine": 74,
+      "startCol": 6,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_57",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__Card_60",
+        "screens_ProfileScreen_jsx__element__Card_77"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "styles.content"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Card_60": {
+      "id": "screens_ProfileScreen_jsx__element__Card_60",
+      "type": "component-instance",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 23,
+      "endLine": 59,
+      "startCol": 8,
+      "endCol": 15,
+      "parentId": "screens_ProfileScreen_jsx__element__ScrollView_59",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__View_61",
+        "screens_ProfileScreen_jsx__element__View_65",
+        "screens_ProfileScreen_jsx__element__View_69",
+        "screens_ProfileScreen_jsx__element__View_73"
+      ],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Личная информация"
+        }
+      },
+      "uses": [
+        "components_Card_jsx__component__Card_21"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Card_jsx__component__Card_21"
+    },
+    "screens_ProfileScreen_jsx__element__View_61": {
+      "id": "screens_ProfileScreen_jsx__element__View_61",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 24,
+      "endLine": 31,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_ProfileScreen_jsx__element__Card_60",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__Text_62",
+        "screens_ProfileScreen_jsx__element__Text_64"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.spacing"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Text_62": {
+      "id": "screens_ProfileScreen_jsx__element__Text_62",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 25,
+      "endLine": 27,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_61",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__text__anon_63"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[commonStyles.text, commonStyles.textBold]"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__text__anon_63": {
+      "id": "screens_ProfileScreen_jsx__text__anon_63",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "\n              Имя:\n            ",
+      "startLine": 25,
+      "endLine": 27,
+      "startCol": 69,
+      "endCol": 12,
+      "parentId": "screens_ProfileScreen_jsx__element__Text_62",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "screens_ProfileScreen_jsx__element__Text_64": {
+      "id": "screens_ProfileScreen_jsx__element__Text_64",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 28,
+      "endLine": 30,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_61",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.textSecondary"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__View_65": {
+      "id": "screens_ProfileScreen_jsx__element__View_65",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 33,
+      "endLine": 40,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_ProfileScreen_jsx__element__Card_60",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__Text_66",
+        "screens_ProfileScreen_jsx__element__Text_68"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.spacing"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Text_66": {
+      "id": "screens_ProfileScreen_jsx__element__Text_66",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 34,
+      "endLine": 36,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_65",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__text__anon_67"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[commonStyles.text, commonStyles.textBold]"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__text__anon_67": {
+      "id": "screens_ProfileScreen_jsx__text__anon_67",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "\n              Email:\n            ",
+      "startLine": 34,
+      "endLine": 36,
+      "startCol": 69,
+      "endCol": 12,
+      "parentId": "screens_ProfileScreen_jsx__element__Text_66",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "screens_ProfileScreen_jsx__element__Text_68": {
+      "id": "screens_ProfileScreen_jsx__element__Text_68",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 37,
+      "endLine": 39,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_65",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.textSecondary"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__View_69": {
+      "id": "screens_ProfileScreen_jsx__element__View_69",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 42,
+      "endLine": 49,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_ProfileScreen_jsx__element__Card_60",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__Text_70",
+        "screens_ProfileScreen_jsx__element__Text_72"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.spacing"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Text_70": {
+      "id": "screens_ProfileScreen_jsx__element__Text_70",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 43,
+      "endLine": 45,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_69",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__text__anon_71"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[commonStyles.text, commonStyles.textBold]"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__text__anon_71": {
+      "id": "screens_ProfileScreen_jsx__text__anon_71",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "\n              Роль:\n            ",
+      "startLine": 43,
+      "endLine": 45,
+      "startCol": 69,
+      "endCol": 12,
+      "parentId": "screens_ProfileScreen_jsx__element__Text_70",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "screens_ProfileScreen_jsx__element__Text_72": {
+      "id": "screens_ProfileScreen_jsx__element__Text_72",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 46,
+      "endLine": 48,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_69",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.textSecondary"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__View_73": {
+      "id": "screens_ProfileScreen_jsx__element__View_73",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 51,
+      "endLine": 58,
+      "startCol": 10,
+      "endCol": 17,
+      "parentId": "screens_ProfileScreen_jsx__element__Card_60",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__Text_74",
+        "screens_ProfileScreen_jsx__element__Text_76"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.spacing"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Text_74": {
+      "id": "screens_ProfileScreen_jsx__element__Text_74",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 52,
+      "endLine": 54,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_73",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__text__anon_75"
+      ],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "[commonStyles.text, commonStyles.textBold]"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__text__anon_75": {
+      "id": "screens_ProfileScreen_jsx__text__anon_75",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "\n              Дата регистрации:\n            ",
+      "startLine": 52,
+      "endLine": 54,
+      "startCol": 69,
+      "endCol": 12,
+      "parentId": "screens_ProfileScreen_jsx__element__Text_74",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "screens_ProfileScreen_jsx__element__Text_76": {
+      "id": "screens_ProfileScreen_jsx__element__Text_76",
+      "type": "element",
+      "name": "Text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 55,
+      "endLine": 57,
+      "startCol": 12,
+      "endCol": 19,
+      "parentId": "screens_ProfileScreen_jsx__element__View_73",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.textSecondary"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Card_77": {
+      "id": "screens_ProfileScreen_jsx__element__Card_77",
+      "type": "component-instance",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 61,
+      "endLine": 73,
+      "startCol": 8,
+      "endCol": 15,
+      "parentId": "screens_ProfileScreen_jsx__element__ScrollView_59",
+      "childrenIds": [
+        "screens_ProfileScreen_jsx__element__Button_78",
+        "screens_ProfileScreen_jsx__element__View_79",
+        "screens_ProfileScreen_jsx__element__Button_80"
+      ],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Действия"
+        }
+      },
+      "uses": [
+        "components_Card_jsx__component__Card_21"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Card_jsx__component__Card_21"
+    },
+    "screens_ProfileScreen_jsx__element__Button_78": {
+      "id": "screens_ProfileScreen_jsx__element__Button_78",
+      "type": "component-instance",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 62,
+      "endLine": 66,
+      "startCol": 10,
+      "endCol": 12,
+      "parentId": "screens_ProfileScreen_jsx__element__Card_77",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Редактировать профиль"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "() => alert('Редактирование профиля')"
+        },
+        "variant": {
+          "type": "string",
+          "value": "primary"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__component__Button_15"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Button_jsx__component__Button_15"
+    },
+    "screens_ProfileScreen_jsx__element__View_79": {
+      "id": "screens_ProfileScreen_jsx__element__View_79",
+      "type": "element",
+      "name": "View",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 67,
+      "endLine": 67,
+      "startCol": 10,
+      "endCol": 47,
+      "parentId": "screens_ProfileScreen_jsx__element__Card_77",
+      "childrenIds": [],
+      "props": {
+        "style": {
+          "type": "expression",
+          "value": "commonStyles.spacing"
+        }
+      },
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "screens_ProfileScreen_jsx__element__Button_80": {
+      "id": "screens_ProfileScreen_jsx__element__Button_80",
+      "type": "component-instance",
+      "name": "Button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/screens/ProfileScreen.jsx",
+      "relPath": "screens/ProfileScreen.jsx",
+      "sourceCode": "",
+      "startLine": 68,
+      "endLine": 72,
+      "startCol": 10,
+      "endCol": 12,
+      "parentId": "screens_ProfileScreen_jsx__element__Card_77",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Выйти"
+        },
+        "onPress": {
+          "type": "expression",
+          "value": "() => alert('Выход из аккаунта')"
+        },
+        "variant": {
+          "type": "string",
+          "value": "danger"
+        }
+      },
+      "uses": [
+        "components_Button_jsx__component__Button_15"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "components_Button_jsx__component__Button_15"
+    },
+    "styles_commonStyles_js__object__StyleSheet_81": {
+      "id": "styles_commonStyles_js__object__StyleSheet_81",
+      "type": "object",
+      "name": "StyleSheet",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project/styles/commonStyles.js",
+      "relPath": "styles/commonStyles.js",
+      "sourceCode": "import { StyleSheet } from 'react-native';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 9,
+      "endCol": 19,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-native",
+        "importKind": "named",
+        "importedName": "StyleSheet",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    }
+  }
+}

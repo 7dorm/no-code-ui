@@ -6,6 +6,8 @@ import { openDirectoryDialog, setRootDirectory, isFileSystemAPIAvailable } from 
 import { CreateProjectDialog } from './shared/ui/dialogs/create-project-dialog';
 import { createProject } from './features/file-operations/lib/file-operations';
 import { useEditorStore } from './store/editorStore';
+import { DependencyInsightsPanel } from './features/dependency-insights/DependencyInsightsPanel';
+import { useDependencyInsights } from './features/dependency-insights/useDependencyInsights';
 
 function AppRN() {
   const isInternalSourceFile = (path: string | null | undefined) => {
@@ -29,6 +31,7 @@ function AppRN() {
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileSelection | null>(null);
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
+  const [projectInsightsVersion, setProjectInsightsVersion] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const leftPanelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,6 +187,17 @@ function AppRN() {
       setError(`Ошибка: ${err.message}`);
     }
   };
+
+  const {
+    indexLoading: dependencyIndexLoading,
+    indexError: dependencyIndexError,
+    scannedFileCount: dependencyScannedFileCount,
+    insight: dependencyInsight,
+  } = useDependencyInsights({
+    projectPath,
+    selectedFile,
+    refreshToken: projectInsightsVersion,
+  });
 
   const applyCanvasPreset = (mode: 'desktop' | 'mobile') => {
     setCanvasDevice(mode);
@@ -371,25 +385,37 @@ function AppRN() {
             <View style={styles.sidebarHeader}>
               <Text style={styles.sidebarTitle}>Файлы проекта</Text>
             </View>
-            <FileTree
-              key={`file-tree-${projectPath || 'none'}-${fileTreeVersion}`}
-              rootPath={projectPath!}
-              onSelectFile={handleSelectFile}
-              selectedPath={selectedFile?.selectionKey || ''}
-              onStartComponentDrag={(payload) => {
-                setExternalFileDrag(null);
-                setExternalComponentDrag(payload);
-              }}
-              onEndComponentDrag={() => setExternalComponentDrag(null)}
-              onStartFileDrag={(payload) => {
-                setExternalComponentDrag(null);
-                setExternalFileDrag(payload);
-              }}
-              onEndFileDrag={() => setExternalFileDrag(null)}
-              onUnsupportedComponentDrag={(message) => {
-                setExternalComponentDrag(null);
-                setError(message);
-              }}
+            <View style={styles.sidebarTree}>
+              <FileTree
+                key={`file-tree-${projectPath || 'none'}-${fileTreeVersion}`}
+                rootPath={projectPath!}
+                onSelectFile={handleSelectFile}
+                selectedPath={selectedFile?.selectionKey || ''}
+                onProjectChanged={() => setProjectInsightsVersion((v) => v + 1)}
+                onStartComponentDrag={(payload) => {
+                  setExternalFileDrag(null);
+                  setExternalComponentDrag(payload);
+                }}
+                onEndComponentDrag={() => setExternalComponentDrag(null)}
+                onStartFileDrag={(payload) => {
+                  setExternalComponentDrag(null);
+                  setExternalFileDrag(payload);
+                }}
+                onEndFileDrag={() => setExternalFileDrag(null)}
+                onUnsupportedComponentDrag={(message) => {
+                  setExternalComponentDrag(null);
+                  setError(message);
+                }}
+              />
+            </View>
+            <DependencyInsightsPanel
+              hasProject={Boolean(projectPath)}
+              hasSelection={Boolean(selectedFile?.filePath)}
+              loading={dependencyIndexLoading}
+              error={dependencyIndexError}
+              scannedFileCount={dependencyScannedFileCount}
+              insight={dependencyInsight}
+              onOpenFile={(filePath) => handleSelectFile(filePath)}
             />
           </View>
         </View>
@@ -415,7 +441,10 @@ function AppRN() {
               aggressivePreviewMode={aggressivePreviewMode}
               externalComponentDrag={externalComponentDrag}
               externalFileDrag={externalFileDrag}
-              onProjectFilesChanged={() => setFileTreeVersion((v) => v + 1)}
+              onProjectFilesChanged={() => {
+                setFileTreeVersion((v) => v + 1);
+                setProjectInsightsVersion((v) => v + 1);
+              }}
               onOpenFile={handleSelectFile}
             />
           ) : (
@@ -622,6 +651,10 @@ const styles = StyleSheet.create({
     minHeight: 0,
     minWidth: 260, // Минимальная ширина для комфортного отображения
     transition: 'opacity 0.2s ease',
+  },
+  sidebarTree: {
+    flex: 1,
+    minHeight: 0,
   },
   sidebarContentCollapsed: {
     opacity: 0,

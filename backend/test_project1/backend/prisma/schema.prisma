@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Nsu {
+  idNsuUser  Int     @id @default(autoincrement())
+  realName   String  @db.VarChar(100)
+  email      String  @unique @db.VarChar(100)
+  group      String  @db.VarChar(10)
+  hasLogined Boolean @default(false)
+  user       Users?  @relation("NsuToUsers")
+}
+
+model Users {
+  idUser                   Int                       @id
+  displayedName            String                    @db.VarChar(255)
+  pic                      String?                   @db.LongText
+  admin                    Boolean                   @default(false)
+  password                 String?                   @db.VarChar(255)
+  nsu                      Nsu?                      @relation("NsuToUsers", fields: [idUser], references: [idNsuUser], onDelete: Cascade)
+  posts                    Post[]
+  comments                 Comment[]
+  likedPosts               UserLikedPost[]
+  likedComments            UserLikedComment[]
+  viewedPosts              UserViewedPost[]
+  followedTags             UserFollowedTag[]
+  notifications            Notification[]
+  pushSubscriptions        PushSubscription[]
+  userNotificationSettings UserNotificationSettings?
+}
+
+model Post {
+  idPost          Int              @id @default(autoincrement())
+  content         String           @db.Text
+  iframe          String?          @db.Text
+  images          String?          @db.Text
+  tags            String?          @db.VarChar(255)
+  createdAt       DateTime         @default(now())
+  views           Int              @default(0)
+  likes           Int              @default(0)
+  createdByIdUser Int
+  createdBy       Users            @relation(fields: [createdByIdUser], references: [idUser], onDelete: Cascade)
+  comments        Comment[]
+  likedBy         UserLikedPost[]
+  viewedBy        UserViewedPost[]
+}
+
+model Comment {
+  idComment       Int                @id @default(autoincrement())
+  commentIdPost   Int
+  text            String             @db.Text
+  images          String?            @db.LongText
+  likes           Int                @default(0)
+  createdAt       DateTime           @default(now())
+  createdByIdUser Int
+  post            Post               @relation(fields: [commentIdPost], references: [idPost], onDelete: Cascade)
+  createdBy       Users              @relation(fields: [createdByIdUser], references: [idUser], onDelete: Cascade)
+  likedBy         UserLikedComment[]
+}
+
+model Tag {
+  idTag      Int               @id @default(autoincrement())
+  name       String            @unique @db.VarChar(50)
+  followedBy UserFollowedTag[]
+}
+
+model UserFollowedTag {
+  idUser Int
+  idTag  Int
+  user   Users @relation(fields: [idUser], references: [idUser], onDelete: Cascade)
+  tag    Tag   @relation(fields: [idTag], references: [idTag], onDelete: Cascade)
+
+  @@id([idUser, idTag])
+}
+
+model UserLikedPost {
+  idUser Int
+  idPost Int
+  user   Users @relation(fields: [idUser], references: [idUser], onDelete: Cascade)
+  post   Post  @relation(fields: [idPost], references: [idPost], onDelete: Cascade)
+
+  @@id([idUser, idPost])
+}
+
+model UserLikedComment {
+  idUser    Int
+  idComment Int
+  user      Users   @relation(fields: [idUser], references: [idUser], onDelete: Cascade)
+  comment   Comment @relation(fields: [idComment], references: [idComment], onDelete: Cascade)
+
+  @@id([idUser, idComment])
+}
+
+model UserViewedPost {
+  idUser Int
+  idPost Int
+  user   Users @relation(fields: [idUser], references: [idUser], onDelete: Cascade)
+  post   Post  @relation(fields: [idPost], references: [idPost], onDelete: Cascade)
+
+  @@id([idUser, idPost])
+}
+
+model Notification {
+  idNotification Int      @id @default(autoincrement())
+  userId         Int
+  type           String   @db.VarChar(50) // 'like', 'comment', 'follow', 'mention', 'system'
+  title          String   @db.VarChar(255)
+  message        String   @db.Text
+  data           String?  @db.Text // JSON data for additional context
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  user           Users    @relation(fields: [userId], references: [idUser], onDelete: Cascade)
+}
+
+model UserNotificationSettings {
+  idUser               Int     @id
+  emailNotifications   Boolean @default(true)
+  pushNotifications    Boolean @default(true)
+  inAppNotifications   Boolean @default(true)
+  likeNotifications    Boolean @default(true)
+  commentNotifications Boolean @default(true)
+  followNotifications  Boolean @default(true)
+  mentionNotifications Boolean @default(true)
+  systemNotifications  Boolean @default(true)
+  user                 Users   @relation(fields: [idUser], references: [idUser], onDelete: Cascade)
+}
+
+model PushSubscription {
+  idSubscription Int      @id @default(autoincrement())
+  userId         Int
+  endpoint       String   @db.Text
+  p256dh         String   @db.Text
+  auth           String   @db.Text
+  createdAt      DateTime @default(now())
+  user           Users    @relation(fields: [userId], references: [idUser], onDelete: Cascade)
+}

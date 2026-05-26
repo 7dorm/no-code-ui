@@ -549,6 +549,7 @@ function FileTree({
   rootPath,
   onSelectFile,
   selectedPath,
+  onProjectChanged,
   onStartComponentDrag,
   onEndComponentDrag,
   onStartFileDrag,
@@ -558,6 +559,7 @@ function FileTree({
   rootPath: string;
   onSelectFile: (selection: FileSelection | null) => void;
   selectedPath: string;
+  onProjectChanged?: () => void;
   onStartComponentDrag?: (payload: ComponentDragPayload) => void;
   onEndComponentDrag?: () => void;
   onStartFileDrag?: (payload: FileDragPayload) => void;
@@ -738,6 +740,7 @@ function FileTree({
 
           // Перезагружаем родительскую директорию
           await loadDirectory(parentPath, parentPath === '');
+          onProjectChanged?.();
 
           setRenameDialogVisible(false);
           setItemToRename(null);
@@ -790,6 +793,7 @@ function FileTree({
 
         // Перезагружаем родительскую директорию
         await loadDirectory(parentDir, parentDir === '');
+        onProjectChanged?.();
 
         setDeleteDialogVisible(false);
         setItemToDelete(null);
@@ -882,6 +886,7 @@ export default ${componentName};`;
         });
         // Перезагружаем директорию
         await loadDirectory(parentDir, parentDir === '');
+        onProjectChanged?.();
         // Автоматически выбираем созданный файл
         if (onSelectFile) {
           onSelectFile({ filePath, selectionKey: filePath });
@@ -913,6 +918,7 @@ export default ${componentName};`;
         });
         // Перезагружаем директорию
         await loadDirectory(parentDir, parentDir === '');
+        onProjectChanged?.();
       } else {
         setError(`Ошибка создания папки: ${result.error}`);
       }

@@ -1,0 +1,200 @@
+{
+  "stats": {
+    "totalCssBlocks": 8,
+    "filesProcessed": 2
+  },
+  "blocks": {
+    "src_styles_card_css__css-class__card_24": {
+      "id": "src_styles_card_css__css-class__card_24",
+      "type": "css-class",
+      "name": "card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/card.css",
+      "relPath": "src/styles/card.css",
+      "sourceCode": ".card {\r\n  border: 1px solid #ccc;\r\n  border-radius: 12px;\r\n  padding: 16px;\r\n  width: 200px;\r\n  background: white;\r\n}\r\n",
+      "startLine": 1,
+      "endLine": 8,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_components_Card_tsx__element__div_12"
+      ],
+      "metadata": {
+        "selector": ".card",
+        "braceOpenIndex": 6,
+        "braceCloseIndex": 117,
+        "ruleStartIndex": 0,
+        "ruleEndExclusive": 120
+      }
+    },
+    "src_styles_card_css__css-class__card_title_25": {
+      "id": "src_styles_card_css__css-class__card_title_25",
+      "type": "css-class",
+      "name": "card-title",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/card.css",
+      "relPath": "src/styles/card.css",
+      "sourceCode": ".card-title {\r\n  font-size: 18px;\r\n  margin-bottom: 8px;\r\n}\r\n",
+      "startLine": 9,
+      "endLine": 13,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_components_Card_tsx__element__h2_13"
+      ],
+      "metadata": {
+        "selector": ".card-title",
+        "braceOpenIndex": 134,
+        "braceCloseIndex": 180,
+        "ruleStartIndex": 122,
+        "ruleEndExclusive": 183
+      }
+    },
+    "src_styles_card_css__css-class__card_text_26": {
+      "id": "src_styles_card_css__css-class__card_text_26",
+      "type": "css-class",
+      "name": "card-text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/card.css",
+      "relPath": "src/styles/card.css",
+      "sourceCode": ".card-text {\r\n  font-size: 14px;\r\n  color: #666;\r\n}\r\n",
+      "startLine": 14,
+      "endLine": 18,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_components_Card_tsx__element__p_15"
+      ],
+      "metadata": {
+        "selector": ".card-text",
+        "braceOpenIndex": 196,
+        "braceCloseIndex": 235,
+        "ruleStartIndex": 185,
+        "ruleEndExclusive": 238
+      }
+    },
+    "src_styles_card_css__css-class__card_button_27": {
+      "id": "src_styles_card_css__css-class__card_button_27",
+      "type": "css-class",
+      "name": "card-button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/card.css",
+      "relPath": "src/styles/card.css",
+      "sourceCode": ".card-button {\r\n  margin-top: 12px;\r\n  padding: 8px 12px;\r\n  background: #4caf50;\r\n  color: white;\r\n  border: none;\r\n  border-radius: 6px;\r\n  cursor: pointer;\r\n  --codex-smoke: 2;\r\n}\r\n",
+      "startLine": 19,
+      "endLine": 29,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_components_Card_tsx__element__button_17"
+      ],
+      "metadata": {
+        "selector": ".card-button",
+        "braceOpenIndex": 253,
+        "braceCloseIndex": 421,
+        "ruleStartIndex": 240,
+        "ruleEndExclusive": 424
+      }
+    },
+    "src_styles_global_css__css-class__app_container_28": {
+      "id": "src_styles_global_css__css-class__app_container_28",
+      "type": "css-class",
+      "name": "app-container",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/global.css",
+      "relPath": "src/styles/global.css",
+      "sourceCode": ".app-container {\r\n  padding: 20px;\r\n  font-family: Arial, sans-serif;\r\n}\r\n",
+      "startLine": 1,
+      "endLine": 5,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_App_tsx__element__div_2"
+      ],
+      "metadata": {
+        "selector": ".app-container",
+        "braceOpenIndex": 15,
+        "braceCloseIndex": 71,
+        "ruleStartIndex": 0,
+        "ruleEndExclusive": 74
+      }
+    },
+    "src_styles_global_css__css-class__main_header_29": {
+      "id": "src_styles_global_css__css-class__main_header_29",
+      "type": "css-class",
+      "name": "main-header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/global.css",
+      "relPath": "src/styles/global.css",
+      "sourceCode": ".main-header {\r\n  background: #1e90ff;\r\n  color: white;\r\n  padding: 16px;\r\n}\r\n",
+      "startLine": 6,
+      "endLine": 11,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_components_Header_jsx__element__header_21"
+      ],
+      "metadata": {
+        "selector": ".main-header",
+        "braceOpenIndex": 89,
+        "braceCloseIndex": 151,
+        "ruleStartIndex": 76,
+        "ruleEndExclusive": 154
+      }
+    },
+    "src_styles_global_css__css-class__header_title_30": {
+      "id": "src_styles_global_css__css-class__header_title_30",
+      "type": "css-class",
+      "name": "header-title",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/global.css",
+      "relPath": "src/styles/global.css",
+      "sourceCode": ".header-title {\r\n  margin: 0;\r\n}\r\n",
+      "startLine": 12,
+      "endLine": 15,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_components_Header_jsx__element__h1_22"
+      ],
+      "metadata": {
+        "selector": ".header-title",
+        "braceOpenIndex": 170,
+        "braceCloseIndex": 187,
+        "ruleStartIndex": 156,
+        "ruleEndExclusive": 190
+      }
+    },
+    "src_styles_global_css__css-class__cards_wrapper_31": {
+      "id": "src_styles_global_css__css-class__cards_wrapper_31",
+      "type": "css-class",
+      "name": "cards-wrapper",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/styles/global.css",
+      "relPath": "src/styles/global.css",
+      "sourceCode": ".cards-wrapper {\r\n  display: flex;\r\n  gap: 16px;\r\n  margin-top: 20px;\r\n}\r\n",
+      "startLine": 16,
+      "endLine": 21,
+      "startCol": 0,
+      "endCol": 0,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [
+        "src_App_tsx__element__div_4"
+      ],
+      "metadata": {
+        "selector": ".cards-wrapper",
+        "braceOpenIndex": 207,
+        "braceCloseIndex": 263,
+        "ruleStartIndex": 192,
+        "ruleEndExclusive": 266
+      }
+    }
+  }
+}
