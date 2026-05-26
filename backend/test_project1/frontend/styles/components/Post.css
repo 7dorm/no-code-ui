@@ -1,0 +1,105 @@
+.post-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto 20px;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.post-container.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.username {
+    font-weight: 500;
+}
+
+.tags-container {
+    flex: 1;
+    margin-left: 15px;
+}
+
+.tags-list {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.tag {
+    background: #333;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    margin-left: 10px;
+}
+
+.post-content {
+    margin: 10px 0;
+}
+
+.media-container {
+    margin: 10px 0;
+}
+
+.interaction-row {
+    display: flex;
+    gap: 20px;
+    margin: 10px 0;
+}
+
+.like-btn, .comment-btn {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.timestamp {
+    font-size: 12px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

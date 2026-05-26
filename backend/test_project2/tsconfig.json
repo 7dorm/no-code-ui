@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "strict": true
+  },
+  "exclude": [
+    "test_project",
+    "test_project1"
+  ]
+}

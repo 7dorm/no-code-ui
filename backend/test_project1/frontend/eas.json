@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 15.0.13",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "preview": {},
+    "production": {}
+  }
+}

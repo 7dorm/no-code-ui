@@ -1,0 +1,359 @@
+{
+  "stats": {
+    "totalBlocks": 14,
+    "roots": 3,
+    "filesProcessed": 3
+  },
+  "roots": [
+    {
+      "id": "src_App_tsx__component__App__1765104780017_0",
+      "name": "App",
+      "type": "component",
+      "file": "src/App.tsx"
+    },
+    {
+      "id": "src_components_Card_tsx__component__Card__1765104780216_6",
+      "name": "Card",
+      "type": "component",
+      "file": "src/components/Card.tsx"
+    },
+    {
+      "id": "src_components_Header_tsx__component__Header__1765104780224_14",
+      "name": "Header",
+      "type": "component",
+      "file": "src/components/Header.tsx"
+    }
+  ],
+  "blocks": {
+    "src_App_tsx__component__App__1765104780017_0": {
+      "id": "src_App_tsx__component__App__1765104780017_0",
+      "type": "component",
+      "name": "App",
+      "filePath": "src/App.tsx",
+      "sourceCode": "\r\n\r\nexport default function App() {\r\n  return (\r\n    <div className=\"app-container\">\r\n      <Header />\r\n      <div className=\"cards-wrapper\">\r\n        <Card title=\"First card\" />\r\n        <Card title=\"Second card\" />\r\n      </div>\r\n    </div>\r\n  );\r\n}",
+      "startLine": 6,
+      "endLine": 16,
+      "childrenIds": [
+        "src_App_tsx__element__div__1765104780017_1"
+      ],
+      "uses": [],
+      "usedIn": [],
+      "isExported": true,
+      "props": {},
+      "metadata": {
+        "isDefaultExport": true
+      },
+      "imports": [
+        "react|default|React",
+        "./styles/global.css|none|",
+        "./components/Header|default|Header",
+        "./components/Card|default|Card"
+      ]
+    },
+    "src_App_tsx__element__div__1765104780017_1": {
+      "id": "src_App_tsx__element__div__1765104780017_1",
+      "type": "element",
+      "name": "div",
+      "filePath": "src/App.tsx",
+      "sourceCode": "",
+      "startLine": 5,
+      "endLine": 11,
+      "parentId": "src_App_tsx__component__App__1765104780017_0",
+      "childrenIds": [
+        "src_components_Header_tsx__component__Header__1765104780224_14",
+        "src_App_tsx__element__div__1765104780018_3"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "app-container"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__app_container__1765104780225_22"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_App_tsx__element__div__1765104780018_3": {
+      "id": "src_App_tsx__element__div__1765104780018_3",
+      "type": "element",
+      "name": "div",
+      "filePath": "src/App.tsx",
+      "sourceCode": "",
+      "startLine": 7,
+      "endLine": 10,
+      "parentId": "src_App_tsx__element__div__1765104780017_1",
+      "childrenIds": [
+        "src_components_Card_tsx__component__Card__1765104780216_6",
+        "src_components_Card_tsx__component__Card__1765104780216_6"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "cards-wrapper"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__cards_wrapper__1765104780225_25"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__component__Card__1765104780216_6": {
+      "id": "src_components_Card_tsx__component__Card__1765104780216_6",
+      "type": "component",
+      "name": "Card",
+      "filePath": "src/components/Card.tsx",
+      "sourceCode": "\r\n\r\nexport default function Card({ title }: Props) {\r\n  return (\r\n    <div className=\"card\">\r\n      <h2 className=\"card-title\">{title}</h2>\r\n      <p className=\"card-text\">Some description text</p>\r\n      <button className=\"card-button\">Click me</button>\r\n    </div>\r\n  );\r\n}",
+      "startLine": 8,
+      "endLine": 16,
+      "childrenIds": [
+        "src_components_Card_tsx__element__div__1765104780223_7"
+      ],
+      "uses": [],
+      "usedIn": [
+        "src_App_tsx__element__div__1765104780018_3",
+        "src_App_tsx__element__div__1765104780018_3"
+      ],
+      "isExported": true,
+      "props": {
+        "props": {
+          "type": "object",
+          "value": "Props"
+        }
+      },
+      "metadata": {
+        "isDefaultExport": true
+      },
+      "imports": [
+        "react|default|React",
+        "../styles/card.css|none|"
+      ]
+    },
+    "src_components_Card_tsx__element__div__1765104780223_7": {
+      "id": "src_components_Card_tsx__element__div__1765104780223_7",
+      "type": "element",
+      "name": "div",
+      "filePath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 5,
+      "endLine": 9,
+      "parentId": "src_components_Card_tsx__component__Card__1765104780216_6",
+      "childrenIds": [
+        "src_components_Card_tsx__element__h2__1765104780223_8",
+        "src_components_Card_tsx__element__p__1765104780223_10",
+        "src_components_Card_tsx__element__button__1765104780223_12"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card"
+        }
+      },
+      "uses": [
+        "src_styles_card_css__css-class__card__1765104780225_18"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__element__h2__1765104780223_8": {
+      "id": "src_components_Card_tsx__element__h2__1765104780223_8",
+      "type": "element",
+      "name": "h2",
+      "filePath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 6,
+      "endLine": 6,
+      "parentId": "src_components_Card_tsx__element__div__1765104780223_7",
+      "childrenIds": [],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card-title"
+        }
+      },
+      "uses": [
+        "src_components_Card_tsx__variable__title__1765104780223_9",
+        "src_styles_card_css__css-class__card_title__1765104780225_19"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__element__p__1765104780223_10": {
+      "id": "src_components_Card_tsx__element__p__1765104780223_10",
+      "type": "element",
+      "name": "p",
+      "filePath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 7,
+      "endLine": 7,
+      "parentId": "src_components_Card_tsx__element__div__1765104780223_7",
+      "childrenIds": [
+        "src_components_Card_tsx__text__anon__1765104780223_11"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card-text"
+        }
+      },
+      "uses": [
+        "src_styles_card_css__css-class__card_text__1765104780225_20"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__text__anon__1765104780223_11": {
+      "id": "src_components_Card_tsx__text__anon__1765104780223_11",
+      "type": "element",
+      "name": "#text",
+      "filePath": "src/components/Card.tsx",
+      "sourceCode": "Some description text",
+      "startLine": 7,
+      "endLine": 7,
+      "parentId": "src_components_Card_tsx__element__p__1765104780223_10",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "src_components_Card_tsx__element__button__1765104780223_12": {
+      "id": "src_components_Card_tsx__element__button__1765104780223_12",
+      "type": "element",
+      "name": "button",
+      "filePath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 8,
+      "endLine": 8,
+      "parentId": "src_components_Card_tsx__element__div__1765104780223_7",
+      "childrenIds": [
+        "src_components_Card_tsx__text__anon__1765104780223_13"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card-button"
+        }
+      },
+      "uses": [
+        "src_styles_card_css__css-class__card_button__1765104780225_21"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__text__anon__1765104780223_13": {
+      "id": "src_components_Card_tsx__text__anon__1765104780223_13",
+      "type": "element",
+      "name": "#text",
+      "filePath": "src/components/Card.tsx",
+      "sourceCode": "Click me",
+      "startLine": 8,
+      "endLine": 8,
+      "parentId": "src_components_Card_tsx__element__button__1765104780223_12",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "src_components_Header_tsx__component__Header__1765104780224_14": {
+      "id": "src_components_Header_tsx__component__Header__1765104780224_14",
+      "type": "component",
+      "name": "Header",
+      "filePath": "src/components/Header.tsx",
+      "sourceCode": "\r\n\r\nexport default function Header() {\r\n  return (\r\n    <header className=\"main-header\">\r\n      <h1 className=\"header-title\">Test Project</h1>\r\n    </header>\r\n  );\r\n}",
+      "startLine": 3,
+      "endLine": 9,
+      "childrenIds": [
+        "src_components_Header_tsx__element__header__1765104780224_15"
+      ],
+      "uses": [],
+      "usedIn": [
+        "src_App_tsx__element__div__1765104780017_1"
+      ],
+      "isExported": true,
+      "props": {},
+      "metadata": {
+        "isDefaultExport": true
+      },
+      "imports": [
+        "react|default|React"
+      ]
+    },
+    "src_components_Header_tsx__element__header__1765104780224_15": {
+      "id": "src_components_Header_tsx__element__header__1765104780224_15",
+      "type": "element",
+      "name": "header",
+      "filePath": "src/components/Header.tsx",
+      "sourceCode": "",
+      "startLine": 5,
+      "endLine": 7,
+      "parentId": "src_components_Header_tsx__component__Header__1765104780224_14",
+      "childrenIds": [
+        "src_components_Header_tsx__element__h1__1765104780224_16"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "main-header"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__main_header__1765104780225_23"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Header_tsx__element__h1__1765104780224_16": {
+      "id": "src_components_Header_tsx__element__h1__1765104780224_16",
+      "type": "element",
+      "name": "h1",
+      "filePath": "src/components/Header.tsx",
+      "sourceCode": "",
+      "startLine": 6,
+      "endLine": 6,
+      "parentId": "src_components_Header_tsx__element__header__1765104780224_15",
+      "childrenIds": [
+        "src_components_Header_tsx__text__anon__1765104780224_17"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "header-title"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__header_title__1765104780225_24"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Header_tsx__text__anon__1765104780224_17": {
+      "id": "src_components_Header_tsx__text__anon__1765104780224_17",
+      "type": "element",
+      "name": "#text",
+      "filePath": "src/components/Header.tsx",
+      "sourceCode": "Test Project",
+      "startLine": 6,
+      "endLine": 6,
+      "parentId": "src_components_Header_tsx__element__h1__1765104780224_16",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    }
+  }
+}

@@ -590,5 +590,426 @@
     },
     "astType": "File",
     "programBodyLength": 10
+  },
+  "src/AppRN.tsx": {
+    "timestamp": "2026-05-25T09:37:19.997Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 25416,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 769,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:AppRN.tsx:8997:9028:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8997,
+        "end": 9028,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9064:9092:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9064,
+        "end": 9092,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9101:9133:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9101,
+        "end": 9133,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9144:9189:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9144,
+        "end": 9189,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9255:9288:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9255,
+        "end": 9288,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9340:9372:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9340,
+        "end": 9372,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9387:9570:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9387,
+        "end": 9570,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9587:9680:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9587,
+        "end": 9680,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9742:9921:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9742,
+        "end": 9921,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9938:10029:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9938,
+        "end": 10029,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10090:10273:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10090,
+        "end": 10273,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10290:10383:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10290,
+        "end": 10383,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10491:10525:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10491,
+        "end": 10525,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10544:10747:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10544,
+        "end": 10747,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10768:10855:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10768,
+        "end": 10855,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10925:11128:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10925,
+        "end": 11128,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11149:11236:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11149,
+        "end": 11236,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11306:11503:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11306,
+        "end": 11503,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11524:11608:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11524,
+        "end": 11608,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11712:11748:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11712,
+        "end": 11748,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11765:11799:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11765,
+        "end": 11799,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11818:12023:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11818,
+        "end": 12023,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12044:12141:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12044,
+        "end": 12141,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12207:12410:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12207,
+        "end": 12410,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12431:12527:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12431,
+        "end": 12527,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12616:12650:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12616,
+        "end": 12650,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12669:12702:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12669,
+        "end": 12702,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12729:13111:TextInput": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12729,
+        "end": 13111,
+        "tagName": "TextInput",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13130:13163:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13130,
+        "end": 13163,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13190:13576:TextInput": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13190,
+        "end": 13576,
+        "tagName": "TextInput",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13703:13910:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13703,
+        "end": 13910,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13929:14021:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13929,
+        "end": 14021,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14213:14376:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14213,
+        "end": 14376,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14391:14429:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14391,
+        "end": 14429,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14540:14652:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14540,
+        "end": 14652,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14665:14703:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14665,
+        "end": 14703,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14872:14923:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14872,
+        "end": 14923,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15076:15109:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15076,
+        "end": 15109,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15120:15151:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15120,
+        "end": 15151,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15179:15228:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15179,
+        "end": 15228,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15241:15273:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15241,
+        "end": 15273,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15388:15421:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15388,
+        "end": 15421,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15476:15743:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15476,
+        "end": 15743,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15807:15967:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15807,
+        "end": 15967,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15980:16015:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15980,
+        "end": 16015,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:16030:16064:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16030,
+        "end": 16064,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:16117:16150:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16117,
+        "end": 16150,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:16165:17140:FileTree": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16165,
+        "end": 17140,
+        "tagName": "FileTree",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17173:17581:DependencyInsightsPanel": {
+        "filePath": "src/AppRN.tsx",
+        "start": 17173,
+        "end": 17581,
+        "tagName": "DependencyInsightsPanel",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17653:17684:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 17653,
+        "end": 17684,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17741:17770:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 17741,
+        "end": 17770,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17821:18742:EditorWorkspace": {
+        "filePath": "src/AppRN.tsx",
+        "start": 17821,
+        "end": 18742,
+        "tagName": "EditorWorkspace",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:18771:18804:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 18771,
+        "end": 18804,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:18819:18856:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 18819,
+        "end": 18856,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:18880:18917:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 18880,
+        "end": 18917,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:19002:19039:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 19002,
+        "end": 19039,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:19269:19443:CreateProjectDialog": {
+        "filePath": "src/AppRN.tsx",
+        "start": 19269,
+        "end": 19443,
+        "tagName": "CreateProjectDialog",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 13
   }
 }

@@ -1,0 +1,664 @@
+{
+  "stats": {
+    "totalBlocks": 23,
+    "roots": 3,
+    "filesProcessed": 4,
+    "timeMs": 71
+  },
+  "roots": [
+    {
+      "id": "src_App_tsx__component__App_1",
+      "name": "App",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx"
+    },
+    {
+      "id": "src_components_Card_tsx__component__Card_11",
+      "name": "Card",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx"
+    },
+    {
+      "id": "src_components_Header_jsx__component__Header_20",
+      "name": "Header",
+      "type": "component",
+      "file": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Header.jsx"
+    }
+  ],
+  "blocks": {
+    "src_App_tsx__object__React_0": {
+      "id": "src_App_tsx__object__React_0",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+      "relPath": "src/App.tsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "src_App_tsx__component__App_1": {
+      "id": "src_App_tsx__component__App_1",
+      "type": "component",
+      "name": "App",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+      "relPath": "src/App.tsx",
+      "sourceCode": "function App() {\r\n  return (\r\n    <div className=\"app-container\">\r\n      <Header />\r\n      <div className=\"cards-wrapper\">\r\n        <Card title=\"First card\" />\r\n        <Card title=\"Second card\" />\r\n      </div>\r\n    </div>\r\n  );\r\n}",
+      "startLine": 6,
+      "endLine": 16,
+      "startCol": 15,
+      "endCol": 1,
+      "childrenIds": [
+        "src_App_tsx__element__div_2"
+      ],
+      "uses": [],
+      "usedIn": [],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": true
+      },
+      "imports": [
+        "react|default|React",
+        "./styles/global.css|none|",
+        "./components/Header|default|Header",
+        "./components/Card|default|Card"
+      ],
+      "args": {},
+      "usages": []
+    },
+    "src_App_tsx__element__div_2": {
+      "id": "src_App_tsx__element__div_2",
+      "type": "element",
+      "name": "div",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+      "relPath": "src/App.tsx",
+      "sourceCode": "",
+      "startLine": 8,
+      "endLine": 14,
+      "startCol": 4,
+      "endCol": 10,
+      "parentId": "src_App_tsx__component__App_1",
+      "childrenIds": [
+        "src_App_tsx__element__Header_3",
+        "src_App_tsx__element__div_4"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "app-container"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__app_container_28"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_App_tsx__element__Header_3": {
+      "id": "src_App_tsx__element__Header_3",
+      "type": "component-instance",
+      "name": "Header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+      "relPath": "src/App.tsx",
+      "sourceCode": "",
+      "startLine": 9,
+      "endLine": 9,
+      "startCol": 6,
+      "endCol": 16,
+      "parentId": "src_App_tsx__element__div_2",
+      "childrenIds": [],
+      "props": {},
+      "uses": [
+        "src_components_Header_jsx__component__Header_20"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "src_components_Header_jsx__component__Header_20"
+    },
+    "src_App_tsx__element__div_4": {
+      "id": "src_App_tsx__element__div_4",
+      "type": "element",
+      "name": "div",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+      "relPath": "src/App.tsx",
+      "sourceCode": "",
+      "startLine": 10,
+      "endLine": 13,
+      "startCol": 6,
+      "endCol": 12,
+      "parentId": "src_App_tsx__element__div_2",
+      "childrenIds": [
+        "src_App_tsx__element__Card_5",
+        "src_App_tsx__element__Card_6"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "cards-wrapper"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__cards_wrapper_31"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_App_tsx__element__Card_5": {
+      "id": "src_App_tsx__element__Card_5",
+      "type": "component-instance",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+      "relPath": "src/App.tsx",
+      "sourceCode": "",
+      "startLine": 11,
+      "endLine": 11,
+      "startCol": 8,
+      "endCol": 35,
+      "parentId": "src_App_tsx__element__div_4",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "First card"
+        }
+      },
+      "uses": [
+        "src_components_Card_tsx__component__Card_11"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "src_components_Card_tsx__component__Card_11"
+    },
+    "src_App_tsx__element__Card_6": {
+      "id": "src_App_tsx__element__Card_6",
+      "type": "component-instance",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+      "relPath": "src/App.tsx",
+      "sourceCode": "",
+      "startLine": 12,
+      "endLine": 12,
+      "startCol": 8,
+      "endCol": 36,
+      "parentId": "src_App_tsx__element__div_4",
+      "childrenIds": [],
+      "props": {
+        "title": {
+          "type": "string",
+          "value": "Second card"
+        }
+      },
+      "uses": [
+        "src_components_Card_tsx__component__Card_11"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      },
+      "refId": "src_components_Card_tsx__component__Card_11"
+    },
+    "src_index_tsx__object__React_7": {
+      "id": "src_index_tsx__object__React_7",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/index.tsx",
+      "relPath": "src/index.tsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "src_index_tsx__object__createRoot_8": {
+      "id": "src_index_tsx__object__createRoot_8",
+      "type": "object",
+      "name": "createRoot",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/index.tsx",
+      "relPath": "src/index.tsx",
+      "sourceCode": "import { createRoot } from 'react-dom/client';",
+      "startLine": 2,
+      "endLine": 2,
+      "startCol": 9,
+      "endCol": 19,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react-dom/client",
+        "importKind": "named",
+        "importedName": "createRoot",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "src_components_Card_tsx__object__React_9": {
+      "id": "src_components_Card_tsx__object__React_9",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "src_components_Card_tsx__object__Header_10": {
+      "id": "src_components_Card_tsx__object__Header_10",
+      "type": "object",
+      "name": "Header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "import Header from './Header';",
+      "startLine": 3,
+      "endLine": 3,
+      "startCol": 7,
+      "endCol": 13,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "./Header",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "src_components_Card_tsx__component__Card_11": {
+      "id": "src_components_Card_tsx__component__Card_11",
+      "type": "component",
+      "name": "Card",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "function Card({ title }: Props) {\n  console.log(\"hello\");\n  return (\n    <div className=\"card\" data-codex-smoke=\"codex2\">\n      <h2 className=\"card-title\">{title}</h2>\n      <p className=\"card-text\">Some description text</p>\n      <button className=\"card-button\">Click me</button>\n    </div>);\n\n}",
+      "startLine": 9,
+      "endLine": 18,
+      "startCol": 15,
+      "endCol": 1,
+      "childrenIds": [
+        "src_components_Card_tsx__element__div_12"
+      ],
+      "uses": [],
+      "usedIn": [
+        "src_App_tsx__element__Card_5",
+        "src_App_tsx__element__Card_6"
+      ],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": true
+      },
+      "imports": [
+        "react|default|React",
+        "../styles/card.css|none|",
+        "./Header|default|Header"
+      ],
+      "args": {
+        "title": "any"
+      },
+      "usages": [
+        {
+          "usageId": "src_App_tsx__element__Card_5",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+          "relPath": "src/App.tsx",
+          "startLine": 11,
+          "endLine": 11,
+          "startCol": 8,
+          "endCol": 35,
+          "parentId": "src_App_tsx__element__div_4",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "First card"
+            }
+          }
+        },
+        {
+          "usageId": "src_App_tsx__element__Card_6",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+          "relPath": "src/App.tsx",
+          "startLine": 12,
+          "endLine": 12,
+          "startCol": 8,
+          "endCol": 36,
+          "parentId": "src_App_tsx__element__div_4",
+          "props": {
+            "title": {
+              "type": "string",
+              "value": "Second card"
+            }
+          }
+        }
+      ]
+    },
+    "src_components_Card_tsx__element__div_12": {
+      "id": "src_components_Card_tsx__element__div_12",
+      "type": "element",
+      "name": "div",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 12,
+      "endLine": 16,
+      "startCol": 4,
+      "endCol": 10,
+      "parentId": "src_components_Card_tsx__component__Card_11",
+      "childrenIds": [
+        "src_components_Card_tsx__element__h2_13",
+        "src_components_Card_tsx__element__p_15",
+        "src_components_Card_tsx__element__button_17"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card"
+        },
+        "data-codex-smoke": {
+          "type": "string",
+          "value": "codex2"
+        }
+      },
+      "uses": [
+        "src_styles_card_css__css-class__card_24"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__element__h2_13": {
+      "id": "src_components_Card_tsx__element__h2_13",
+      "type": "element",
+      "name": "h2",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 13,
+      "endLine": 13,
+      "startCol": 6,
+      "endCol": 45,
+      "parentId": "src_components_Card_tsx__element__div_12",
+      "childrenIds": [],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card-title"
+        }
+      },
+      "uses": [
+        "src_components_Card_tsx__variable__title_14",
+        "src_styles_card_css__css-class__card_title_25"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__element__p_15": {
+      "id": "src_components_Card_tsx__element__p_15",
+      "type": "element",
+      "name": "p",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 14,
+      "endLine": 14,
+      "startCol": 6,
+      "endCol": 56,
+      "parentId": "src_components_Card_tsx__element__div_12",
+      "childrenIds": [
+        "src_components_Card_tsx__text__anon_16"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card-text"
+        }
+      },
+      "uses": [
+        "src_styles_card_css__css-class__card_text_26"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__text__anon_16": {
+      "id": "src_components_Card_tsx__text__anon_16",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "Some description text",
+      "startLine": 14,
+      "endLine": 14,
+      "startCol": 31,
+      "endCol": 52,
+      "parentId": "src_components_Card_tsx__element__p_15",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "src_components_Card_tsx__element__button_17": {
+      "id": "src_components_Card_tsx__element__button_17",
+      "type": "element",
+      "name": "button",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "",
+      "startLine": 15,
+      "endLine": 15,
+      "startCol": 6,
+      "endCol": 55,
+      "parentId": "src_components_Card_tsx__element__div_12",
+      "childrenIds": [
+        "src_components_Card_tsx__text__anon_18"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "card-button"
+        }
+      },
+      "uses": [
+        "src_styles_card_css__css-class__card_button_27"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Card_tsx__text__anon_18": {
+      "id": "src_components_Card_tsx__text__anon_18",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Card.tsx",
+      "relPath": "src/components/Card.tsx",
+      "sourceCode": "Click me",
+      "startLine": 15,
+      "endLine": 15,
+      "startCol": 38,
+      "endCol": 46,
+      "parentId": "src_components_Card_tsx__element__button_17",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    },
+    "src_components_Header_jsx__object__React_19": {
+      "id": "src_components_Header_jsx__object__React_19",
+      "type": "object",
+      "name": "React",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Header.jsx",
+      "relPath": "src/components/Header.jsx",
+      "sourceCode": "import React from 'react';",
+      "startLine": 1,
+      "endLine": 1,
+      "startCol": 7,
+      "endCol": 12,
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": [],
+      "metadata": {
+        "importSource": "react",
+        "importKind": "default",
+        "isStyle": false,
+        "isScript": false,
+        "isAsset": false
+      }
+    },
+    "src_components_Header_jsx__component__Header_20": {
+      "id": "src_components_Header_jsx__component__Header_20",
+      "type": "component",
+      "name": "Header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Header.jsx",
+      "relPath": "src/components/Header.jsx",
+      "sourceCode": "function Header() {\r\n  return (\r\n    <header className=\"main-header\">\r\n      <h1 className=\"header-title\">Test Project</h1>\r\n    </header>\r\n  );\r\n}",
+      "startLine": 3,
+      "endLine": 9,
+      "startCol": 15,
+      "endCol": 1,
+      "childrenIds": [
+        "src_components_Header_jsx__element__header_21"
+      ],
+      "uses": [],
+      "usedIn": [
+        "src_App_tsx__element__Header_3"
+      ],
+      "isExported": true,
+      "metadata": {
+        "isDefaultExport": true
+      },
+      "imports": [
+        "react|default|React"
+      ],
+      "args": {},
+      "usages": [
+        {
+          "usageId": "src_App_tsx__element__Header_3",
+          "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/App.tsx",
+          "relPath": "src/App.tsx",
+          "startLine": 9,
+          "endLine": 9,
+          "startCol": 6,
+          "endCol": 16,
+          "parentId": "src_App_tsx__element__div_2",
+          "props": {}
+        }
+      ]
+    },
+    "src_components_Header_jsx__element__header_21": {
+      "id": "src_components_Header_jsx__element__header_21",
+      "type": "element",
+      "name": "header",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Header.jsx",
+      "relPath": "src/components/Header.jsx",
+      "sourceCode": "",
+      "startLine": 5,
+      "endLine": 7,
+      "startCol": 4,
+      "endCol": 13,
+      "parentId": "src_components_Header_jsx__component__Header_20",
+      "childrenIds": [
+        "src_components_Header_jsx__element__h1_22"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "main-header"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__main_header_29"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Header_jsx__element__h1_22": {
+      "id": "src_components_Header_jsx__element__h1_22",
+      "type": "element",
+      "name": "h1",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Header.jsx",
+      "relPath": "src/components/Header.jsx",
+      "sourceCode": "",
+      "startLine": 6,
+      "endLine": 6,
+      "startCol": 6,
+      "endCol": 52,
+      "parentId": "src_components_Header_jsx__element__header_21",
+      "childrenIds": [
+        "src_components_Header_jsx__text__anon_23"
+      ],
+      "props": {
+        "className": {
+          "type": "string",
+          "value": "header-title"
+        }
+      },
+      "uses": [
+        "src_styles_global_css__css-class__header_title_30"
+      ],
+      "usedIn": [],
+      "metadata": {
+        "isFragment": false
+      }
+    },
+    "src_components_Header_jsx__text__anon_23": {
+      "id": "src_components_Header_jsx__text__anon_23",
+      "type": "element",
+      "name": "#text",
+      "filePath": "/Users/ocirhubanov/Documents/pak/pakserega /no-code-ui/backend/test_project2/src/components/Header.jsx",
+      "relPath": "src/components/Header.jsx",
+      "sourceCode": "Test Project",
+      "startLine": 6,
+      "endLine": 6,
+      "startCol": 35,
+      "endCol": 47,
+      "parentId": "src_components_Header_jsx__element__h1_22",
+      "childrenIds": [],
+      "uses": [],
+      "usedIn": []
+    }
+  }
+}
