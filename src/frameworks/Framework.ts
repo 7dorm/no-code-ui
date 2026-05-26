@@ -5,7 +5,7 @@
  export type CommitPatchesResult = {
    ok: boolean;
    code?: string;
-   externalPatches?: any[];
+   externalPatches?: unknown[];
    error?: string;
  };
  
@@ -50,7 +50,7 @@ export class Framework {
    * @param {Object} params.externalStylesMap - карта внешних стилей
    * @returns {Object} { ok: boolean, code?: string, html?: string, error?: string, needsExternalPatch?: boolean, ... }
    */
-  applyStylePatch({ code, mapEntry, patch, externalStylesMap }: { code: string, mapEntry: any, patch: any, externalStylesMap: any }) {
+  applyStylePatch({ code, mapEntry, patch, externalStylesMap }: { code: string, mapEntry: Record<string, unknown>, patch: Record<string, unknown>, externalStylesMap: Record<string, unknown> }) {
     throw new Error('Framework.applyStylePatch() must be implemented');
   }
 
@@ -64,7 +64,7 @@ export class Framework {
    * @param {string} params.snippet - HTML/JSX код для вставки
    * @returns {Object} { ok: boolean, code?: string, error?: string }
    */
-  applyInsert({ code, targetEntry, targetId, mode, snippet }: { code: string, targetEntry: any, targetId: string, mode: string, snippet: string }) {
+  applyInsert({ code, targetEntry, targetId, mode, snippet }: { code: string, targetEntry: Record<string, unknown>, targetId: string, mode: string, snippet: string }) {
     throw new Error('Framework.applyInsert() must be implemented');
   }
 
@@ -76,7 +76,7 @@ export class Framework {
    * @param {string} params.blockId - ID элемента (ключ в blockMap)
    * @returns {Object} { ok: boolean, code?: string, error?: string }
    */
-  applyDelete({ code, entry, blockId }: { code: string, entry: any, blockId: string }) {
+  applyDelete({ code, entry, blockId }: { code: string, entry: Record<string, unknown>, blockId: string }) {
     throw new Error('Framework.applyDelete() must be implemented');
   }
 
@@ -92,11 +92,11 @@ export class Framework {
    */
   applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId, targetBeforeEntry, targetBeforeId }: {
     code: string;
-    sourceEntry: any;
+    sourceEntry: Record<string, unknown>;
     sourceId: string;
-    targetEntry: any;
+    targetEntry: Record<string, unknown>;
     targetId: string;
-    targetBeforeEntry?: any;
+    targetBeforeEntry?: Record<string, unknown>;
     targetBeforeId?: string | null;
   }) {
     throw new Error('Framework.applyReparent() must be implemented');
@@ -111,7 +111,7 @@ export class Framework {
    * @param {string} params.text - новый текст
    * @returns {Object} { ok: boolean, code?: string, error?: string }
    */
-  applySetText({ code, entry, blockId, text }: { code: string, entry: any, blockId: string, text: string }) {
+  applySetText({ code, entry, blockId, text }: { code: string, entry: Record<string, unknown>, blockId: string, text: string }) {
     throw new Error('Framework.applySetText() must be implemented');
   }
 
@@ -158,7 +158,7 @@ export class Framework {
    * @param {Function} params.writeFile - функция для записи файлов
    * @returns {Promise<Object>} { ok: boolean, code?: string, externalPatches?: Array, error?: string }
    */
-  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile }: { originalCode: string, stagedPatches: any, stagedOps: any, blockMapForFile: any, externalStylesMap: any, filePath: string, resolvePath: any, readFile: any, writeFile: any }): Promise<CommitPatchesResult> {
+  async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile }: { originalCode: string, stagedPatches: Record<string, Record<string, unknown>>, stagedOps: unknown[], blockMapForFile: Record<string, unknown>, externalStylesMap: Record<string, unknown>, filePath: string, resolvePath: (path: string, base?: string) => string, readFile: (path: string) => { success: boolean, content: string }, writeFile: (path: string, content: string) => { success: boolean, error?: string } }): Promise<CommitPatchesResult> {
     throw new Error('Framework.commitPatches() must be implemented');
   }
 
@@ -190,7 +190,7 @@ export class Framework {
    * @param {Object} params.stylePatch - объект с изменениями стилей
    * @returns {string} - HTML/JSX сниппет для вставки
    */
-  buildInsertSnippet({ tag, text, stylePatch }: { tag: string, text: string, stylePatch: any }) {
+  buildInsertSnippet({ tag, text, stylePatch }: { tag: string, text: string, stylePatch?: Record<string, unknown> }) {
     throw new Error('Framework.buildInsertSnippet() must be implemented');
   }
 }

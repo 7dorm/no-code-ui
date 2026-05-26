@@ -10,9 +10,14 @@ import type {
 
 type UseHistoryParams = {
   filePath: string;
+  applyBlockPatchRef?: React.MutableRefObject<any>;
+  stageInsertBlockRef?: React.MutableRefObject<any>;
+  stageDeleteBlockRef?: React.MutableRefObject<any>;
+  stageReparentBlockRef?: React.MutableRefObject<any>;
+  stageSetTextRef?: React.MutableRefObject<any>;
 };
 
-export function useHistory({ filePath }: UseHistoryParams) {
+export function useHistory({ filePath, applyBlockPatchRef, stageInsertBlockRef, stageDeleteBlockRef, stageReparentBlockRef, stageSetTextRef }: UseHistoryParams) {
   const {
     fileType,
     sendIframeCommand,
@@ -29,10 +34,11 @@ export function useHistory({ filePath }: UseHistoryParams) {
   const pendingHistoryOperationRef = useRef<HistoryOperation | null>(null);
 
   const addToHistory = useCallback((operation: HistoryOperation | SetTextHistoryOperation | ReparentHistoryOperation) => {
-    setUndoStack([...undoStack, operation]);
+    const currentStack = useEditorStore.getState().undoStack;
+    setUndoStack([...currentStack, operation]);
     setRedoStack([]);
     console.log('📝 [History] Added operation:', operation.type);
-  }, [undoStack, setUndoStack, setRedoStack]);
+  }, [setUndoStack, setRedoStack]);
 
   const addToHistoryDebounced = useCallback((operation: HistoryOperation, isIntermediate: boolean = false) => {
     if (isIntermediate) {
@@ -75,16 +81,6 @@ export function useHistory({ filePath }: UseHistoryParams) {
 
     switch (operation.type) {
       case 'patch': {
-        updateStagedPatches((prev) => {
-          const next = { ...prev };
-          if (operation.previousValue) {
-            next[operation.blockId] = operation.previousValue;
-          } else {
-            delete next[operation.blockId];
-          }
-          return next;
-        });
-
         let patchToApply: Record<string, any>;
         if (operation.previousValue) {
           patchToApply = operation.previousValue;
@@ -94,57 +90,47 @@ export function useHistory({ filePath }: UseHistoryParams) {
             patchToApply[key] = null;
           }
         }
-
-        sendIframeCommand({
-          type: MRPAK_CMD.SET_STYLE,
-          id: operation.blockId,
-          patch: patchToApply,
-          fileType,
-        });
+        if (applyBlockPatchRef?.current) {
+          void applyBlockPatchRef.current(operation.blockId, patchToApply, false, true);
+        }
         break;
       }
       case 'insert': {
-        updateStagedOps((prev) => prev.filter((op) => op.blockId !== operation.blockId));
-        sendIframeCommand({ type: MRPAK_CMD.DELETE, id: operation.blockId });
+        if (stageDeleteBlockRef?.current) {
+          stageDeleteBlockRef.current(operation.blockId, true);
+        }
         break;
       }
       case 'delete': {
-        updateStagedOps((prev: StagedOp[]) => [
-          ...prev,
-          {
-            type: 'insert',
+        if (stageInsertBlockRef?.current) {
+          stageInsertBlockRef.current({
             targetId: operation.parentId,
             mode: 'child',
             snippet: operation.snippet,
-            blockId: operation.blockId,
-            fileType,
-            filePath,
-          },
-        ]);
-        sendIframeCommand({
-          type: MRPAK_CMD.INSERT,
-          targetId: operation.parentId,
-          mode: 'child',
-          html: operation.snippet,
-        });
+            skipIframeInsert: false,
+            isUndoRedo: true
+          });
+        }
         break;
       }
       case 'setText': {
-        updateStagedOps((prev) => prev.filter((op) => !(op.type === 'setText' && op.blockId === operation.blockId)));
-        sendIframeCommand({
-          type: MRPAK_CMD.SET_TEXT,
-          id: operation.blockId,
-          text: operation.previousText || '',
-        });
+        if (stageSetTextRef?.current) {
+          stageSetTextRef.current({
+            blockId: operation.blockId,
+            text: operation.previousText || '',
+            isUndoRedo: true
+          });
+        }
         break;
       }
       case 'reparent': {
-        updateStagedOps((prev) => prev.filter((op) => !(op.type === 'reparent' && op.blockId === operation.blockId)));
-        sendIframeCommand({
-          type: MRPAK_CMD.REPARENT,
-          sourceId: operation.blockId,
-          targetParentId: operation.oldParentId,
-        });
+        if (stageReparentBlockRef?.current) {
+          stageReparentBlockRef.current({
+            sourceId: operation.blockId,
+            targetParentId: operation.oldParentId,
+            isUndoRedo: true
+          });
+        }
         break;
       }
       default:
@@ -184,90 +170,46 @@ export function useHistory({ filePath }: UseHistoryParams) {
 
     switch (operation.type) {
       case 'patch': {
-        updateStagedPatches((prev) => ({
-          ...prev,
-          [operation.blockId]: { ...(prev[operation.blockId] || {}), ...operation.patch },
-        }));
-        sendIframeCommand({
-          type: MRPAK_CMD.SET_STYLE,
-          id: operation.blockId,
-          patch: operation.patch,
-          fileType,
-        });
+        if (applyBlockPatchRef?.current) {
+          void applyBlockPatchRef.current(operation.blockId, operation.patch, false, true);
+        }
         break;
       }
       case 'insert': {
-        updateStagedOps((prev: StagedOp[]) => [
-          ...prev,
-          {
-            type: 'insert',
+        if (stageInsertBlockRef?.current) {
+          stageInsertBlockRef.current({
             targetId: operation.targetId,
             mode: operation.mode,
             snippet: operation.snippet,
-            blockId: operation.blockId,
-            fileType,
-            filePath,
-          },
-        ]);
-        sendIframeCommand({
-          type: MRPAK_CMD.INSERT,
-          targetId: operation.targetId,
-          mode: operation.mode,
-          html: operation.snippet,
-        });
+            skipIframeInsert: false,
+            isUndoRedo: true
+          });
+        }
         break;
       }
       case 'delete': {
-        updateStagedOps((prev: StagedOp[]) => [
-          ...prev,
-          {
-            type: 'delete',
-            blockId: operation.blockId,
-            fileType,
-            filePath,
-          },
-        ]);
-        sendIframeCommand({ type: MRPAK_CMD.DELETE, id: operation.blockId });
+        if (stageDeleteBlockRef?.current) {
+          stageDeleteBlockRef.current(operation.blockId, true);
+        }
         break;
       }
       case 'setText': {
-        updateStagedOps((prev: StagedOp[]) => [
-          ...prev,
-          {
-            type: 'setText',
+        if (stageSetTextRef?.current) {
+          stageSetTextRef.current({
             blockId: operation.blockId,
             text: operation.text,
-            fileType,
-            filePath,
-          },
-        ]);
-        sendIframeCommand({
-          type: MRPAK_CMD.SET_TEXT,
-          id: operation.blockId,
-          text: operation.text,
-        });
+            isUndoRedo: true
+          });
+        }
         break;
       }
       case 'reparent': {
-        updateStagedOps((prev: StagedOp[]) => [
-          ...prev,
-          {
-            type: 'reparent',
-            blockId: operation.blockId,
-            oldParentId: operation.oldParentId,
-            newParentId: operation.newParentId,
+        if (stageReparentBlockRef?.current) {
+          stageReparentBlockRef.current({
             sourceId: operation.blockId,
             targetParentId: operation.newParentId,
-            targetBeforeId: operation.targetBeforeId || null,
-            fileType: operation.fileType,
-            filePath: operation.filePath,
-          },
-        ]);
-        if (!operation.targetBeforeId) {
-          sendIframeCommand({
-            type: MRPAK_CMD.REPARENT,
-            sourceId: operation.blockId,
-            targetParentId: operation.newParentId,
+            targetBeforeId: operation.targetBeforeId,
+            isUndoRedo: true
           });
         }
         break;

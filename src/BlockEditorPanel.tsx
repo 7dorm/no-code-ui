@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import WebView from './WebView';
 import {
@@ -26,34 +26,66 @@ const htmlInputStyle = {
   outline: 'none',
 };
 
+type StyleValue = string | number | boolean | null;
+type StylePatch = Record<string, StyleValue | undefined>;
+type SelectedBlock = { id: string; meta?: unknown } | null;
+type StyleSnapshot = {
+  inlineStyle?: string;
+  computedStyle?: Record<string, unknown> | null;
+  textContent?: string;
+} | null;
+type LayerNode = {
+  parentId?: string | null;
+  childIds?: string[];
+  tagName?: string;
+  isIsolatedComponent?: boolean;
+  componentName?: string;
+  sourceBasename?: string;
+  sourceFilePath?: string;
+  [key: string]: unknown;
+};
+type LayersTree = {
+  nodes: Record<string, LayerNode>;
+  rootIds?: string[];
+} | null;
+type LayerNames = Record<string, string>;
+type IframeCommand = Record<string, unknown>;
+type MoveMode = 'absolute' | 'relative' | 'grid8';
+type DropZone = 'before' | 'inside' | 'after';
+type DropEventLike = {
+  currentTarget?: { getBoundingClientRect?: () => { top: number; height: number } };
+  clientY?: number;
+  nativeEvent?: { clientY?: number };
+};
+
 export type BlockEditorPanelProps = {
   fileType: 'html' | 'react' | 'react-native';
   html: string;
-  selectedBlock: any;
-  onMessage: (msg: any) => void;
-  onApplyPatch: (blockId: any, patch: any) => void;
-  onStagePatch: (blockId: any, patch: any, isIntermediate?: boolean) => void;
-  styleSnapshot: any;
-  textSnapshot: any;
-  layersTree: any;
-  layerNames: any;
+  selectedBlock: SelectedBlock;
+  onMessage: (msg: unknown) => void;
+  onApplyPatch: (blockId: string, patch: StylePatch) => void;
+  onStagePatch: (blockId: string, patch: StylePatch, isIntermediate?: boolean) => void;
+  styleSnapshot: StyleSnapshot;
+  textSnapshot: string;
+  layersTree: LayersTree;
+  layerNames: LayerNames;
   onRenameLayer: (id: string, name: string) => void;
-  outgoingMessage: any;
-  onSendCommand: (cmd: any) => void;
+  outgoingMessage: unknown;
+  onSendCommand: (cmd: IframeCommand) => void;
   onInsertBlock: ({ targetId, mode, snippet }: {
-    targetId: any;
-    mode: any;
-    snippet: any;
+    targetId: string;
+    mode: 'child' | 'sibling';
+    snippet: string;
   }) => void;
   onDeleteBlock: (id: string) => void;
   onReparentBlock: ({ sourceId, targetParentId, targetBeforeId }: {
-    sourceId: any;
-    targetParentId: any;
-    targetBeforeId?: any;
+    sourceId: string;
+    targetParentId: string;
+    targetBeforeId?: string | null;
   }) => void;
   onSetText: ({ blockId, text }: {
-    blockId: any;
-    text: any;
+    blockId: string;
+    text: string;
   }) => void;
   onCommitStagedChanges?: () => void;
   framework: HtmlFramework | ReactFramework | null;
@@ -72,7 +104,7 @@ export type BlockEditorPanelProps = {
     sourceFileName?: string;
     className?: string;
     cssText?: string;
-    stylePatch?: Record<string, any>;
+    stylePatch?: StylePatch;
   }>;
   onImportStyleTemplate?: (templateId: string) => void;
   onImportStyleFromPicker?: () => void;
@@ -114,7 +146,14 @@ export function useBlockEditorSidebarController({
   onApplyStyleLibraryEntry,
   onAddProjectDependency,
   onInsertComponentFromLibrary,
-}: BlockEditorSidebarControllerProps) {
+  externalDropTargetState = null,
+}: BlockEditorSidebarControllerProps & {
+  externalDropTargetState?: {
+    source: string;
+    sourceId: string | null;
+    targetId: string | null;
+  } | null;
+}) {
   const [left, setLeft] = useState<number | null>(null);
   const [top, setTop] = useState<number | null>(null);
   const [width, setWidth] = useState<number | null>(null);
@@ -133,7 +172,7 @@ export function useBlockEditorSidebarController({
     setLeftMode('value');
     if (selectedBlock?.id && value !== null && value !== undefined && !isNaN(value)) {
       const moveKeys = getMovePatchKeys(moveMode);
-      const patch: any = { [moveKeys.x]: formatMoveValue(value) };
+      const patch: StylePatch = { [moveKeys.x]: formatMoveValue(value) };
       patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
       if (moveMode === 'relative') {
         patch.left = '';
@@ -150,7 +189,7 @@ export function useBlockEditorSidebarController({
     setTopMode('value');
     if (selectedBlock?.id && value !== null) {
       const moveKeys = getMovePatchKeys(moveMode);
-      const patch: any = { [moveKeys.y]: formatMoveValue(value) };
+      const patch: StylePatch = { [moveKeys.y]: formatMoveValue(value) };
       patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
       if (moveMode === 'relative') {
         patch.top = '';
@@ -163,7 +202,7 @@ export function useBlockEditorSidebarController({
     setWidth(value);
     setWidthMode('value');
     if (selectedBlock?.id && value !== null) {
-      onApplyPatch(selectedBlock.id, { 
+      onApplyPatch(selectedBlock.id, {
         width: toDimensionValue(value, widthUnit),
       });
     }
@@ -173,7 +212,7 @@ export function useBlockEditorSidebarController({
     setHeight(value);
     setHeightMode('value');
     if (selectedBlock?.id && value !== null) {
-      onApplyPatch(selectedBlock.id, { 
+      onApplyPatch(selectedBlock.id, {
         height: toDimensionValue(value, heightUnit),
       });
     }
@@ -222,9 +261,9 @@ export function useBlockEditorSidebarController({
       setLeftMode('value');
       setTopMode('value');
     }
-    
+
     if (selectedBlock?.id) {
-      const patch: any = { position: newMoveMode === 'grid8' ? 'absolute' : newMoveMode };
+      const patch: StylePatch = { position: newMoveMode === 'grid8' ? 'absolute' : newMoveMode };
       console.log('[handleMoveModeChange] Sending patch:', { blockId: selectedBlock.id, patch });
       onApplyPatch(selectedBlock.id, patch);
     } else {
@@ -293,7 +332,7 @@ export function useBlockEditorSidebarController({
 
   const getSpecialModePatch = (field: 'left' | 'top' | 'width' | 'height', mode: string) => {
     if (!selectedBlock?.id) return null;
-    const patch: any = {};
+    const patch: StylePatch = {};
     if (field === 'left' || field === 'top') {
       if (!canUseAutoOffsets) return null;
       patch.position = moveMode === 'grid8' ? 'absolute' : moveMode;
@@ -310,7 +349,7 @@ export function useBlockEditorSidebarController({
     setMoveUnit(newMoveUnit);
     if (!selectedBlock?.id) return;
     const moveKeys = getMovePatchKeys(moveMode);
-    const patch: any = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
+    const patch: StylePatch = { position: moveMode === 'grid8' ? 'absolute' : moveMode };
     if (left !== null && Number.isFinite(left)) {
       patch[moveKeys.x] = newMoveUnit === '%' ? `${left}%` : (fileType === 'html' ? `${left}px` : left);
     }
@@ -441,8 +480,8 @@ export function useBlockEditorSidebarController({
     }
     setBaselineMap(norm);
     // Инициализируем числовые поля позиции/размера из computedStyle, если оно есть
-    const cs = styleSnapshot?.computedStyle as any | null;
-    const parseNumeric = (v: any): number | null => {
+    const cs = styleSnapshot?.computedStyle || null;
+    const parseNumeric = (v: unknown): number | null => {
       if (v == null) return null;
       if (typeof v === 'number') return Number.isFinite(v) ? v : null;
       if (typeof v === 'string') {
@@ -470,35 +509,37 @@ export function useBlockEditorSidebarController({
     if (selectedBlock?.id) {
       // В React-режиме нужно искать в DOM через data-no-code-ui-id
       const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
-                      document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
+        document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
       if (element) {
         const savedMoveMode = element.getAttribute('data-move-mode');
-        if (savedMoveMode && ['absolute', 'relative', 'grid8'].includes(savedMoveMode as any)) {
-          elementMoveMode = savedMoveMode as 'absolute' | 'relative' | 'grid8';
+        if (savedMoveMode === 'absolute' || savedMoveMode === 'relative' || savedMoveMode === 'grid8') {
+          elementMoveMode = savedMoveMode;
         }
         const savedMoveUnit = element.getAttribute('data-move-unit');
         if (savedMoveUnit === 'px' || savedMoveUnit === '%') {
           setMoveUnit(savedMoveUnit);
         } else {
           const moveKeys = getMovePatchKeys(elementMoveMode);
-          const inlineLeft = (element.style as any)?.[moveKeys.x] || '';
-          const inlineTop = (element.style as any)?.[moveKeys.y] || '';
+          const inlineStyle = element.style as CSSStyleDeclaration & Record<string, string>;
+          const inlineLeft = inlineStyle?.[moveKeys.x] || '';
+          const inlineTop = inlineStyle?.[moveKeys.y] || '';
           setMoveUnit(
             String(inlineLeft).includes('%') || String(inlineTop).includes('%') ? '%' : 'px'
           );
         }
 
         const moveKeys = getMovePatchKeys(elementMoveMode);
-        const inlineLeftNumeric = parseNumeric((element.style as any)?.[moveKeys.x]);
-        const inlineTopNumeric = parseNumeric((element.style as any)?.[moveKeys.y]);
+        const inlineStyle = element.style as CSSStyleDeclaration & Record<string, string>;
+        const inlineLeftNumeric = parseNumeric(inlineStyle?.[moveKeys.x]);
+        const inlineTopNumeric = parseNumeric(inlineStyle?.[moveKeys.y]);
         const computedX = elementMoveMode === 'relative' ? marginLeftValFromComputed : leftValFromComputed;
         const computedY = elementMoveMode === 'relative' ? marginTopValFromComputed : topValFromComputed;
-        if (String((element.style as any)?.[moveKeys.x] || '').includes('%') && inlineLeftNumeric !== null) {
+        if (String(inlineStyle?.[moveKeys.x] || '').includes('%') && inlineLeftNumeric !== null) {
           setLeft(inlineLeftNumeric);
         } else if (computedX !== null) {
           setLeft(computedX);
         }
-        if (String((element.style as any)?.[moveKeys.y] || '').includes('%') && inlineTopNumeric !== null) {
+        if (String(inlineStyle?.[moveKeys.y] || '').includes('%') && inlineTopNumeric !== null) {
           setTop(inlineTopNumeric);
         } else if (computedY !== null) {
           setTop(computedY);
@@ -540,7 +581,7 @@ export function useBlockEditorSidebarController({
     setTopMode(currentYRaw === 'auto' && canUseAutoOffsets ? 'auto' : 'value');
     setWidthMode(
       widthRaw === 'auto' || widthRaw === 'min-content' || widthRaw === 'max-content' || widthRaw === 'fit-content'
-        ? (widthRaw as any)
+        ? widthRaw
         : 'value'
     );
     setHeightMode(heightRaw === 'auto' ? 'auto' : 'value');
@@ -559,9 +600,9 @@ export function useBlockEditorSidebarController({
   // Отдельный useEffect только для локальных data-атрибутов iframe.
   useEffect(() => {
     if (!selectedBlock?.id || !isMoveModeInitialized) return;
-    
+
     const element = document.querySelector(`[data-no-code-ui-id="${selectedBlock.id}"]`) ||
-                    document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
+      document.querySelector(`[data-mrpak-id="${selectedBlock.id}"]`);
     if (element) {
       element.setAttribute('data-move-mode', moveMode);
       element.setAttribute('data-move-unit', moveMode === 'grid8' ? 'px' : moveUnit);
@@ -571,13 +612,13 @@ export function useBlockEditorSidebarController({
   const canApply = !!selectedBlock?.id;
 
   const patch = useMemo(() => {
-    const p: Record<string, any> = {};
+    const p: StylePatch = {};
     const setStyleString = (htmlKey: string, reactKey: string, value: string) => {
       if (!value) return;
       p[fileType === 'html' ? htmlKey : reactKey] = value;
     };
 
-    const setPx = (key: any, val: any) => {
+    const setPx = (key: string, val: number | null) => {
       if (val == null || !Number.isFinite(val)) return;
       if (key === 'left' || key === 'top') {
         p[key] = formatMoveValue(val);
@@ -711,8 +752,8 @@ export function useBlockEditorSidebarController({
     return buildPatchFromKv({ fileType, rows: styleRows });
   };
 
-  const diffAgainstBaseline = (patchObj: Record<string, any>) => {
-    const out: Record<string, any> = {};
+  const diffAgainstBaseline = (patchObj: StylePatch) => {
+    const out: StylePatch = {};
     for (const [k, v] of Object.entries(patchObj || {})) {
       if (!k) continue;
       const base = baselineMap ? baselineMap[k] : undefined;
@@ -740,14 +781,14 @@ export function useBlockEditorSidebarController({
 
   const stageLocalStyles = () => {
     if (!canApply) return;
-    
+
     // Защита от двойного клика (debounce 300ms)
     const now = Date.now();
     if (now - lastStageTimeRef.current < 300) {
       return;
     }
     lastStageTimeRef.current = now;
-    
+
     const stylePatch = diffAgainstBaseline(buildCurrentStylePatch());
     // Stage для записи
     if (onStagePatch) {
@@ -765,7 +806,7 @@ export function useBlockEditorSidebarController({
   const [insertStyleMode, setInsertStyleMode] = useState('kv');
   const [insertStyleRows, setInsertStyleRows] = useState([{ key: '', value: '' }]);
   const [insertStyleText, setInsertStyleText] = useState('');
-  
+
   // Защита от двойного клика
   const lastInsertTimeRef = useRef(0);
   const lastDeleteTimeRef = useRef(0);
@@ -794,31 +835,31 @@ export function useBlockEditorSidebarController({
       const attrs = styleAttr ? ` style="${styleAttr}"` : '';
       const tag = insertTag || 'div';
       const body = insertText || '';
-      
+
       // Для plain HTML используем inline onclick, чтобы не требовать внешних функций
       const isButton = tag.toLowerCase() === 'button';
       const onClickAttr = isButton
         ? ` onclick="(function(ev){try{ev&&ev.preventDefault&&ev.preventDefault();console.log('Button clicked');}catch(e){}})(event)"`
         : '';
-      
+
       return `<${tag}${attrs}${onClickAttr}>${body}</${tag}>`;
     }
 
     // react / react-native
     const styleObj = toReactStyleObjectText(patch);
     const styleAttr = styleObj ? ` style={{${styleObj}}}` : '';
-    
+
     if (fileType === 'react-native') {
       if (insertTag === 'Text') {
         return `<Text${styleAttr}>${insertText || 'Новый текст'}</Text>`;
       }
-      
+
       // TouchableOpacity: вшиваем inline onPress, чтобы не создавать лишних обработчиков в коде
       const isButton = insertTag === 'TouchableOpacity';
       const onPressAttr = isButton
         ? ` onPress={() => { try { console.log('Button pressed'); } catch(e) {} }}`
         : '';
-      
+
       // View/TouchableOpacity: вложим Text для читаемости
       return `<${insertTag}${styleAttr}${onPressAttr}><Text>${insertText || 'Новый блок'}</Text></${insertTag}>`;
     }
@@ -828,7 +869,7 @@ export function useBlockEditorSidebarController({
     const onClickAttr = isButton
       ? ` onClick={(e) => { try { e?.preventDefault?.(); console.log('Button clicked'); } catch(_) {} }}`
       : '';
-    
+
     return `<${insertTag}${styleAttr}${onClickAttr}>${insertText || 'Новый блок'}</${insertTag}>`;
   };
 
@@ -884,7 +925,7 @@ export function useBlockEditorSidebarController({
 
   // ВАЖНО: стабилизируем source объект, иначе WebView пересоздаёт iframe на каждый ререндер
   // (например, при клике по блоку и обновлении selectedBlock).
-  const shortId = (id: any) => {
+  const shortId = (id: unknown) => {
     const s = String(id || '');
     return s.length > 28 ? s.slice(0, 28) + '…' : s;
   };
@@ -894,7 +935,7 @@ export function useBlockEditorSidebarController({
     const firstLevel = Array.isArray(nodes?.[possibleParentId]?.childIds)
       ? nodes[possibleParentId].childIds
       : [];
-    const stack = firstLevel.map((id: any) => String(id));
+    const stack = firstLevel.map((id: string) => String(id));
     const visited = new Set<string>();
     while (stack.length > 0) {
       const current = stack.pop();
@@ -903,13 +944,13 @@ export function useBlockEditorSidebarController({
       visited.add(current);
       const childIds = nodes?.[current]?.childIds;
       if (Array.isArray(childIds) && childIds.length) {
-        stack.push(...childIds.map((id: any) => String(id)));
+        stack.push(...childIds.map((id: string) => String(id)));
       }
     }
     return false;
   };
 
-  const calculateDropZone = (event: any): 'before' | 'inside' | 'after' => {
+  const calculateDropZone = (event: DropEventLike): DropZone => {
     const rect = event?.currentTarget?.getBoundingClientRect?.();
     if (!rect) return 'inside';
     const y = event?.clientY ?? event?.nativeEvent?.clientY ?? rect.top + rect.height / 2;
@@ -919,7 +960,7 @@ export function useBlockEditorSidebarController({
     return 'inside';
   };
 
-  const commitTreeReparent = (sourceIdRaw: any, targetIdRaw: any, zone: 'before' | 'inside' | 'after') => {
+  const commitTreeReparent = (sourceIdRaw: unknown, targetIdRaw: unknown, zone: DropZone) => {
     const sourceId = String(sourceIdRaw || '');
     const targetId = String(targetIdRaw || '');
     if (!sourceId || !targetId || sourceId === targetId) return;
@@ -938,7 +979,7 @@ export function useBlockEditorSidebarController({
     if (!targetParentId || sourceId === targetParentId) return;
 
     const siblings: string[] = Array.isArray(nodes?.[targetParentId]?.childIds)
-      ? nodes[targetParentId].childIds.map((id: any) => String(id))
+      ? nodes[targetParentId].childIds.map((id: string) => String(id))
       : [];
     const targetIndex = siblings.indexOf(targetId);
     if (targetIndex < 0) return;
@@ -952,7 +993,7 @@ export function useBlockEditorSidebarController({
     onReparentBlock && onReparentBlock({ sourceId, targetParentId, targetBeforeId });
   };
 
-  const renderTreeNode = (id: any, depth = 0) => {
+  const renderTreeNode = (id: string, depth = 0) => {
     if (!layersTree?.nodes?.[id]) return null;
     const node = layersTree.nodes[id];
     const isSelected = selectedBlock?.id === id;
@@ -977,16 +1018,16 @@ export function useBlockEditorSidebarController({
       <View key={id} style={{ marginLeft: depth * 10, marginBottom: 6 }}>
         <div
           draggable={true}
-          onDragStart={(event: any) => {
+          onDragStart={(event: React.DragEvent<HTMLDivElement>) => {
             const sourceId = String(id);
             setDragSourceId(sourceId);
             setTreeDropHint(null);
             try {
               event.dataTransfer.effectAllowed = 'move';
               event.dataTransfer.setData('text/plain', sourceId);
-            } catch (_) {}
+            } catch (_) { }
           }}
-          onDragOver={(event: any) => {
+          onDragOver={(event: React.DragEvent<HTMLDivElement>) => {
             if (!dragSourceId || dragSourceId === String(id)) return;
             if (isDescendantNode(dragSourceId, String(id))) return;
             const zone = calculateDropZone(event);
@@ -994,7 +1035,7 @@ export function useBlockEditorSidebarController({
             event.dataTransfer.dropEffect = 'move';
             setTreeDropHint({ targetId: String(id), zone });
           }}
-          onDrop={(event: any) => {
+          onDrop={(event: React.DragEvent<HTMLDivElement>) => {
             event.preventDefault();
             const sourceId = dragSourceId || event?.dataTransfer?.getData?.('text/plain');
             const zone = treeDropHint?.targetId === String(id) ? treeDropHint.zone : calculateDropZone(event);
@@ -1008,42 +1049,47 @@ export function useBlockEditorSidebarController({
             setDragSourceId(null);
           }}
         >
-        <TouchableOpacity
-          style={[
-            blockEditorPanelStyles.layerRow,
-            isSelected && blockEditorPanelStyles.layerRowSelected,
-            isDrop && blockEditorPanelStyles.layerRowDropTarget,
-            dragHighlightStyle as any,
-          ]}
-          onPress={(event: any) => {
-            const nativeEvent = event?.nativeEvent || event;
-            if ((nativeEvent?.ctrlKey || nativeEvent?.metaKey) && node?.sourceFilePath && onOpenFile) {
-              onOpenFile(node.sourceFilePath);
-              return;
-            }
-            if (reparentMode) {
-              setReparentTargetId(id);
-            } else if (onSendCommand) {
-              onSendCommand({ type: 'MRPAK_CMD_SELECT', id });
-            }
-          }}
-        >
-          <Text style={blockEditorPanelStyles.layerRowText} numberOfLines={1}>{displayTitle}</Text>
-          {reparentMode && (
-            <Text style={blockEditorPanelStyles.reparentMark}>
-              {reparentTargetId === id ? '✓' : ''}
-            </Text>
-          )}
           <TouchableOpacity
-            style={blockEditorPanelStyles.layerEditBtn}
-            onPress={() => {
-              setEditingLayerId(id);
-              setEditingLayerName(customName || '');
+            style={[
+              blockEditorPanelStyles.layerRow,
+              isSelected && blockEditorPanelStyles.layerRowSelected,
+              isDrop && blockEditorPanelStyles.layerRowDropTarget,
+              dragHighlightStyle as unknown as object,
+            ]}
+            onPress={(event: unknown) => {
+              const eventLike = event as {
+                nativeEvent?: { ctrlKey?: boolean; metaKey?: boolean };
+                ctrlKey?: boolean;
+                metaKey?: boolean;
+              };
+              const nativeEvent = eventLike?.nativeEvent || eventLike;
+              if ((nativeEvent?.ctrlKey || nativeEvent?.metaKey) && node?.sourceFilePath && onOpenFile) {
+                onOpenFile(node.sourceFilePath);
+                return;
+              }
+              if (reparentMode) {
+                setReparentTargetId(id);
+              } else if (onSendCommand) {
+                onSendCommand({ type: 'MRPAK_CMD_SELECT', id });
+              }
             }}
           >
-            <Text style={styles.layerEditBtnText}>✎</Text>
+            <Text style={blockEditorPanelStyles.layerRowText} numberOfLines={1}>{displayTitle}</Text>
+            {reparentMode && (
+              <Text style={blockEditorPanelStyles.reparentMark}>
+                {reparentTargetId === id ? '✓' : ''}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={blockEditorPanelStyles.layerEditBtn}
+              onPress={() => {
+                setEditingLayerId(id);
+                setEditingLayerName(customName || '');
+              }}
+            >
+              <Text style={styles.layerEditBtnText}>✎</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
         </div>
 
         {editingLayerId === id && (
@@ -1077,7 +1123,7 @@ export function useBlockEditorSidebarController({
 
         {!node?.isIsolatedComponent && Array.isArray(node.childIds) && node.childIds.length > 0 && (
           <View style={{ marginTop: 6 }}>
-            {node.childIds.map((cid: any) => renderTreeNode(cid, depth + 1))}
+            {node.childIds.map((cid: string) => renderTreeNode(cid, depth + 1))}
           </View>
         )}
       </View>
@@ -1149,6 +1195,8 @@ export function useBlockEditorSidebarController({
     handleMoveUnitChange,
     handlePositionPreset,
     onSendCommand,
+    onInsertBlock,
+    externalDropTargetState,
     styleMode,
     setStyleMode,
     styleRows,
@@ -1222,31 +1270,129 @@ export function useBlockEditorSidebarController({
   };
 }
 
+import { useState, useRef, useEffect, useMemo, memo } from 'react';
+
 function BlockEditorPanelComponent({
   fileType,
   html,
+  selectedBlock,
   onMessage,
   outgoingMessage,
-}: Pick<BlockEditorPanelProps, 'fileType' | 'html' | 'onMessage' | 'outgoingMessage'>) {
+}: Pick<BlockEditorPanelProps, 'fileType' | 'html' | 'selectedBlock' | 'onMessage' | 'outgoingMessage'>) {
   const webSource = useMemo(() => ({ html }), [html]);
   const webViewKey = useMemo(
-    () => `block-editor-webview-${fileType}-${html ? html.length : 0}`,
-    [fileType, html]
+    () => `block-editor-webview-${fileType}`,
+    [fileType]
   );
+
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panStartRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleGlobalMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (data && data.type === 'MRPAK_CANVAS_ZOOM') {
+         setZoom(z => {
+           let newZ = z * data.delta;
+           return Math.min(Math.max(newZ, 0.1), 5);
+         });
+      } else if (data && data.type === 'MRPAK_CANVAS_PAN') {
+         setPan(p => ({ x: p.x + data.dx, y: p.y + data.dy }));
+      }
+    };
+    window.addEventListener('message', handleGlobalMessage);
+    return () => window.removeEventListener('message', handleGlobalMessage);
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+        setZoom(z => Math.min(Math.max(z * zoomDelta, 0.1), 5));
+      }
+    };
+
+    let localIsPanning = false;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 1 || e.altKey) {
+        e.preventDefault();
+        localIsPanning = true;
+        setIsPanning(true);
+        panStartRef.current = { x: e.clientX, y: e.clientY };
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!localIsPanning) return;
+      e.preventDefault();
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+      setPan(p => ({ x: p.x + dx, y: p.y + dy }));
+    };
+
+    const handleMouseUp = () => {
+      if (localIsPanning) {
+        localIsPanning = false;
+        setIsPanning(false);
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    el.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove, { passive: false });
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   return (
     <View style={blockEditorPanelStyles.preview}>
-      <WebView
-        key={webViewKey}
-        source={webSource}
-        style={blockEditorPanelStyles.webview}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        startInLoadingState={false}
-        allowExternalScripts={true}
-        onMessage={onMessage}
-        outgoingMessage={outgoingMessage}
-      />
+      <div 
+        ref={containerRef}
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          overflow: 'hidden', 
+          cursor: isPanning ? 'grabbing' : 'default',
+          position: 'relative'
+        }}
+      >
+        <div style={{
+          width: '100%',
+          height: '100%',
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: '50% 50%',
+          transition: 'transform 0.05s linear',
+          willChange: 'transform'
+        }}>
+          <WebView
+            key={webViewKey}
+            source={webSource}
+            style={blockEditorPanelStyles.webview}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={false}
+            allowExternalScripts={true}
+            onMessage={onMessage}
+            outgoingMessage={outgoingMessage}
+            selectedBlockId={selectedBlock?.id || null}
+          />
+        </div>
+      </div>
     </View>
   );
 }
@@ -1256,8 +1402,10 @@ const BlockEditorPanel = memo(
   (prevProps, nextProps) =>
     prevProps.fileType === nextProps.fileType &&
     prevProps.html === nextProps.html &&
+    prevProps.selectedBlock?.id === nextProps.selectedBlock?.id &&
     prevProps.onMessage === nextProps.onMessage &&
-    prevProps.outgoingMessage === nextProps.outgoingMessage
+    (prevProps.outgoingMessage as { ts?: number } | null)?.ts ===
+    (nextProps.outgoingMessage as { ts?: number } | null)?.ts
 );
 
 export default BlockEditorPanel;

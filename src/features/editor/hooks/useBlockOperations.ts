@@ -33,6 +33,7 @@ type UseBlockOperationsParams = {
   setShowSaveIndicator: (show: boolean) => void;
   onProjectFilesChanged?: () => void;
   setError: (error: string | null) => void;
+  unsavedContent: string | null;
 };
 
 export function useBlockOperations({
@@ -55,6 +56,7 @@ export function useBlockOperations({
   setShowSaveIndicator,
   onProjectFilesChanged,
   setError,
+  unsavedContent,
 }: UseBlockOperationsParams) {
   const {
     fileType,
@@ -112,7 +114,7 @@ export function useBlockOperations({
     return null;
   }, [blockMapForFile, layersTree?.nodes]);
 
-  const applyBlockPatch = useCallback(async (blockId: any, patch: any, isIntermediate = false) => {
+  const applyBlockPatch = useCallback(async (blockId: any, patch: any, isIntermediate = false, isUndoRedo = false) => {
     try {
       if (!blockId) return;
       const mappedBlockId = resolveToMappedBlockId(blockId) || String(blockId);
@@ -172,12 +174,14 @@ export function useBlockOperations({
         updateMonacoEditorWithScroll(newContent);
         await manager.updateCodeASTFromCode(newContent || '', true);
         const previousValue = derivePreviousStylePatch(mappedBlockId, patch);
-        addToHistoryDebounced({ type: 'patch', blockId: mappedBlockId, patch, previousValue }, true);
+        if (!isUndoRedo) addToHistoryDebounced({ type: 'patch', blockId: mappedBlockId, patch, previousValue }, true);
         return;
       }
 
       isUpdatingFromConstructorRef.current = true;
       updateMonacoEditorWithScroll(newContent);
+      // Send the patch to the iframe so it updates instantly without reload
+      sendIframeCommand({ type: MRPAK_CMD.APPLY, id: mappedBlockId, patch, isIntermediate: false });
       updateStagedPatches((prev) => ({
         ...prev,
         [mappedBlockId]: { ...(prev?.[mappedBlockId] || {}), ...patch },
@@ -188,7 +192,7 @@ export function useBlockOperations({
         ...prev,
       ]);
       const previousValue = derivePreviousStylePatch(mappedBlockId, patch);
-      addToHistoryDebounced({ type: 'patch', blockId: mappedBlockId, patch, previousValue }, false);
+      if (!isUndoRedo) addToHistoryDebounced({ type: 'patch', blockId: mappedBlockId, patch, previousValue }, false);
       setTimeout(() => {
         isUpdatingFromConstructorRef.current = false;
       }, 100);
@@ -236,8 +240,18 @@ export function useBlockOperations({
       }
       if (!isFrameworkSupported(fileType as string)) return;
       const framework = createFramework(fileType as string, filePath);
+      
+      let baseCode = String(fileContent ?? '');
+      if (unsavedContent !== null) {
+        baseCode = unsavedContent;
+      } else if (monacoEditorRef?.current) {
+        try {
+          baseCode = String(monacoEditorRef.current.getValue() ?? '');
+        } catch {}
+      }
+
       const result = await framework.commitPatches({
-        originalCode: String(fileContent ?? ''),
+        originalCode: baseCode,
         stagedPatches: currentStagedPatches,
         stagedOps: ops,
         blockMapForFile: blockMapForFile || {},
@@ -254,6 +268,11 @@ export function useBlockOperations({
 
       const writeRes = await writeFile(filePath, finalContent, { backup: true });
       if (!writeRes?.success) throw new Error(writeRes?.error || 'File write error');
+
+      const isOnlyStylePatches = entries.length > 0 && ops.length === 0 && imports.length === 0;
+      if (isOnlyStylePatches) {
+        useEditorStore.getState().setSkipPreviewGeneration(true);
+      }
 
       setFileContent(finalContent);
       setRenderVersion((v) => v + 1);
@@ -313,7 +332,7 @@ export function useBlockOperations({
     return `mrpak:temp:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`;
   }, []);
 
-  const stageDeleteBlock = useCallback((blockId: any) => {
+  const stageDeleteBlock = useCallback((blockId: any, isUndoRedo = false) => {
     if (!blockId) return;
     const mappedBlockId = resolveToMappedBlockId(blockId) || blockId;
     const now = Date.now();
@@ -341,7 +360,7 @@ export function useBlockOperations({
             { type: 'delete', blockId: mappedBlockId, fileType, filePath } as any,
           ]);
           setHasStagedChanges(true);
-          addToHistory({ type: 'delete', blockId: mappedBlockId, parentId: '', snippet: '', fileType, filePath });
+          if (!isUndoRedo) addToHistory({ type: 'delete', blockId: mappedBlockId, parentId: '', snippet: '', fileType, filePath });
         } catch (e) {
           const errorMessage = e instanceof Error ? e.message : String(e);
           setError(`Delete block failed: ${errorMessage}`);
@@ -356,7 +375,7 @@ export function useBlockOperations({
       { type: 'delete', blockId: mappedBlockId, fileType, filePath } as any,
     ]);
     setHasStagedChanges(true);
-    addToHistory({
+    if (!isUndoRedo) addToHistory({
       type: 'delete',
       blockId: mappedBlockId,
       parentId: layersTree?.nodes?.[blockId]?.parentId || '',
@@ -380,7 +399,7 @@ export function useBlockOperations({
     updateStagedOps,
   ]);
 
-  const stageInsertBlock = useCallback(({ targetId, mode, snippet, skipIframeInsert = false }: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean }) => {
+  const stageInsertBlock = useCallback(({ targetId, mode, snippet, skipIframeInsert = false, isUndoRedo = false }: { targetId: string; mode: 'child' | 'sibling'; snippet: string; skipIframeInsert?: boolean, isUndoRedo?: boolean }) => {
     if (!targetId) return;
     const operationKey = `${targetId}:${mode}:${snippet}`;
     const now = Date.now();
@@ -406,7 +425,7 @@ export function useBlockOperations({
       } as any,
     ]);
     setHasStagedChanges(true);
-    addToHistory({
+    if (!isUndoRedo) addToHistory({
       type: 'insert',
       blockId: newId,
       targetId: mappedTargetId,
@@ -436,7 +455,7 @@ export function useBlockOperations({
     updateStagedOps,
   ]);
 
-  const stageReparentBlock = useCallback(({ sourceId, targetParentId, targetBeforeId = null }: { sourceId: string; targetParentId: string; targetBeforeId?: string | null }) => {
+  const stageReparentBlock = useCallback(({ sourceId, targetParentId, targetBeforeId = null, isUndoRedo = false }: { sourceId: string; targetParentId: string; targetBeforeId?: string | null, isUndoRedo?: boolean }) => {
     if (!sourceId || !targetParentId || sourceId === targetParentId) return;
     const operationKey = `${sourceId}:${targetParentId}:${targetBeforeId ?? ''}`;
     const now = Date.now();
@@ -450,7 +469,7 @@ export function useBlockOperations({
       { type: 'reparent', sourceId, targetParentId, targetBeforeId, fileType, filePath } as any,
     ]);
     setHasStagedChanges(true);
-    addToHistory({
+    if (!isUndoRedo) addToHistory({
       type: 'reparent',
       blockId: sourceId,
       oldParentId: layersTree?.nodes?.[sourceId]?.parentId || null,
@@ -459,7 +478,7 @@ export function useBlockOperations({
       fileType,
       filePath,
     });
-    if (!targetBeforeId) sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId });
+    sendIframeCommand({ type: MRPAK_CMD.REPARENT, sourceId, targetParentId, targetBeforeId });
   }, [
     addToHistory,
     filePath,
@@ -471,7 +490,7 @@ export function useBlockOperations({
     updateStagedOps,
   ]);
 
-  const stageSetText = useCallback(({ blockId, text }: { blockId: string; text: string }) => {
+  const stageSetText = useCallback(({ blockId, text, isUndoRedo = false }: { blockId: string; text: string, isUndoRedo?: boolean }) => {
     if (!blockId) return;
     const mappedBlockId = resolveToMappedBlockId(blockId) || String(blockId);
     const previousText = textSnapshots[mappedBlockId] || textSnapshots[blockId] || '';
@@ -480,7 +499,7 @@ export function useBlockOperations({
       { type: 'setText', blockId: mappedBlockId, text: String(text ?? ''), fileType, filePath } as any,
     ]);
     setHasStagedChanges(true);
-    addToHistory({
+    if (!isUndoRedo) addToHistory({
       type: 'setText',
       blockId: mappedBlockId,
       text: String(text ?? ''),

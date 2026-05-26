@@ -23,7 +23,8 @@ function AppRN() {
     aggressivePreviewMode, setAggressivePreviewMode,
     canvasDevice, setCanvasDevice,
     canvasWidth, setCanvasWidth,
-    canvasHeight, setCanvasHeight
+    canvasHeight, setCanvasHeight,
+    undoStack, redoStack
   } = useEditorStore();
   
   const [canvasWidthInput, setCanvasWidthInput] = useState<string>('1280');
@@ -257,23 +258,39 @@ function AppRN() {
               >
                 <Text style={[styles.modeButtonText, viewMode === 'changes' && styles.modeButtonTextActive]}>Изменения</Text>
               </TouchableOpacity>
+              <View style={styles.splitButtons}>
+                <TouchableOpacity
+                  style={[styles.modeButton, undoStack.length === 0 && { opacity: 0.5 }]}
+                  disabled={undoStack.length === 0}
+                  onPress={() => document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ', ctrlKey: true }))}
+                >
+                  <Text style={styles.modeButtonText}>↩</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modeButton, redoStack.length === 0 && { opacity: 0.5 }]}
+                  disabled={redoStack.length === 0}
+                  onPress={() => document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ', ctrlKey: true, shiftKey: true }))}
+                >
+                  <Text style={styles.modeButtonText}>↪</Text>
+                </TouchableOpacity>
+              </View>
               {viewMode === 'split' && (
                 <View style={styles.splitButtons}>
                   <TouchableOpacity
                     style={[styles.modeButton, showSplitSidebar && styles.modeButtonActive]}
-                    onPress={() => setShowSplitSidebar((prev) => !prev)}
+                    onPress={() => setShowSplitSidebar(!showSplitSidebar)}
                   >
                     <Text style={[styles.modeButtonText, showSplitSidebar && styles.modeButtonTextActive]}>Панель</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.modeButton, showSplitPreview && styles.modeButtonActive]}
-                    onPress={() => setShowSplitPreview((prev) => !prev)}
+                    onPress={() => setShowSplitPreview(!showSplitPreview)}
                   >
                     <Text style={[styles.modeButtonText, showSplitPreview && styles.modeButtonTextActive]}>Превью</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.modeButton, showSplitCode && styles.modeButtonActive]}
-                    onPress={() => setShowSplitCode((prev) => !prev)}
+                    onPress={() => setShowSplitCode(!showSplitCode)}
                   >
                     <Text style={[styles.modeButtonText, showSplitCode && styles.modeButtonTextActive]}>Код</Text>
                   </TouchableOpacity>
@@ -318,7 +335,7 @@ function AppRN() {
               {isInternalSourceFile(selectedFile.filePath) && (
                 <TouchableOpacity
                   style={[styles.modeButton, aggressivePreviewMode && styles.modeButtonActive]}
-                  onPress={() => setAggressivePreviewMode((prev) => !prev)}
+                  onPress={() => setAggressivePreviewMode(!aggressivePreviewMode)}
                 >
                   <Text style={[styles.modeButtonText, aggressivePreviewMode && styles.modeButtonTextActive]}>
                     Агрессивный режим

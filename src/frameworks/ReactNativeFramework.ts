@@ -10,6 +10,19 @@ import { detectComponents } from '../features/editor/lib/react-processor';
 import { generateBlockEditorScript } from '../features/editor/lib/block-editor-script';
 import { toReactStyleObjectText } from '../blockEditor/styleUtils';
 
+interface GenerateHTMLOptions {
+  viewMode?: string;
+  selectedComponentName?: string | null;
+  aggressivePreviewMode?: boolean;
+  projectRoot?: string | null;
+}
+
+interface BuildInsertSnippetParams {
+  tag?: string;
+  text?: string;
+  stylePatch?: Record<string, unknown>;
+}
+
 /**
  * Реализация Framework для React Native файлов
  * Использует React Native Web для рендеринга в браузере
@@ -19,7 +32,7 @@ export class ReactNativeFramework extends ReactFramework {
    * Генерирует HTML для превью/редактора с поддержкой React Native Web
    * Перенесено из RenderFile.jsx: createReactNativeHTML
    */
-  async generateHTML(code: string, filePath: string, options: any = {}) {
+  async generateHTML(code: string, filePath: string, options: GenerateHTMLOptions = {}) {
     const viewMode = options.viewMode || 'preview';
     const requestedComponentName =
       typeof options.selectedComponentName === 'string' && options.selectedComponentName.trim()
@@ -1024,7 +1037,7 @@ export class ReactNativeFramework extends ReactFramework {
    * Строит JSX сниппет для вставки нового блока (React Native)
    * Переопределяет метод из ReactFramework для поддержки React Native компонентов
    */
-  buildInsertSnippet({ tag, text, stylePatch } : any) {
+  buildInsertSnippet({ tag, text, stylePatch }: BuildInsertSnippetParams) {
     const styleObj = stylePatch ? toReactStyleObjectText(stylePatch) : '';
     const styleAttr = styleObj ? ` style={{${styleObj}}}` : '';
     const tagName = tag || 'View';

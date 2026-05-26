@@ -13,6 +13,7 @@ import { ensureComponentImportInCode, isInternalSourceFilePath } from '../utils'
 import { AstBidirectionalManager } from '../../../blockEditor/AstBidirectional';
 import { upsertLayerName } from '../../../blockEditor/LayerNamesStore';
 import { createFramework, isFrameworkSupported } from '../../../frameworks/FrameworkFactory';
+import { MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
 
 // Hooks
 import { useHistory } from '../hooks/useHistory';
@@ -103,6 +104,13 @@ export function EditorWorkspace({
   const lastReparentOperationRef = useRef<any>(null);
   const astManagerRef = useRef<AstBidirectionalManager | null>(null);
 
+  // Refs for block operations to pass to useHistory
+  const applyBlockPatchRef = useRef<any>(null);
+  const stageInsertBlockRef = useRef<any>(null);
+  const stageDeleteBlockRef = useRef<any>(null);
+  const stageReparentBlockRef = useRef<any>(null);
+  const stageSetTextRef = useRef<any>(null);
+
   // Zustand state select
   const {
     fileContent,
@@ -169,12 +177,14 @@ export function EditorWorkspace({
     aggressivePreviewMode,
   ]);
 
+  const storeViewMode = useEditorStore((s) => s.viewMode);
+
   // Sync back viewMode modifications to parent component if needed
   useEffect(() => {
     if (onViewModeChange) {
-      onViewModeChange(useEditorStore.getState().viewMode);
+      onViewModeChange(storeViewMode);
     }
-  }, [useEditorStore((s) => s.viewMode), onViewModeChange]);
+  }, [storeViewMode, onViewModeChange]);
 
   const {
     undo,
@@ -184,8 +194,11 @@ export function EditorWorkspace({
     clearHistory,
   } = useHistory({
     filePath,
-    monacoEditorRef,
-    isUpdatingFromFileRef,
+    applyBlockPatchRef,
+    stageInsertBlockRef,
+    stageDeleteBlockRef,
+    stageReparentBlockRef,
+    stageSetTextRef,
   });
 
   const {
@@ -205,6 +218,11 @@ export function EditorWorkspace({
     setShowSaveIndicator,
   });
 
+  const { handleMonacoCtrlClick, revealSelectedBlockInCode } = useMonacoEditor({
+    monacoEditorRef,
+    isUpdatingFromFileRef,
+  });
+
   const {
     resolvePathForFramework,
   } = useDependencies();
@@ -215,9 +233,12 @@ export function EditorWorkspace({
       const scroll = monacoEditorRef.current.getScrollTop();
       monacoEditorRef.current.setValue(newContent);
       monacoEditorRef.current.setScrollTop(scroll);
-      isUpdatingFromFileRef.current = false;
+      setUnsavedContent(newContent);
+      setTimeout(() => {
+        isUpdatingFromFileRef.current = false;
+      }, 100);
     }
-  }, []);
+  }, [setUnsavedContent]);
 
   const {
     resolveToMappedBlockId,
@@ -244,12 +265,21 @@ export function EditorWorkspace({
     lastDeleteOperationRef,
     lastReparentOperationRef,
     setUnsavedContent,
+    unsavedContent,
     setIsModified,
     setRenderVersion,
     setShowSaveIndicator,
     onProjectFilesChanged,
     setError,
   });
+
+  useEffect(() => {
+    applyBlockPatchRef.current = applyBlockPatch;
+    stageInsertBlockRef.current = stageInsertBlock;
+    stageDeleteBlockRef.current = stageDeleteBlock;
+    stageReparentBlockRef.current = stageReparentBlock;
+    stageSetTextRef.current = stageSetText;
+  }, [applyBlockPatch, stageInsertBlock, stageDeleteBlock, stageReparentBlock, stageSetText]);
 
   useAstOperations({
     filePath,
@@ -265,7 +295,7 @@ export function EditorWorkspace({
 
   usePreviewGeneration({
     filePath,
-    previewSourceCode: fileContent || '',
+    previewSourceCode: unsavedContent !== null ? unsavedContent : (fileContent || ''),
     selectedComponentName,
     setIsProcessingReact,
     setReactHTML,
@@ -285,19 +315,25 @@ export function EditorWorkspace({
     reactNativeHTML,
   });
 
+  const saveFileRef = useRef<typeof saveFile | null>(null);
+  useEffect(() => {
+    saveFileRef.current = saveFile;
+  }, [saveFile]);
+
   const {
     handleEditorMessageStable,
   } = useEditorMessage({
-    filePath,
-    astManagerRef,
-    isUpdatingFromConstructorRef,
-    isUpdatingFromFileRef,
+    commitStagedPatches,
     monacoEditorRef,
-    applyBlockPatch,
+    unsavedContent,
+    saveFileRef: saveFileRef as React.MutableRefObject<typeof saveFile | null>,
+    filePath,
+    dependencyPaths,
+    setError,
     stageInsertBlock,
-    stageDeleteBlock,
     stageReparentBlock,
-    stageSetText,
+    setRenderVersion,
+    applyBlockPatch,
   });
 
   useFileWatchSync({
@@ -371,7 +407,7 @@ export function EditorWorkspace({
   const handleRenameLayer = useCallback(
     async (mrpakId: string, name: string) => {
       try {
-        if (!projectRoot || !filePath) return;
+        if ((projectRoot === null || projectRoot === undefined) || !filePath) return;
         setLayerNames({ ...layerNames, [mrpakId]: String(name ?? '') });
         await upsertLayerName({ projectRoot, targetFilePath: filePath, mrpakId, name });
       } catch (e) {
@@ -686,11 +722,7 @@ export function EditorWorkspace({
     );
   }, [aggressivePreviewMode, previewOpenError, shouldOfferAggressiveMode]);
 
-  const handleMonacoCtrlClick = useCallback((mrpakId: string) => {
-    setSelectedBlock({ id: mrpakId });
-    setSelectedBlockIds([mrpakId]);
-    sendIframeCommand({ type: MRPAK_CMD.SELECT_BLOCK, blockId: mrpakId });
-  }, [setSelectedBlock, setSelectedBlockIds, sendIframeCommand]);
+  // handleMonacoCtrlClick is now provided by useMonacoEditor
 
   const renderBlockEditorSplitMode = useCallback((editorType: 'html' | 'react' | 'react-native', html: string) => {
     const hasAnyVisiblePanel = showSplitSidebar || showSplitPreview || showSplitCode;
@@ -899,7 +931,7 @@ export function EditorWorkspace({
 
   // Render HTML Files
   if (fileType === 'html' && fileContent) {
-    if (isProcessingHTML) {
+    if (!processedHTML && isProcessingHTML) {
       return (
         <View style={styles.htmlContainer}>
           <View style={styles.fileTypeBadge}>
@@ -949,6 +981,16 @@ export function EditorWorkspace({
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('html', editorHTML || htmlToRender)
+        ) : viewMode === 'code' ? (
+          <View style={styles.editorContainer}>
+            <MonacoEditorWrapper
+              value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+              language={monacoLanguage}
+              filePath={filePath}
+              onChange={handleEditorChange}
+              onSave={saveFile}
+            />
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>
@@ -979,7 +1021,7 @@ export function EditorWorkspace({
 
   // Render React Files (JSX/TSX)
   if (fileType === 'react' && fileContent) {
-    if (isProcessingReact || !reactHTML) {
+    if (!reactHTML && isProcessingReact) {
       return (
         <View style={styles.htmlContainer}>
           <View style={styles.fileTypeBadge}>
@@ -1044,6 +1086,16 @@ export function EditorWorkspace({
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react', editorHTML || reactHTML)
+        ) : viewMode === 'code' ? (
+          <View style={styles.editorContainer}>
+            <MonacoEditorWrapper
+              value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+              language={monacoLanguage}
+              filePath={filePath}
+              onChange={handleEditorChange}
+              onSave={saveFile}
+            />
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>
@@ -1069,7 +1121,7 @@ export function EditorWorkspace({
 
   // Render React Native Files
   if (fileType === 'react-native' && fileContent) {
-    if (isProcessingReactNative || !reactNativeHTML) {
+    if (!reactNativeHTML && isProcessingReactNative) {
       return (
         <View style={styles.htmlContainer}>
           <View style={styles.fileTypeBadge}>
@@ -1134,6 +1186,16 @@ export function EditorWorkspace({
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react-native', editorHTML || reactNativeHTML)
+        ) : viewMode === 'code' ? (
+          <View style={styles.editorContainer}>
+            <MonacoEditorWrapper
+              value={unsavedContent !== null ? unsavedContent : (fileContent || '')}
+              language={monacoLanguage}
+              filePath={filePath}
+              onChange={handleEditorChange}
+              onSave={saveFile}
+            />
+          </View>
         ) : viewMode === 'changes' ? (
           <View style={styles.changesContainer}>
             <Text style={styles.changesTitle}>Change history</Text>

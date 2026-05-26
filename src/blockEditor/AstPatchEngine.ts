@@ -1,34 +1,55 @@
 // Применение патчей напрямую к AST (для bidirectional editing)
 // Работает с constructorAST и возвращает обновленное AST
 
-import { parse } from '@babel/parser';
-import traverse from '@babel/traverse';
+import { parse, type ParserPlugin } from '@babel/parser';
+import traverse, { type NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import { isTypeScriptFile } from './AstUtils';
 
+type StylePatch = Record<string, unknown>;
+
+type AstMutationResult =
+  | { ok: true; ast: t.File }
+  | { ok: false; error: string };
+
+type JsxContainerPath = NodePath<t.JSXElement> | NodePath<t.JSXFragment>;
+
+type FoundOpeningElement = {
+  path: NodePath<t.JSXOpeningElement>;
+  node: t.JSXOpeningElement;
+};
+
+function findJsxContainerPath(path: NodePath<t.Node>): JsxContainerPath | null {
+  let current: NodePath<t.Node> | null = path;
+  while (current && !current.isJSXElement() && !current.isJSXFragment()) {
+    current = current.parentPath;
+  }
+  return current ? (current as JsxContainerPath) : null;
+}
+
 /**
  * Находит JSX элемент по ID в AST
- * @param {Object} ast - AST дерево
- * @param {string} id - ID элемента
- * @returns {Object|null} { path, node } или null
  */
-function findElementByIdInAst(ast: any, id: any) {
-  let found: any = null;
+function findElementByIdInAst(ast: t.File, id: string): FoundOpeningElement | null {
+  let found: FoundOpeningElement | null = null;
 
   traverse(ast, {
-    JSXOpeningElement(path: any) {
+    JSXOpeningElement(path: NodePath<t.JSXOpeningElement>) {
       const node = path.node;
 
       for (const attr of node.attributes) {
-        if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
-          if (attr.name.name === 'data-no-code-ui-id' || attr.name.name === 'data-mrpak-id') {
-            const value = attr.value;
-            if (t.isStringLiteral(value) && value.value === id) {
-              found = { path, node };
-              path.stop();
-              return;
-            }
-          }
+        if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) continue;
+        if (attr.name.name !== 'data-no-code-ui-id' && attr.name.name !== 'data-mrpak-id') continue;
+
+        const value = attr.value;
+        const idValue = t.isStringLiteral(value)
+          ? value.value
+          : (t.isJSXExpressionContainer(value) && t.isStringLiteral(value.expression) ? value.expression.value : null);
+
+        if (idValue === id) {
+          found = { path, node };
+          path.stop();
+          return;
         }
       }
     }
@@ -39,98 +60,65 @@ function findElementByIdInAst(ast: any, id: any) {
 
 /**
  * Извлекает текущие стили из style атрибута
- * @param {t.JSXOpeningElement} node - узел открывающего тега
- * @returns {Object} объект со стилями
  */
-function extractStyleFromNode(node: any) {
-  const styles: any = {};
+function extractStyleFromNode(node: t.JSXOpeningElement): StylePatch {
+  const styles: StylePatch = {};
 
   for (const attr of node.attributes) {
-    if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'style') {
-      const value = attr.value;
+    if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name) || attr.name.name !== 'style') continue;
+    const value = attr.value;
+    if (!t.isJSXExpressionContainer(value) || !t.isObjectExpression(value.expression)) continue;
 
-      if (t.isJSXExpressionContainer(value)) {
-        const expr = value.expression;
+    for (const prop of value.expression.properties) {
+      if (!t.isObjectProperty(prop)) continue;
+      const key = prop.key;
+      const val = prop.value;
+      const keyName =
+        t.isIdentifier(key) ? key.name :
+        t.isStringLiteral(key) ? key.value :
+        null;
+      if (!keyName) continue;
 
-        if (t.isObjectExpression(expr)) {
-          for (const prop of expr.properties) {
-            if (t.isObjectProperty(prop)) {
-              const key = prop.key;
-              const val = prop.value;
-
-              let keyName: any = null;
-              if (t.isIdentifier(key)) {
-                keyName = key.name;
-              } else if (t.isStringLiteral(key)) {
-                keyName = key.value;
-              }
-
-              if (keyName) {
-                if (t.isStringLiteral(val)) {
-                  styles[keyName] = val.value;
-                } else if (t.isNumericLiteral(val)) {
-                  styles[keyName] = val.value;
-                } else if (t.isBooleanLiteral(val)) {
-                  styles[keyName] = val.value;
-                } else {
-                  // Для сложных выражений сохраняем как строку
-                  styles[keyName] = String(val);
-                }
-              }
-            }
-          }
-        }
-      }
+      if (t.isStringLiteral(val)) styles[keyName] = val.value;
+      else if (t.isNumericLiteral(val)) styles[keyName] = val.value;
+      else if (t.isBooleanLiteral(val)) styles[keyName] = val.value;
+      else styles[keyName] = String(val.type);
     }
   }
 
   return styles;
 }
 
+function toStyleValueNode(value: unknown): t.Expression {
+  if (typeof value === 'string') return t.stringLiteral(value);
+  if (typeof value === 'number') return t.numericLiteral(value);
+  if (typeof value === 'boolean') return t.booleanLiteral(value);
+  return t.stringLiteral(String(value));
+}
+
 /**
  * Обновляет style атрибут в JSX элементе
- * @param {t.JSXOpeningElement} node - узел открывающего тега
- * @param {Object} patch - объект с новыми стилями { property: value }
  */
-function updateStyleAttribute(node: any, patch: any) {
-  // Извлекаем текущие стили
+function updateStyleAttribute(node: t.JSXOpeningElement, patch: StylePatch): void {
   const currentStyles = extractStyleFromNode(node);
+  const updatedStyles: StylePatch = { ...currentStyles, ...patch };
 
-  // Объединяем с новыми стилями
-  const updatedStyles = { ...currentStyles, ...patch };
-
-  // Удаляем null значения
-  for (const key in updatedStyles) {
+  for (const key of Object.keys(updatedStyles)) {
     if (updatedStyles[key] === null || updatedStyles[key] === undefined) {
       delete updatedStyles[key];
     }
   }
 
-  // Создаем свойства объекта стилей
-  const properties = Object.entries(updatedStyles).map(([key, value]: any) => {
-    let valueNode: any;
+  const properties = Object.entries(updatedStyles).map(([key, value]) =>
+    t.objectProperty(t.identifier(key), toStyleValueNode(value))
+  );
+  const newStyleAttr = t.jsxAttribute(
+    t.jsxIdentifier('style'),
+    t.jsxExpressionContainer(t.objectExpression(properties))
+  );
 
-    if (typeof value === 'string') {
-      valueNode = t.stringLiteral(value);
-    } else if (typeof value === 'number') {
-      valueNode = t.numericLiteral(value);
-    } else if (typeof value === 'boolean') {
-      valueNode = t.booleanLiteral(value);
-    } else {
-      valueNode = t.stringLiteral(String(value));
-    }
-
-    return t.objectProperty(t.identifier(key), valueNode);
-  });
-
-  // Создаем объект стилей
-  const styleObject = t.objectExpression(properties);
-  const styleValue = t.jsxExpressionContainer(styleObject);
-  const newStyleAttr = t.jsxAttribute(t.jsxIdentifier('style'), styleValue);
-
-  // Ищем существующий style атрибут
   let styleAttrIndex = -1;
-  for (let i = 0; i < node.attributes.length; i++) {
+  for (let i = 0; i < node.attributes.length; i += 1) {
     const attr = node.attributes[i];
     if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'style') {
       styleAttrIndex = i;
@@ -138,277 +126,208 @@ function updateStyleAttribute(node: any, patch: any) {
     }
   }
 
-  // Заменяем или добавляем атрибут
-  if (styleAttrIndex >= 0) {
-    node.attributes[styleAttrIndex] = newStyleAttr;
-  } else {
-    node.attributes.push(newStyleAttr);
-  }
+  if (styleAttrIndex >= 0) node.attributes[styleAttrIndex] = newStyleAttr;
+  else node.attributes.push(newStyleAttr);
 }
 
-/**
- * Применяет патч стилей к constructorAST
- * @param {Object} params - параметры
- * @param {Object} params.constructorAST - AST конструктора
- * @param {string} params.blockId - ID блока
- * @param {Object} params.patch - объект со стилями
- * @returns {Object} { ok: boolean, ast?: Object, error?: string }
- */
-export function applyStylePatchToAst({ constructorAST, blockId, patch }: any) {
-  if (!constructorAST) {
-    return { ok: false, error: 'constructorAST is required' };
-  }
+export function applyStylePatchToAst({
+  constructorAST,
+  blockId,
+  patch,
+}: {
+  constructorAST: t.File;
+  blockId: string;
+  patch: StylePatch;
+}): AstMutationResult {
+  if (!constructorAST) return { ok: false, error: 'constructorAST is required' };
+  if (!blockId) return { ok: false, error: 'blockId is required' };
 
-  if (!blockId) {
-    return { ok: false, error: 'blockId is required' };
-  }
-
-  // Находим элемент по ID
   const element = findElementByIdInAst(constructorAST, blockId);
-  if (!element) {
-    return { ok: false, error: `Element with ID ${blockId} not found` };
-  }
+  if (!element) return { ok: false, error: `Element with ID ${blockId} not found` };
 
-  // Применяем патч стилей
   try {
     updateStyleAttribute(element.node, patch);
     return { ok: true, ast: constructorAST };
-  } catch (error: any) {
-    return { ok: false, error: error.message };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message };
   }
 }
 
-/**
- * Применяет операцию удаления к constructorAST
- * @param {Object} params - параметры
- * @param {Object} params.constructorAST - AST конструктора
- * @param {string} params.blockId - ID блока для удаления
- * @returns {Object} { ok: boolean, ast?: Object, error?: string }
- */
-export function applyDeleteToAst({ constructorAST, blockId }: any) {
-  if (!constructorAST) {
-    return { ok: false, error: 'constructorAST is required' };
-  }
+export function applyDeleteToAst({
+  constructorAST,
+  blockId,
+}: {
+  constructorAST: t.File;
+  blockId: string;
+}): AstMutationResult {
+  if (!constructorAST) return { ok: false, error: 'constructorAST is required' };
+  if (!blockId) return { ok: false, error: 'blockId is required' };
 
-  if (!blockId) {
-    return { ok: false, error: 'blockId is required' };
-  }
-
-  // Находим элемент по ID
   const element = findElementByIdInAst(constructorAST, blockId);
-  if (!element) {
-    return { ok: false, error: `Element with ID ${blockId} not found` };
-  }
+  if (!element) return { ok: false, error: `Element with ID ${blockId} not found` };
 
-  // Находим родительский JSX элемент
-  let jsxElementPath = element.path;
-  while (jsxElementPath && !t.isJSXElement(jsxElementPath.node) && !t.isJSXFragment(jsxElementPath.node)) {
-    jsxElementPath = jsxElementPath.parentPath;
-  }
-
-  if (!jsxElementPath) {
-    return { ok: false, error: 'JSX element not found' };
-  }
+  const jsxElementPath = findJsxContainerPath(element.path);
+  if (!jsxElementPath) return { ok: false, error: 'JSX element not found' };
 
   try {
-    // Удаляем элемент
     jsxElementPath.remove();
     return { ok: true, ast: constructorAST };
-  } catch (error: any) {
-    return { ok: false, error: error.message };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message };
   }
 }
 
-/**
- * Применяет операцию вставки к constructorAST
- * @param {Object} params - параметры
- * @param {Object} params.constructorAST - AST конструктора
- * @param {string} params.targetId - ID целевого элемента
- * @param {string} params.mode - 'child' или 'sibling'
- * @param {string} params.snippet - JSX код для вставки
- * @param {string} params.filePath - путь к файлу (для парсинга)
- * @returns {Object} { ok: boolean, ast?: Object, error?: string }
- */
-export function applyInsertToAst({ constructorAST, targetId, mode, snippet, filePath }: any) {
-  if (!constructorAST) {
-    return { ok: false, error: 'constructorAST is required' };
-  }
-
-  if (!targetId || !snippet) {
-    return { ok: false, error: 'targetId and snippet are required' };
-  }
-
-  // Парсим snippet в AST
-  const plugins: any[] = ['jsx'];
+function parseSnippet(snippet: string, filePath: string): t.JSXElement | t.JSXFragment | null {
+  const plugins: ParserPlugin[] = ['jsx'];
   if (isTypeScriptFile(filePath)) {
-    plugins.push('typescript', 'classProperties', 'decorators-legacy', 'optionalChaining', 'nullishCoalescingOperator');
+    plugins.push(
+      'typescript',
+      'classProperties',
+      'decorators-legacy',
+      'optionalChaining',
+      'nullishCoalescingOperator'
+    );
   }
 
-  let newElementAst: any;
   try {
-    newElementAst = parse(snippet, {
+    const wrapped = `function _() { return (${snippet}); }`;
+    const snippetAst = parse(wrapped, {
       sourceType: 'module',
       plugins,
-      allowImportExportEverywhere: true,
       allowReturnOutsideFunction: true,
       errorRecovery: true,
     });
-  } catch (error: any) {
-    return { ok: false, error: `Failed to parse snippet: ${error.message}` };
+
+    let extracted: t.JSXElement | t.JSXFragment | null = null;
+    traverse(snippetAst, {
+      ReturnStatement(path: NodePath<t.ReturnStatement>) {
+        const argumentNode = path.node.argument;
+        if (t.isJSXElement(argumentNode) || t.isJSXFragment(argumentNode)) {
+          extracted = argumentNode;
+          path.stop();
+        } else if (
+          t.isParenthesizedExpression(argumentNode) &&
+          (t.isJSXElement(argumentNode.expression) || t.isJSXFragment(argumentNode.expression))
+        ) {
+          extracted = argumentNode.expression;
+          path.stop();
+        }
+      }
+    });
+
+    return extracted;
+  } catch {
+    return null;
   }
+}
 
-  // Извлекаем JSX элемент из snippet
-  let newElement: any = null;
-  traverse(newElementAst, {
-    JSXElement(path: any) {
-      newElement = path.node;
-      path.stop();
-    }
-  });
+export function applyInsertToAst({
+  constructorAST,
+  targetId,
+  mode,
+  snippet,
+  filePath,
+}: {
+  constructorAST: t.File;
+  targetId: string;
+  mode: 'child' | 'sibling';
+  snippet: string;
+  filePath: string;
+}): AstMutationResult {
+  if (!constructorAST) return { ok: false, error: 'constructorAST is required' };
+  if (!targetId || !snippet) return { ok: false, error: 'targetId and snippet are required' };
 
-  if (!newElement) {
-    return { ok: false, error: 'No JSX element found in snippet' };
-  }
+  const newElement = parseSnippet(snippet, filePath);
+  if (!newElement) return { ok: false, error: 'Failed to parse snippet' };
 
-  // Находим целевой элемент
   const targetElement = findElementByIdInAst(constructorAST, targetId);
-  if (!targetElement) {
-    return { ok: false, error: `Target element with ID ${targetId} not found` };
-  }
+  if (!targetElement) return { ok: false, error: `Target element with ID ${targetId} not found` };
 
-  // Находим родительский JSX элемент
-  let targetJsxPath = targetElement.path;
-  while (targetJsxPath && !t.isJSXElement(targetJsxPath.node) && !t.isJSXFragment(targetJsxPath.node)) {
-    targetJsxPath = targetJsxPath.parentPath;
-  }
-
-  if (!targetJsxPath) {
-    return { ok: false, error: 'Target JSX element not found' };
-  }
+  const targetJsxPath = findJsxContainerPath(targetElement.path);
+  if (!targetJsxPath) return { ok: false, error: 'Target JSX element not found' };
 
   try {
     if (mode === 'child') {
       targetJsxPath.node.children.push(newElement);
-    } else if (mode === 'sibling') {
+    } else {
       const parentPath = targetJsxPath.parentPath;
-      if (parentPath && (t.isJSXElement(parentPath.node) || t.isJSXFragment(parentPath.node))) {
+      if (parentPath && (parentPath.isJSXElement() || parentPath.isJSXFragment())) {
         const index = parentPath.node.children.indexOf(targetJsxPath.node);
-        if (index >= 0) {
-          parentPath.node.children.splice(index + 1, 0, newElement);
-        } else {
-          parentPath.node.children.push(newElement);
-        }
+        if (index >= 0) parentPath.node.children.splice(index + 1, 0, newElement);
+        else parentPath.node.children.push(newElement);
       }
     }
-
     return { ok: true, ast: constructorAST };
-  } catch (error: any) {
-    return { ok: false, error: error.message };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message };
   }
 }
 
-/**
- * Применяет операцию изменения текста к constructorAST
- * @param {Object} params - параметры
- * @param {Object} params.constructorAST - AST конструктора
- * @param {string} params.blockId - ID блока
- * @param {string} params.text - новый текст
- * @returns {Object} { ok: boolean, ast?: Object, error?: string }
- */
-export function applySetTextToAst({ constructorAST, blockId, text }: any) {
-  if (!constructorAST) {
-    return { ok: false, error: 'constructorAST is required' };
-  }
+export function applySetTextToAst({
+  constructorAST,
+  blockId,
+  text,
+}: {
+  constructorAST: t.File;
+  blockId: string;
+  text: string;
+}): AstMutationResult {
+  if (!constructorAST) return { ok: false, error: 'constructorAST is required' };
+  if (!blockId) return { ok: false, error: 'blockId is required' };
 
-  if (!blockId) {
-    return { ok: false, error: 'blockId is required' };
-  }
-
-  // Находим элемент по ID
   const element = findElementByIdInAst(constructorAST, blockId);
-  if (!element) {
-    return { ok: false, error: `Element with ID ${blockId} not found` };
-  }
+  if (!element) return { ok: false, error: `Element with ID ${blockId} not found` };
 
-  // Находим JSX элемент
-  let jsxElementPath = element.path;
-  while (jsxElementPath && !t.isJSXElement(jsxElementPath.node) && !t.isJSXFragment(jsxElementPath.node)) {
-    jsxElementPath = jsxElementPath.parentPath;
-  }
-
-  if (!jsxElementPath || !t.isJSXElement(jsxElementPath.node)) {
+  const jsxElementPath = findJsxContainerPath(element.path);
+  if (!jsxElementPath || !jsxElementPath.isJSXElement()) {
     return { ok: false, error: 'JSX element not found' };
   }
 
   try {
-    // Заменяем все текстовые дочерние элементы на новый текст
-    const textNode = t.jsxText(String(text || ''));
-    jsxElementPath.node.children = [textNode];
-
+    jsxElementPath.node.children = [t.jsxText(String(text || ''))];
     return { ok: true, ast: constructorAST };
-  } catch (error: any) {
-    return { ok: false, error: error.message };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message };
   }
 }
 
-/**
- * Применяет операцию перемещения (reparent) к constructorAST
- * @param {Object} params - параметры
- * @param {Object} params.constructorAST - AST конструктора
- * @param {string} params.sourceId - ID перемещаемого элемента
- * @param {string} params.targetParentId - ID нового родителя
- * @returns {Object} { ok: boolean, ast?: Object, error?: string }
- */
-export function applyReparentToAst({ constructorAST, sourceId, targetParentId }: any) {
-  if (!constructorAST) {
-    return { ok: false, error: 'constructorAST is required' };
-  }
-
+export function applyReparentToAst({
+  constructorAST,
+  sourceId,
+  targetParentId,
+}: {
+  constructorAST: t.File;
+  sourceId: string;
+  targetParentId: string;
+}): AstMutationResult {
+  if (!constructorAST) return { ok: false, error: 'constructorAST is required' };
   if (!sourceId || !targetParentId) {
     return { ok: false, error: 'sourceId and targetParentId are required' };
   }
 
-  // Находим исходный элемент
   const sourceElement = findElementByIdInAst(constructorAST, sourceId);
-  if (!sourceElement) {
-    return { ok: false, error: `Source element with ID ${sourceId} not found` };
-  }
+  if (!sourceElement) return { ok: false, error: `Source element with ID ${sourceId} not found` };
 
-  // Находим целевой родительский элемент
   const targetElement = findElementByIdInAst(constructorAST, targetParentId);
   if (!targetElement) {
     return { ok: false, error: `Target parent element with ID ${targetParentId} not found` };
   }
 
-  // Находим JSX элементы
-  let sourceJsxPath = sourceElement.path;
-  while (sourceJsxPath && !t.isJSXElement(sourceJsxPath.node) && !t.isJSXFragment(sourceJsxPath.node)) {
-    sourceJsxPath = sourceJsxPath.parentPath;
-  }
-
-  let targetJsxPath = targetElement.path;
-  while (targetJsxPath && !t.isJSXElement(targetJsxPath.node) && !t.isJSXFragment(targetJsxPath.node)) {
-    targetJsxPath = targetJsxPath.parentPath;
-  }
-
-  if (!sourceJsxPath || !targetJsxPath) {
-    return { ok: false, error: 'JSX elements not found' };
-  }
+  const sourceJsxPath = findJsxContainerPath(sourceElement.path);
+  const targetJsxPath = findJsxContainerPath(targetElement.path);
+  if (!sourceJsxPath || !targetJsxPath) return { ok: false, error: 'JSX elements not found' };
 
   try {
-    // Удаляем элемент из старого места
     const sourceNode = sourceJsxPath.node;
     sourceJsxPath.remove();
-
-    // Добавляем в новое место
-    if (t.isJSXElement(targetJsxPath.node) || t.isJSXFragment(targetJsxPath.node)) {
-      targetJsxPath.node.children.push(sourceNode);
-    }
-
+    targetJsxPath.node.children.push(sourceNode);
     return { ok: true, ast: constructorAST };
-  } catch (error: any) {
-    return { ok: false, error: error.message };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message };
   }
 }
-
-

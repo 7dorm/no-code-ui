@@ -1,9 +1,9 @@
 import { MRPAK_MSG, MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
 
 /**
- * Генерирует скрипт для блочного редактора, который инжектируется в HTML
- * @param {string} type - тип файла ('html', 'react', 'react-native')
- * @param {string} mode - режим работы ('preview' | 'edit')
+ * Р“РµРЅРµСЂРёСЂСѓРµС‚ СЃРєСЂРёРїС‚ РґР»СЏ Р±Р»РѕС‡РЅРѕРіРѕ СЂРµРґР°РєС‚РѕСЂР°, РєРѕС‚РѕСЂС‹Р№ РёРЅР¶РµРєС‚РёСЂСѓРµС‚СЃСЏ РІ HTML
+ * @param {string} type - С‚РёРї С„Р°Р№Р»Р° ('html', 'react', 'react-native')
+ * @param {string} mode - СЂРµР¶РёРј СЂР°Р±РѕС‚С‹ ('preview' | 'edit')
  */
 export function generateBlockEditorScript(type: string, mode: string = 'preview', rootFileBasename: string = '') {
   const isEditMode = mode === 'edit';
@@ -25,7 +25,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         .mrpak-shift-badge { position: fixed; z-index: 10001; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(245, 158, 11, 0.65); border-radius: 6px; padding: 4px 6px; font: 11px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 3px 8px rgba(0,0,0,0.22); }
         .mrpak-hint { position: fixed; z-index: 9999; bottom: 10px; right: 10px; background: rgba(15,23,42,0.85); color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; }
         ${isEditMode ? `
-        /* Блокируем интерактивные элементы только в режиме редактора */
+        /* Р‘Р»РѕРєРёСЂСѓРµРј РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹ С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР° */
         [data-no-code-ui-id] button,
         [data-no-code-ui-id] input,
         [data-no-code-ui-id] select,
@@ -45,7 +45,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           -moz-user-select: none !important;
           -ms-user-select: none !important;
         }
-        /* Разрешаем pointer-events только для выбора блоков */
+        /* Р Р°Р·СЂРµС€Р°РµРј pointer-events С‚РѕР»СЊРєРѕ РґР»СЏ РІС‹Р±РѕСЂР° Р±Р»РѕРєРѕРІ */
         [data-no-code-ui-id],
         [data-mrpak-id] {
           cursor: pointer;
@@ -114,12 +114,30 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
             return selected ? [selected] : [];
           };
+          const getStyleTargetNodes = (el) => {
+            if (!el) return [];
+            try {
+              if (el.getAttribute && el.getAttribute('data-mrpak-component-boundary') === '1') {
+                const directChild = el.firstElementChild;
+                if (directChild) return [directChild];
+                const descendants = Array.from(el.querySelectorAll('*')).filter((node) => {
+                  if (!node || !node.getBoundingClientRect) return false;
+                  const rect = node.getBoundingClientRect();
+                  return rect.width > 0.5 && rect.height > 0.5;
+                });
+                if (descendants.length > 0) return [descendants[0]];
+              }
+            } catch (e) {}
+            return [el];
+          };
           const applyToSelectedGroup = (cb) => {
             const nodes = getSelectedGroupNodes();
             nodes.forEach((node, index) => {
-              try {
-                cb(node, index);
-              } catch (e) {}
+              getStyleTargetNodes(node).forEach((target) => {
+                try {
+                  cb(target, index);
+                } catch (e) {}
+              });
             });
           };
           const getIdFileBasename = (id) => {
@@ -171,6 +189,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_REQ_TEXT = '${MRPAK_CMD.REQUEST_TEXT_SNAPSHOT}';
           const CMD_START_DRAG = '${MRPAK_CMD.START_DRAG}';
           const CMD_END_DRAG = '${MRPAK_CMD.END_DRAG}';
+          const CMD_UPDATE_EXTERNAL_POINTER = '${MRPAK_CMD.UPDATE_EXTERNAL_POINTER}';
           const CMD_SET_RESIZE_TARGET = '${MRPAK_CMD.SET_RESIZE_TARGET}';
           let selected = null;
           let selectedGroup = [];
@@ -436,7 +455,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const pb = toNum(cs.paddingBottom);
               const pl = toNum(cs.paddingLeft);
               
-              // Показываем родительскую рамку
+              // РџРѕРєР°Р·С‹РІР°РµРј СЂРѕРґРёС‚РµР»СЊСЃРєСѓСЋ СЂР°РјРєСѓ
               const parentInfo = getParentContentRect(selected);
               const parent = parentInfo.parent;
               if (parent && parent !== document.body && parent !== document.documentElement) {
@@ -492,13 +511,26 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               }
 
               const mode = cs.position === 'relative' ? 'relative' : moveMode;
-              const hasVisibleOffset = mode === 'relative' || Math.abs(ml) > 0.5 || Math.abs(mt) > 0.5;
-              if (hasVisibleOffset) {
-                const labelText = 'offset ml:' + Math.round(ml) + ' mt:' + Math.round(mt);
-                setShiftBadge(labelText, rect.left - ml, rect.top - mt - 24);
+              const elLeft = mode === 'relative' ? (pxToNum(cs.left) || 0) : ml;
+              const elTop = mode === 'relative' ? (pxToNum(cs.top) || 0) : mt;
+              
+              let badgeText = '';
+              const currentResizeTarget = resizeTargetMode || 'size';
+              if (currentResizeTarget === 'margin') {
+                badgeText = 'margin: ' + Math.round(mt) + ' ' + Math.round(mr) + ' ' + Math.round(mb) + ' ' + Math.round(ml);
+              } else if (currentResizeTarget === 'padding') {
+                badgeText = 'padding: ' + Math.round(pt) + ' ' + Math.round(pr) + ' ' + Math.round(pb) + ' ' + Math.round(pl);
               } else {
-                setShiftBadge('', 0, 0);
+                badgeText = Math.round(rect.width) + ' × ' + Math.round(rect.height);
               }
+
+              const hasVisibleOffset = mode === 'relative' || Math.abs(elLeft) > 0.5 || Math.abs(elTop) > 0.5;
+              if (hasVisibleOffset) {
+                const labelText = mode === 'relative' ? ('left:' + Math.round(elLeft) + ' top:' + Math.round(elTop)) : ('ml:' + Math.round(elLeft) + ' mt:' + Math.round(elTop));
+                badgeText += ' | ' + labelText;
+              }
+              setShiftBadge(badgeText, rect.left - ml, rect.top - mt - 24);
+              
               updateResizeOverlayStyles();
             } catch (e) {
               try {
@@ -512,75 +544,6 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           };
 
-          const updateRelativeParentPreview = (el, dx, dy) => {
-            try {
-              ensureOverlay();
-              if (!el || !overlay.parent || !overlay.margin) return;
-              const rect = getElementVisualRect(el);
-              if (!rect) return;
-              const cs = window.getComputedStyle(el);
-              const mt = toNum(cs.marginTop);
-              const mr = toNum(cs.marginRight);
-              const mb = toNum(cs.marginBottom);
-              const ml = toNum(cs.marginLeft);
-              const bt = toNum(cs.borderTopWidth);
-              const br = toNum(cs.borderRightWidth);
-              const bb = toNum(cs.borderBottomWidth);
-              const bl = toNum(cs.borderLeftWidth);
-              const pt = toNum(cs.paddingTop);
-              const pr = toNum(cs.paddingRight);
-              const pb = toNum(cs.paddingBottom);
-              const pl = toNum(cs.paddingLeft);
-              const futureMl = ml + dx;
-              const futureMt = mt + dy;
-              const parentInfo = getParentContentRect(el);
-              const parent = parentInfo.parent;
-              if (!parent || parent === document.body || parent === document.documentElement) return;
-
-              const parentRect = parentInfo.rect;
-              const parentLeft = parentRect.left + parentInfo.padding.left;
-              const parentTop = parentRect.top + parentInfo.padding.top;
-              const parentRight = parentRect.right - parentInfo.padding.right;
-              const parentBottom = parentRect.bottom - parentInfo.padding.bottom;
-
-              const movedLeft = rect.left - futureMl;
-              const movedTop = rect.top - futureMt;
-              const movedRight = rect.right + mr;
-              const movedBottom = rect.bottom + mb;
-
-              setRect(overlay.margin, {
-                left: movedLeft,
-                top: movedTop,
-                width: Math.max(0, rect.width + futureMl + mr),
-                height: Math.max(0, rect.height + futureMt + mb),
-              });
-              setRect(overlay.content, {
-                left: rect.left + bl + pl,
-                top: rect.top + bt + pt,
-                width: Math.max(0, rect.width - bl - br - pl - pr),
-                height: Math.max(0, rect.height - bt - bb - pt - pb),
-              });
-              setRect(overlay.padding, {
-                left: rect.left + bl,
-                top: rect.top + bt,
-                width: Math.max(0, rect.width - bl - br),
-                height: Math.max(0, rect.height - bt - bb),
-              });
-
-              const unionLeft = Math.min(parentLeft, movedLeft);
-              const unionTop = Math.min(parentTop, movedTop);
-              const unionRight = Math.max(parentRight, movedRight);
-              const unionBottom = Math.max(parentBottom, movedBottom);
-
-              setRect(overlay.parent, {
-                left: unionLeft,
-                top: unionTop,
-                width: Math.max(0, unionRight - unionLeft),
-                height: Math.max(0, unionBottom - unionTop),
-              });
-              setShiftBadge('offset ml:' + Math.round(futureMl) + ' mt:' + Math.round(futureMt), movedLeft, movedTop - 24);
-            } catch (e) {}
-          };
 
           const snap = (v) => {
             if (moveMode !== 'grid8') return v;
@@ -608,22 +571,62 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             const pct = pxToPercent(value, axisSize);
             return pct + '%';
           };
+          const NUMERIC_CSS_PROPS = /^(left|top|right|bottom|width|height|minWidth|maxWidth|minHeight|maxHeight|margin|marginTop|marginRight|marginBottom|marginLeft|padding|paddingTop|paddingRight|paddingBottom|paddingLeft|fontSize|lineHeight|letterSpacing|borderRadius|borderWidth|borderTopWidth|borderRightWidth|borderBottomWidth|borderLeftWidth|gap|rowGap|columnGap|flexBasis)$/i;
+          const UNITLESS_CSS_PROPS = /^(opacity|zIndex|flex|flexGrow|flexShrink|order|fontWeight)$/i;
+          const normalizeStyleValueForDom = (key, value) => {
+            if (value === null || value === undefined) return '';
+            const keyName = String(key || '');
+            if (UNITLESS_CSS_PROPS.test(keyName)) return String(value);
+            if (typeof value === 'number' && Number.isFinite(value)) {
+              return NUMERIC_CSS_PROPS.test(keyName) ? (value + 'px') : String(value);
+            }
+            const s = String(value).trim();
+            if (/^-?\d+(\.\d+)?$/.test(s) && NUMERIC_CSS_PROPS.test(keyName)) {
+              return s + 'px';
+            }
+            return s;
+          };
+          const applyStylePatchToDom = (node, patch) => {
+            if (!node || !patch) return;
+            for (const k in patch) {
+              if (!Object.prototype.hasOwnProperty.call(patch, k)) continue;
+              const cssValue = normalizeStyleValueForDom(k, patch[k]);
+              if (k.includes('-')) {
+                if (cssValue === '') node.style.removeProperty(k);
+                else node.style.setProperty(k, cssValue);
+              } else {
+                try {
+                  if (cssValue === '') node.style[k] = '';
+                  else node.style[k] = cssValue;
+                } catch (e) {}
+              }
+            }
+          };
+          const ensureOffsetParent = (el) => {
+            const parent = el && el.parentElement;
+            if (!parent || parent === document.body || parent === document.documentElement) return;
+            try {
+              const pos = window.getComputedStyle(parent).position;
+              if (pos === 'static') parent.style.position = 'relative';
+            } catch (e) {}
+          };
           const getMovePatchKeys = (mode) => {
             if (mode === 'relative') {
-              return { x: 'marginLeft', y: 'marginTop' };
+              return { x: 'left', y: 'top' };
             }
             return { x: 'left', y: 'top' };
           };
           const getElementMoveMode = (el) => {
-            if (!el || !el.getAttribute) {
+            const probe = (getStyleTargetNodes(el)[0]) || el;
+            if (!probe || !probe.getAttribute) {
               return moveMode;
             }
-            const saved = el.getAttribute('data-move-mode');
+            const saved = probe.getAttribute('data-move-mode');
             if (saved === 'relative' || saved === 'absolute' || saved === 'grid8') {
               return saved;
             }
             try {
-              const position = window.getComputedStyle(el).position;
+              const position = window.getComputedStyle(probe).position;
               if (position === 'relative') return 'relative';
               if (position === 'absolute' || position === 'fixed') return 'absolute';
             } catch (e) {}
@@ -740,19 +743,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
             if (activeMoveMode === 'relative') {
               const cs = window.getComputedStyle(el);
-              const baseMl = toNum(cs.marginLeft);
-              const baseMt = toNum(cs.marginTop);
+              const baseLeft = pxToNum(cs.left) || 0;
+              const baseTop = pxToNum(cs.top) || 0;
               const deltaX = desiredLeft - rect.left;
               const deltaY = desiredTop - rect.top;
-              const nextMl = snap(baseMl + deltaX);
-              const nextMt = snap(baseMt + deltaY);
+              const nextLeft = snap(baseLeft + deltaX);
+              const nextTop = snap(baseTop + deltaY);
               const leftValue = formatMoveValue(
-                nextMl,
+                nextLeft,
                 getMoveAxisReferenceSize('relative', 'x', contentWidth, contentHeight),
                 'relative'
               );
               const topValue = formatMoveValue(
-                nextMt,
+                nextTop,
                 getMoveAxisReferenceSize('relative', 'y', contentWidth, contentHeight),
                 'relative'
               );
@@ -830,7 +833,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const getOffsetParent = (el) => {
             if (!el) return document.body;
             
-            // Ищем родителя с ограничениями (с position: relative/absolute или с overflow)
+            // РС‰РµРј СЂРѕРґРёС‚РµР»СЏ СЃ РѕРіСЂР°РЅРёС‡РµРЅРёСЏРјРё (СЃ position: relative/absolute РёР»Рё СЃ overflow)
             let parent = el.parentElement;
             while (parent && parent !== document.body && parent !== document.documentElement) {
               const cs = window.getComputedStyle(parent);
@@ -839,7 +842,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               const overflowX = cs.overflowX;
               const overflowY = cs.overflowY;
               
-              // Если родитель имеет позиционирование или overflow, это наш контейнер
+              // Р•СЃР»Рё СЂРѕРґРёС‚РµР»СЊ РёРјРµРµС‚ РїРѕР·РёС†РёРѕРЅРёСЂРѕРІР°РЅРёРµ РёР»Рё overflow, СЌС‚Рѕ РЅР°С€ РєРѕРЅС‚РµР№РЅРµСЂ
               if (position !== 'static' || overflow !== 'visible' || overflowX !== 'visible' || overflowY !== 'visible') {
                 return parent;
               }
@@ -847,7 +850,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               parent = parent.parentElement;
             }
             
-            // Если не нашли подходящего родителя, используем offsetParent или body
+            // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё РїРѕРґС…РѕРґСЏС‰РµРіРѕ СЂРѕРґРёС‚РµР»СЏ, РёСЃРїРѕР»СЊР·СѓРµРј offsetParent РёР»Рё body
             return el.offsetParent || document.body;
           };
 
@@ -949,12 +952,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               .filter(Boolean)
               .filter((el, index, arr) => arr.indexOf(el) === index);
             
-            // Сначала создаем все узлы
+            // РЎРЅР°С‡Р°Р»Р° СЃРѕР·РґР°РµРј РІСЃРµ СѓР·Р»С‹
             for (const el of all) {
               const id = ensureId(el);
               if (!id) continue;
               
-              // Ищем родителя более точно: идем вверх по DOM дереву и ищем ближайший элемент с id-атрибутом
+              // РС‰РµРј СЂРѕРґРёС‚РµР»СЏ Р±РѕР»РµРµ С‚РѕС‡РЅРѕ: РёРґРµРј РІРІРµСЂС… РїРѕ DOM РґРµСЂРµРІСѓ Рё РёС‰РµРј Р±Р»РёР¶Р°Р№С€РёР№ СЌР»РµРјРµРЅС‚ СЃ id-Р°С‚СЂРёР±СѓС‚РѕРј
               let parentEl = null;
               let current = el.parentElement;
               while (current && current !== document.body && current !== document.documentElement) {
@@ -977,7 +980,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               };
             }
             
-            // Определяем детей и корневые элементы
+            // РћРїСЂРµРґРµР»СЏРµРј РґРµС‚РµР№ Рё РєРѕСЂРЅРµРІС‹Рµ СЌР»РµРјРµРЅС‚С‹
             for (const id of Object.keys(nodes)) {
               const p = nodes[id].parentId;
               if (p && nodes[p]) {
@@ -987,14 +990,14 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               }
             }
             
-            // Упорядочиваем children по порядку в DOM
+            // РЈРїРѕСЂСЏРґРѕС‡РёРІР°РµРј children РїРѕ РїРѕСЂСЏРґРєСѓ РІ DOM
             for (const id of Object.keys(nodes)) {
               const el = document.querySelector(byIdSelector(id));
               if (!el) continue;
               
               const parentEl = el.parentElement;
               if (parentEl) {
-                // Ищем родителя с id-атрибутом
+                // РС‰РµРј СЂРѕРґРёС‚РµР»СЏ СЃ id-Р°С‚СЂРёР±СѓС‚РѕРј
                 let parentWithId = null;
                 let current = parentEl;
                 while (current && current !== document.body && current !== document.documentElement) {
@@ -1008,7 +1011,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 if (parentWithId) {
                   const pid = ensureId(parentWithId);
                   if (pid && nodes[pid]) {
-                    // Получаем прямых детей с id-атрибутом в порядке DOM
+                    // РџРѕР»СѓС‡Р°РµРј РїСЂСЏРјС‹С… РґРµС‚РµР№ СЃ id-Р°С‚СЂРёР±СѓС‚РѕРј РІ РїРѕСЂСЏРґРєРµ DOM
                     const directChildren = Array.from(parentWithId.children)
                       .map(child => getBoundaryBlock(child))
                       .filter(child => child && child.hasAttribute && (child.hasAttribute(ATTR_NEW) || child.hasAttribute(ATTR_OLD)))
@@ -1024,7 +1027,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             post(MSG_TREE, { tree: { nodes, rootIds } });
           }
           
-          // Делаем buildTree доступной глобально для вызова из скрипта React
+          // Р”РµР»Р°РµРј buildTree РґРѕСЃС‚СѓРїРЅРѕР№ РіР»РѕР±Р°Р»СЊРЅРѕ РґР»СЏ РІС‹Р·РѕРІР° РёР· СЃРєСЂРёРїС‚Р° React
           window.__MRPAK_BUILD_TREE__ = buildTree;
 
           function clearSelected() {
@@ -1094,7 +1097,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             emitSelection();
             updateBoxOverlay();
             buildTree();
-            // отправляем снапшот inline style, чтобы UI мог показать базовые стили
+            // РѕС‚РїСЂР°РІР»СЏРµРј СЃРЅР°РїС€РѕС‚ inline style, С‡С‚РѕР±С‹ UI РјРѕРі РїРѕРєР°Р·Р°С‚СЊ Р±Р°Р·РѕРІС‹Рµ СЃС‚РёР»Рё
             try {
               const inline = selected.getAttribute('style') || '';
               const cs = window.getComputedStyle(selected);
@@ -1157,9 +1160,9 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             updateBoxOverlay();
           }
 
-          // В режиме редактора делаем контент "неинтерактивным":
-          // - гасим клики/submit/клавиатурные активации по интерактивным элементам
-          // - при этом сохраняем возможность выбирать блоки кликом и двигать Shift/Alt+Drag
+          // Р’ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР° РґРµР»Р°РµРј РєРѕРЅС‚РµРЅС‚ "РЅРµРёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рј":
+          // - РіР°СЃРёРј РєР»РёРєРё/submit/РєР»Р°РІРёР°С‚СѓСЂРЅС‹Рµ Р°РєС‚РёРІР°С†РёРё РїРѕ РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рј СЌР»РµРјРµРЅС‚Р°Рј
+          // - РїСЂРё СЌС‚РѕРј СЃРѕС…СЂР°РЅСЏРµРј РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РІС‹Р±РёСЂР°С‚СЊ Р±Р»РѕРєРё РєР»РёРєРѕРј Рё РґРІРёРіР°С‚СЊ Shift/Alt+Drag
           const isPointWithinRect = (rect, x, y) => {
             if (!rect) return false;
             return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
@@ -1257,6 +1260,21 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           };
 
+          const toIframeClientPoint = (clientX, clientY) => {
+            let x = Number(clientX);
+            let y = Number(clientY);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+            try {
+              const frameEl = window.frameElement;
+              if (frameEl && frameEl.getBoundingClientRect) {
+                const rect = frameEl.getBoundingClientRect();
+                x = x - rect.left;
+                y = y - rect.top;
+              }
+            } catch (e) {}
+            return { x, y };
+          };
+
           const updateExternalDropCandidate = (x, y) => {
             if (!externalDrag) return;
             externalPointer = { x, y };
@@ -1294,7 +1312,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             return false;
           }
 
-          // Hover для drop target при перетаскивании (режим reparent)
+          // Hover РґР»СЏ drop target РїСЂРё РїРµСЂРµС‚Р°СЃРєРёРІР°РЅРёРё (СЂРµР¶РёРј reparent)
           document.addEventListener('mousemove', (ev) => {
             if (!isActiveInstance()) return;
             if (externalDrag) {
@@ -1316,7 +1334,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           }, true);
 
-          // Блокируем submit форм только в режиме редактора
+          // Р‘Р»РѕРєРёСЂСѓРµРј submit С„РѕСЂРј С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР°
           if (EDIT_MODE) {
             document.addEventListener('submit', (ev) => {
               if (!isActiveInstance()) return;
@@ -1328,7 +1346,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }, true);
           }
 
-          // Блокируем все события на интерактивных элементах только в режиме редактора
+          // Р‘Р»РѕРєРёСЂСѓРµРј РІСЃРµ СЃРѕР±С‹С‚РёСЏ РЅР° РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹С… СЌР»РµРјРµРЅС‚Р°С… С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР°
           const blockInteractiveEvents = (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
@@ -1339,18 +1357,18 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               t = t.parentElement;
             }
             if (!t) return;
-            // Проверяем, является ли элемент интерактивным
+            // РџСЂРѕРІРµСЂСЏРµРј, СЏРІР»СЏРµС‚СЃСЏ Р»Рё СЌР»РµРјРµРЅС‚ РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рј
             if (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,label,form,[role=button],[role=link],[role=checkbox],[role=switch],[contenteditable]'))) {
               try {
                 ev.preventDefault();
                 ev.stopPropagation();
                 ev.stopImmediatePropagation();
-                // Если у интерактивного элемента есть id-атрибут, выбираем его напрямую
+                // Р•СЃР»Рё Сѓ РёРЅС‚РµСЂР°РєС‚РёРІРЅРѕРіРѕ СЌР»РµРјРµРЅС‚Р° РµСЃС‚СЊ id-Р°С‚СЂРёР±СѓС‚, РІС‹Р±РёСЂР°РµРј РµРіРѕ РЅР°РїСЂСЏРјСѓСЋ
                 if (t.hasAttribute && (t.hasAttribute(ATTR_NEW) || t.hasAttribute(ATTR_OLD))) {
                   selectEl(t);
                   return;
                 }
-                // Иначе выбираем родительский блок
+                // РРЅР°С‡Рµ РІС‹Р±РёСЂР°РµРј СЂРѕРґРёС‚РµР»СЊСЃРєРёР№ Р±Р»РѕРє
                 const block = t.closest(SEL_ALL);
                 if (block && block !== t) {
                   selectEl(block);
@@ -1359,7 +1377,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           };
 
-          // Блокируем hover/enter события, чтобы onPointerEnter/onMouseEnter не срабатывали в edit режиме
+          // Р‘Р»РѕРєРёСЂСѓРµРј hover/enter СЃРѕР±С‹С‚РёСЏ, С‡С‚РѕР±С‹ onPointerEnter/onMouseEnter РЅРµ СЃСЂР°Р±Р°С‚С‹РІР°Р»Рё РІ edit СЂРµР¶РёРјРµ
           const blockHoverEvents = (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
@@ -1371,7 +1389,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             } catch (e) {}
           };
 
-          // Блокируем все события на интерактивных элементах (кроме mousedown, который обрабатывается отдельно) только в режиме редактора
+          // Р‘Р»РѕРєРёСЂСѓРµРј РІСЃРµ СЃРѕР±С‹С‚РёСЏ РЅР° РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹С… СЌР»РµРјРµРЅС‚Р°С… (РєСЂРѕРјРµ mousedown, РєРѕС‚РѕСЂС‹Р№ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚СЃСЏ РѕС‚РґРµР»СЊРЅРѕ) С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР°
           if (EDIT_MODE) {
             document.addEventListener('keydown', (ev) => {
               if (!isActiveInstance()) return;
@@ -1425,12 +1443,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   ev.preventDefault();
                   ev.stopPropagation();
                   ev.stopImmediatePropagation();
-                  // Если у интерактивного элемента есть id-атрибут, выбираем его напрямую
+                  // Р•СЃР»Рё Сѓ РёРЅС‚РµСЂР°РєС‚РёРІРЅРѕРіРѕ СЌР»РµРјРµРЅС‚Р° РµСЃС‚СЊ id-Р°С‚СЂРёР±СѓС‚, РІС‹Р±РёСЂР°РµРј РµРіРѕ РЅР°РїСЂСЏРјСѓСЋ
                   if (t.hasAttribute && (t.hasAttribute(ATTR_NEW) || t.hasAttribute(ATTR_OLD))) {
                     selectEl(t);
                     return;
                   }
-                  // Иначе выбираем родительский блок
+                  // РРЅР°С‡Рµ РІС‹Р±РёСЂР°РµРј СЂРѕРґРёС‚РµР»СЊСЃРєРёР№ Р±Р»РѕРє
                   const block = t.closest(SEL_ALL);
                   if (block && block !== t) {
                     selectEl(block);
@@ -1450,10 +1468,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             document.addEventListener('mousemove', blockHoverEvents, true);
           }
           
-          // Обработка клика для выбора блоков (только в режиме редактора)
+          // РћР±СЂР°Р±РѕС‚РєР° РєР»РёРєР° РґР»СЏ РІС‹Р±РѕСЂР° Р±Р»РѕРєРѕРІ (С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР°)
           document.addEventListener('click', (ev) => {
             if (!isActiveInstance()) return;
-            if (!EDIT_MODE) return; // В preview режиме не обрабатываем клики для выбора
+            if (!EDIT_MODE) return; // Р’ preview СЂРµР¶РёРјРµ РЅРµ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РєР»РёРєРё РґР»СЏ РІС‹Р±РѕСЂР°
             if (externalDrag) {
               try {
                 ev.preventDefault();
@@ -1483,18 +1501,18 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
             
             const t = ev.target;
-            // Если это интерактивный элемент, обрабатываем его
+            // Р•СЃР»Рё СЌС‚Рѕ РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Р№ СЌР»РµРјРµРЅС‚, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РµРіРѕ
             if (t && (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,label,form,[role=button],[role=link],[contenteditable]')))) {
               try {
                 ev.preventDefault();
                 ev.stopPropagation();
                 ev.stopImmediatePropagation();
-                // Если у интерактивного элемента есть id-атрибут, выбираем его напрямую
+                // Р•СЃР»Рё Сѓ РёРЅС‚РµСЂР°РєС‚РёРІРЅРѕРіРѕ СЌР»РµРјРµРЅС‚Р° РµСЃС‚СЊ id-Р°С‚СЂРёР±СѓС‚, РІС‹Р±РёСЂР°РµРј РµРіРѕ РЅР°РїСЂСЏРјСѓСЋ
                 if (t.hasAttribute && (t.hasAttribute(ATTR_NEW) || t.hasAttribute(ATTR_OLD))) {
                   selectEl(getBoundaryBlock(t));
                   return;
                 }
-                // Иначе выбираем родительский блок
+                // РРЅР°С‡Рµ РІС‹Р±РёСЂР°РµРј СЂРѕРґРёС‚РµР»СЊСЃРєРёР№ Р±Р»РѕРє
                 const block = t.closest(SEL_ALL);
                 if (block && block !== t) {
                   selectEl(getBoundaryBlock(block));
@@ -1502,7 +1520,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 }
               } catch(e) {}
             }
-            // Если это не интерактивный элемент, обрабатываем как обычный клик для выбора блока
+            // Р•СЃР»Рё СЌС‚Рѕ РЅРµ РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Р№ СЌР»РµРјРµРЅС‚, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РєР°Рє РѕР±С‹С‡РЅС‹Р№ РєР»РёРє РґР»СЏ РІС‹Р±РѕСЂР° Р±Р»РѕРєР°
             const el = ev.target && ev.target.closest ? getBoundaryBlock(ev.target.closest(SEL_ALL)) : null;
             if (!el) return;
             try {
@@ -1517,6 +1535,18 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           document.addEventListener('wheel', (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return;
+            
+            if (ev.ctrlKey || ev.metaKey) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              const zoomDelta = ev.deltaY > 0 ? 0.9 : 1.1;
+              post(MSG_CANVAS_ZOOM, { delta: zoomDelta, x: ev.clientX, y: ev.clientY });
+              return;
+            }
+
             if (externalDrag) {
               try {
                 ev.preventDefault();
@@ -1557,30 +1587,60 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           }, { passive: false, capture: true });
 
           let drag = null;
+          let canvasPanning = false;
+          let canvasPanStartX = 0;
+          let canvasPanStartY = 0;
+          let isSpacePressed = false;
+
+          document.addEventListener('keydown', (ev) => {
+            if (ev.code === 'Space' && !isInteractive(ev.target)) {
+              isSpacePressed = true;
+            }
+          });
+          document.addEventListener('keyup', (ev) => {
+            if (ev.code === 'Space') {
+              isSpacePressed = false;
+            }
+          });
+
           document.addEventListener('mousedown', (ev) => {
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return; // В preview режиме не обрабатываем
+
+            // Обработка панорамирования холста (Средняя кнопка мыши или Space+Click или Alt+Click)
+            if (ev.button === 1 || ev.altKey || isSpacePressed) {
+              try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.stopImmediatePropagation();
+              } catch (e) {}
+              canvasPanning = true;
+              canvasPanStartX = ev.clientX;
+              canvasPanStartY = ev.clientY;
+              return;
+            }
+
             if (externalDrag) return;
             
             let t = ev.target;
             if (t && t.nodeType === 3) {
               t = t.parentElement;
             }
-            // Если это интерактивный элемент, обрабатываем его
+            // Р•СЃР»Рё СЌС‚Рѕ РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Р№ СЌР»РµРјРµРЅС‚, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РµРіРѕ
             if (t && (isInteractive(t) || (t.closest && t.closest('a,button,input,select,textarea,label,form,[role=button],[role=link],[contenteditable]')))) {
               try {
                 ev.preventDefault();
                 ev.stopPropagation();
                 ev.stopImmediatePropagation();
                 
-                // Если у интерактивного элемента есть id-атрибут, используем его
+                // Р•СЃР»Рё Сѓ РёРЅС‚РµСЂР°РєС‚РёРІРЅРѕРіРѕ СЌР»РµРјРµРЅС‚Р° РµСЃС‚СЊ id-Р°С‚СЂРёР±СѓС‚, РёСЃРїРѕР»СЊР·СѓРµРј РµРіРѕ
                 let targetEl = t;
                 let targetId = null;
                 if (t.hasAttribute && (t.hasAttribute(ATTR_NEW) || t.hasAttribute(ATTR_OLD))) {
                     targetEl = getBoundaryBlock(t);
                     targetId = getId(targetEl);
                 } else {
-                  // Иначе ищем родительский блок
+                  // РРЅР°С‡Рµ РёС‰РµРј СЂРѕРґРёС‚РµР»СЊСЃРєРёР№ Р±Р»РѕРє
                   const block = t.closest(SEL_ALL);
                   if (block && block !== t) {
                     targetEl = getBoundaryBlock(block);
@@ -1598,7 +1658,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey) {
                     return;
                   }
-                  // Если это Shift/Ctrl/Alt + клик, обрабатываем как drag
+                  // Р•СЃР»Рё СЌС‚Рѕ Shift/Ctrl/Alt + РєР»РёРє, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј РєР°Рє drag
                   if (ev.ctrlKey || ev.metaKey) {
                     dragging = { sourceId: dragAnchorId, mode: 'reparent' };
                     post(MSG_DROP_TARGET, { sourceId: dragAnchorId, targetId: null });
@@ -1747,7 +1807,15 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               });
               updateBoxOverlay();
               if (activeMoveMode === 'relative') {
-                updateRelativeParentPreview(selected, constrainedDx, constrainedDy);
+                const cs = window.getComputedStyle(selected);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
+                const futureLeft = baseLeft + constrainedDx;
+                const futureTop = baseTop + constrainedDy;
+                const rect = getElementVisualRect(selected);
+                if (rect) {
+                  setShiftBadge('offset left:' + Math.round(futureLeft) + ' top:' + Math.round(futureTop), rect.left - toNum(cs.marginLeft), rect.top - toNum(cs.marginTop) - 24);
+                }
               }
             } else {
               const resizeTarget = drag.resizeTarget || resizeTargetMode;
@@ -1873,7 +1941,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             }
           }, true);
 
-          // Touch события для мобильных устройств
+          // Touch СЃРѕР±С‹С‚РёСЏ РґР»СЏ РјРѕР±РёР»СЊРЅС‹С… СѓСЃС‚СЂРѕР№СЃС‚РІ
           document.addEventListener('touchmove', (ev) => {
             if (!isActiveInstance()) return;
             if (!drag || !selected) return;
@@ -1906,14 +1974,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               });
               updateBoxOverlay();
               if (activeMoveMode === 'relative') {
-                updateRelativeParentPreview(selected, constrainedDx, constrainedDy);
+                const cs = window.getComputedStyle(selected);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
+                const futureLeft = baseLeft + constrainedDx;
+                const futureTop = baseTop + constrainedDy;
+                const rect = getElementVisualRect(selected);
+                if (rect) {
+                  setShiftBadge('offset left:' + Math.round(futureLeft) + ' top:' + Math.round(futureTop), rect.left - toNum(cs.marginLeft), rect.top - toNum(cs.marginTop) - 24);
+                }
               }
 
-              // Сохраняем финальные координаты в drag объект
+              // РЎРѕС…СЂР°РЅСЏРµРј С„РёРЅР°Р»СЊРЅС‹Рµ РєРѕРѕСЂРґРёРЅР°С‚С‹ РІ drag РѕР±СЉРµРєС‚
               if (activeMoveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
-                const baseLeft = pxToNum(cs.marginLeft);
-                const baseTop = pxToNum(cs.marginTop);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
                 const left = snap(baseLeft + constrainedDx);
                 const top = snap(baseTop + constrainedDy);
                 
@@ -2071,7 +2147,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           document.addEventListener('touchend', (ev) => {
             if (!isActiveInstance()) return;
-            // reparent drag (Ctrl/Cmd + drag) - не поддерживается для touch
+            // reparent drag (Ctrl/Cmd + drag) - РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ РґР»СЏ touch
             if (dragging && dragging.mode === 'reparent') {
               dragging = null;
               dropTarget = null;
@@ -2091,7 +2167,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 node.style.transform = '';
               });
 
-              // Используем сохраненные финальные значения
+              // РСЃРїРѕР»СЊР·СѓРµРј СЃРѕС…СЂР°РЅРµРЅРЅС‹Рµ С„РёРЅР°Р»СЊРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ
               if (drag.finalLeft !== undefined && drag.finalTop !== undefined) {
                 const finalLeftValue = formatMoveValue(
                   drag.finalLeft,
@@ -2105,36 +2181,28 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 );
                 if (drag.finalPosition === 'relative' || activeMoveMode === 'relative') {
                   const moveKeys = getMovePatchKeys('relative');
+                  const relativePatch = {
+                    position: 'relative',
+                    left: '',
+                    top: '',
+                    [moveKeys.x]: finalLeftValue,
+                    [moveKeys.y]: finalTopValue,
+                  };
                   applyToSelectedGroup((node) => {
-                    node.style.position = 'relative';
-                    node.style.left = '';
-                    node.style.top = '';
-                    node.style[moveKeys.x] = String(finalLeftValue);
-                    node.style[moveKeys.y] = String(finalTopValue);
+                    applyStylePatchToDom(node, relativePatch);
                   });
                   post(MSG_APPLY, {
                     id,
-                    patch: {
-                      position: 'relative',
-                      left: '',
-                      top: '',
-                      [moveKeys.x]: finalLeftValue,
-                      [moveKeys.y]: finalTopValue,
-                    },
+                    patch: relativePatch,
                     isIntermediate: false
                   });
                 } else {
+                  const absolutePatch = { position: 'absolute', left: finalLeftValue, top: finalTopValue };
                   applyToSelectedGroup((node) => {
-                    node.style.position = 'absolute';
-                    node.style.left = String(finalLeftValue);
-                    node.style.top = String(finalTopValue);
+                    ensureOffsetParent(node);
+                    applyStylePatchToDom(node, absolutePatch);
                   });
-
-                  const patch = { position: 'absolute' };
-                  patch.left = finalLeftValue;
-                  patch.top = finalTopValue;
-                  
-                  post(MSG_APPLY, { id, patch, isIntermediate: false });
+                  post(MSG_APPLY, { id, patch: absolutePatch, isIntermediate: false });
                 }
               }
             } else {
@@ -2295,6 +2363,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           document.addEventListener('mouseup', (ev) => {
             if (!isActiveInstance()) return;
+
+            if (canvasPanning) {
+              canvasPanning = false;
+              return;
+            }
+
             // reparent drag (Ctrl/Cmd + drag)
             if (dragging && dragging.mode === 'reparent') {
               if (dropTarget && dragging.sourceId && dropTarget !== dragging.sourceId) {
@@ -2339,8 +2413,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
               if (activeMoveMode === 'relative') {
                 const cs = window.getComputedStyle(selected);
-                const baseLeft = pxToNum(cs.marginLeft);
-                const baseTop = pxToNum(cs.marginTop);
+                const baseLeft = pxToNum(cs.left) || 0;
+                const baseTop = pxToNum(cs.top) || 0;
                 const left = snap(baseLeft + constrainedDx);
                 const top = snap(baseTop + constrainedDy);
                 const leftValue = formatMoveValue(
@@ -2354,33 +2428,30 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   activeMoveMode
                 );
                 const moveKeys = getMovePatchKeys('relative');
+                const relativePatch = {
+                  position: 'relative',
+                  left: '',
+                  top: '',
+                  [moveKeys.x]: leftValue,
+                  [moveKeys.y]: topValue,
+                };
                 applyToSelectedGroup((node) => {
-                  node.style.position = 'relative';
-                  node.style.left = '';
-                  node.style.top = '';
-                  node.style[moveKeys.x] = String(leftValue);
-                  node.style[moveKeys.y] = String(topValue);
+                  applyStylePatchToDom(node, relativePatch);
                 });
                 post(MSG_APPLY, {
                   id,
-                  patch: {
-                    position: 'relative',
-                    left: '',
-                    top: '',
-                    [moveKeys.x]: leftValue,
-                    [moveKeys.y]: topValue,
-                  },
+                  patch: relativePatch,
                   isIntermediate: false
                 });
               } else {
-                // absolute с ограничением по padding-box
+                // absolute СЃ РѕРіСЂР°РЅРёС‡РµРЅРёРµРј РїРѕ padding-box
                 const startLeft = drag.rect.left - parentRect.left - padLeft;
                 const startTop = drag.rect.top - parentRect.top - padTop;
                 
                 let left = snap(startLeft + constrainedDx);
                 let top = snap(startTop + constrainedDy);
 
-                // Ограничиваем позицию padding-box родителя
+                // РћРіСЂР°РЅРёС‡РёРІР°РµРј РїРѕР·РёС†РёСЋ padding-box СЂРѕРґРёС‚РµР»СЏ
                 const maxLeft = parentRect.width - padRight - snap(drag.rect.width);
                 const maxTop = parentRect.height - padBottom - snap(drag.rect.height);
                 const minLeft = padLeft;
@@ -2398,17 +2469,13 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   getMoveAxisReferenceSize('absolute', 'y', contentWidth, contentHeight),
                   'absolute'
                 );
+                const absolutePatch = { position: 'absolute', left: leftValue, top: topValue };
                 applyToSelectedGroup((node) => {
-                  node.style.position = 'absolute';
-                  node.style.left = String(leftValue);
-                  node.style.top = String(topValue);
+                  ensureOffsetParent(node);
+                  applyStylePatchToDom(node, absolutePatch);
                 });
 
-                const patch= { position: 'absolute' };
-                patch.left = leftValue;
-                patch.top = topValue;
-                
-                post(MSG_APPLY, { id, patch, isIntermediate: false });
+                post(MSG_APPLY, { id, patch: absolutePatch, isIntermediate: false });
               }
             } else {
               const resizeTarget = drag.resizeTarget || resizeTargetMode;
@@ -2579,7 +2646,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   });
                 }
               } else {
-                // Разрешаем ресайз за пределы родителя
+                // Р Р°Р·СЂРµС€Р°РµРј СЂРµСЃР°Р№Р· Р·Р° РїСЂРµРґРµР»С‹ СЂРѕРґРёС‚РµР»СЏ
                 const cw = w;
                 const ch = h;
                 let nextLeft = undefined;
@@ -2640,11 +2707,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             dropTarget = null;
           }, true);
 
-          // Подсказка
+          // РџРѕРґСЃРєР°Р·РєР°
           try {
             const hint = document.createElement('div');
             hint.className = 'mrpak-hint';
-            hint.textContent = 'MRPAK Editor: клик = выбрать, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize, ←/→ = resize mode (margin/size/padding/content-lock).';
+            hint.textContent = 'MRPAK Editor: РєР»РёРє = РІС‹Р±СЂР°С‚СЊ, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize, в†ђ/в†’ = resize mode (margin/size/padding/content-lock).';
             document.body.appendChild(hint);
           } catch(e) {}
 
@@ -2653,7 +2720,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             window.addEventListener('resize', updateBoxOverlay, true);
           } catch(e) {}
 
-          // Команды из UI (локальные изменения)
+          // РљРѕРјР°РЅРґС‹ РёР· UI (Р»РѕРєР°Р»СЊРЅС‹Рµ РёР·РјРµРЅРµРЅРёСЏ)
           window.addEventListener('message', (event) => {
             if (!isActiveInstance()) return;
             const data = event && event.data;
@@ -2665,45 +2732,33 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 return;
               }
               if (data.type === CMD_SET_STYLE && data.id) {
-                console.log('[iframe CMD_SET_STYLE] Получена команда:', {
+                console.log('[iframe CMD_SET_STYLE] РџРѕР»СѓС‡РµРЅР° РєРѕРјР°РЅРґР°:', {
                   id: data.id,
                   patch: data.patch,
                   hasPatch: !!data.patch
                 });
                 const elements = getElementsById(String(data.id));
-                const el = elements[0];
+                const styleTargets = [];
+                elements.forEach((node) => {
+                  getStyleTargetNodes(node).forEach((target) => styleTargets.push(target));
+                });
+                const el = styleTargets[0];
                 if (!el) {
-                  console.warn('[iframe CMD_SET_STYLE] Элемент не найден:', data.id);
+                  console.warn('[iframe CMD_SET_STYLE] Р­Р»РµРјРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ:', data.id);
                   return;
                 }
                 const patch = data.patch || {};
-                console.log('[iframe CMD_SET_STYLE] Применяю патч:', patch);
-                elements.forEach((node) => {
-                  for (const k in patch) {
-                    const v = patch[k];
-                    if (k.includes('-')) {
-                      if (v === null || v === undefined || v === '') {
-                        node.style.removeProperty(k);
-                      } else {
-                        node.style.setProperty(k, String(v));
-                      }
-                    } else {
-                      try {
-                        if (v === null || v === undefined || v === '') {
-                          node.style[k] = '';
-                        } else {
-                          node.style[k] = String(v);
-                        }
-                      } catch(e) {}
-                    }
-                  }
+                console.log('[iframe CMD_SET_STYLE] РџСЂРёРјРµРЅСЏСЋ РїР°С‚С‡:', patch);
+                styleTargets.forEach((node) => {
+                  if (patch.position === 'absolute') ensureOffsetParent(node);
+                  applyStylePatchToDom(node, patch);
                 });
-                console.log('[iframe CMD_SET_STYLE] Стили применены, текущий style:', el.getAttribute('style'));
+                console.log('[iframe CMD_SET_STYLE] РЎС‚РёР»Рё РїСЂРёРјРµРЅРµРЅС‹, С‚РµРєСѓС‰РёР№ style:', el.getAttribute('style'));
                 
-                // Перестроим дерево после изменения стилей
+                // РџРµСЂРµСЃС‚СЂРѕРёРј РґРµСЂРµРІРѕ РїРѕСЃР»Рµ РёР·РјРµРЅРµРЅРёСЏ СЃС‚РёР»РµР№
                 buildTree();
                 
-                // обновим снапшот
+                // РѕР±РЅРѕРІРёРј СЃРЅР°РїС€РѕС‚
                 try {
                   const cs = window.getComputedStyle(el);
                   post(MSG_STYLE_SNAPSHOT, {
@@ -2771,26 +2826,26 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 return;
               }
               if (data.type === CMD_INSERT && data.targetId && data.mode && data.html) {
-                console.log('[iframe CMD_INSERT] Получена команда вставки', {
+                console.log('[iframe CMD_INSERT] РџРѕР»СѓС‡РµРЅР° РєРѕРјР°РЅРґР° РІСЃС‚Р°РІРєРё', {
                   targetId: data.targetId,
                   mode: data.mode,
                   htmlPreview: String(data.html).substring(0, 100)
                 });
                 const target = document.querySelector(byIdSelector(String(data.targetId)));
                 if (!target) {
-                  console.warn('[iframe CMD_INSERT] Target не найден!', data.targetId);
+                  console.warn('[iframe CMD_INSERT] Target РЅРµ РЅР°Р№РґРµРЅ!', data.targetId);
                   return;
                 }
                 const tmp = document.createElement('div');
                 tmp.innerHTML = String(data.html);
                 const newEl = tmp.firstElementChild;
                 if (!newEl) {
-                  console.warn('[iframe CMD_INSERT] Не удалось создать элемент из HTML');
+                  console.warn('[iframe CMD_INSERT] РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ СЌР»РµРјРµРЅС‚ РёР· HTML');
                   return;
                 }
-                // временный id для дерева до commit
+                // РІСЂРµРјРµРЅРЅС‹Р№ id РґР»СЏ РґРµСЂРµРІР° РґРѕ commit
                 const newElId = ensureId(newEl);
-                console.log('[iframe CMD_INSERT] ✅ Вставляю элемент с ID:', newElId);
+                console.log('[iframe CMD_INSERT] вњ… Р’СЃС‚Р°РІР»СЏСЋ СЌР»РµРјРµРЅС‚ СЃ ID:', newElId);
                 if (data.mode === 'child') {
                   target.appendChild(newEl);
                 } else if (data.mode === 'sibling') {
@@ -2804,7 +2859,17 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 const srcEl = document.querySelector(byIdSelector(String(data.sourceId)));
                 const dstEl = document.querySelector(byIdSelector(String(data.targetParentId)));
                 if (srcEl && dstEl && srcEl !== dstEl) {
-                  dstEl.appendChild(srcEl);
+                  const beforeId = data.targetBeforeId ? String(data.targetBeforeId) : '';
+                  if (beforeId) {
+                    const beforeEl = document.querySelector(byIdSelector(beforeId));
+                    if (beforeEl && beforeEl.parentElement) {
+                      beforeEl.parentElement.insertBefore(srcEl, beforeEl);
+                    } else {
+                      dstEl.appendChild(srcEl);
+                    }
+                  } else {
+                    dstEl.appendChild(srcEl);
+                  }
                   buildTree();
                   selectEl(srcEl);
                 }
@@ -2863,8 +2928,22 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 updateExternalDropCandidate(externalPointer.x || 0, externalPointer.y || 0);
                 return;
               }
+              if (data.type === CMD_UPDATE_EXTERNAL_POINTER) {
+                if (!externalDrag) return;
+                const point = toIframeClientPoint(data.x, data.y);
+                if (!point) return;
+                updateExternalDropCandidate(point.x, point.y);
+                return;
+              }
               if (data.type === CMD_END_DRAG) {
-                if (externalDrag && dropTarget) {
+                let insertTargetId = dropTarget;
+                if (!insertTargetId && data.fallbackTargetId) {
+                  insertTargetId = String(data.fallbackTargetId);
+                }
+                if (!insertTargetId && lastSelectedId) {
+                  insertTargetId = String(lastSelectedId);
+                }
+                if (externalDrag && insertTargetId) {
                   const insertPayload =
                     externalDrag.source === 'component'
                       ? {
@@ -2892,7 +2971,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                         };
 
                   post(MSG_APPLY, {
-                    id: dropTarget,
+                    id: insertTargetId,
                     patch: {
                       __insertFromLibrary: insertPayload,
                     },
@@ -2927,10 +3006,10 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
  }
 
 /**
- * Инжектирует скрипт блочного редактора в HTML
- * @param {string} html - HTML контент
- * @param {string} type - тип файла ('html', 'react', 'react-native')
- * @param {string} mode - режим работы ('preview' | 'edit')
+ * РРЅР¶РµРєС‚РёСЂСѓРµС‚ СЃРєСЂРёРїС‚ Р±Р»РѕС‡РЅРѕРіРѕ СЂРµРґР°РєС‚РѕСЂР° РІ HTML
+ * @param {string} html - HTML РєРѕРЅС‚РµРЅС‚
+ * @param {string} type - С‚РёРї С„Р°Р№Р»Р° ('html', 'react', 'react-native')
+ * @param {string} mode - СЂРµР¶РёРј СЂР°Р±РѕС‚С‹ ('preview' | 'edit')
  */
 export function injectBlockEditorScript(html: string, type: string, mode: string = 'preview', rootFileBasename: string = '') {
   const source = String(html ?? '');

@@ -79,6 +79,22 @@ export function toPosixPath(value: string): string {
   return String(value || '').replace(/\\/g, '/');
 }
 
+/** Синхронно выводит корень проекта из projectPath или пути к файлу. */
+export function resolveProjectRootSync(filePath: string, projectPath?: string | null): string | null {
+  let root = String(projectPath || '').trim();
+  if (!root && filePath) {
+    const normalizedPath = toPosixPath(filePath);
+    const lastSlash = normalizedPath.lastIndexOf('/');
+    if (lastSlash > 0) {
+      root = normalizedPath.substring(0, lastSlash);
+      if (root.endsWith('/src')) {
+        root = root.substring(0, root.length - 4);
+      }
+    }
+  }
+  return root || null;
+}
+
 export const STYLE_TEMPLATES: StyleTemplate[] = [
   { id: 'landing-soft', fileName: 'landing-soft.css', title: 'Landing Soft', cssText: landingSoftCssTemplate },
   { id: 'dashboard-clean', fileName: 'dashboard-clean.css', title: 'Dashboard Clean', cssText: dashboardCleanCssTemplate },
@@ -462,11 +478,11 @@ export function resolveSourceFilePathFromDependencies(
 export function enrichLayersTree(
   tree: LayersTree,
   filePath: string,
-  dependencyPaths: string[]
+  dependencyPaths: string[] = []
 ): LayersTree {
   const rootBasename = getPathBasename(filePath);
   const dependencyByBasename = new Map<string, string[]>();
-  dependencyPaths.forEach((depPath) => {
+  (dependencyPaths || []).forEach((depPath) => {
     const basename = getPathBasename(depPath);
     if (!basename) return;
     const list = dependencyByBasename.get(basename) || [];

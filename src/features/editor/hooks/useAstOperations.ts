@@ -46,9 +46,13 @@ export function useAstOperations({
           root = await findProjectRoot(filePath);
         }
 
+        if (root === null || root === undefined) {
+          root = ''; // fallback to current directory
+        }
+
         if (cancelled) return;
         setProjectRoot(root);
-        if (root) {
+        if (root !== null && root !== undefined) {
           const res = await loadLayerNames({ projectRoot: root, targetFilePath: filePath });
           if (!cancelled && res?.ok) {
             setLayerNames(res.names || {});

@@ -1,322 +1,244 @@
 // Сравнение AST деревьев для обнаружения изменений в коде
 // Используется для bidirectional editing
 
-import traverse from '@babel/traverse';
+import traverse, { type NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 
-/**
- * Извлекает ID из JSX элемента
- * @param {t.JSXOpeningElement} node - узел открывающего тега
- * @returns {string|null} ID или null
- */
-function extractIdFromNode(node: any) {
+type StyleValue = string | number | boolean;
+type StyleMap = Record<string, StyleValue>;
+
+type ElementData = {
+  id: string;
+  parentId: string | null;
+  styles: StyleMap;
+  tagName: string;
+  jsxElement: t.JSXElement | t.JSXFragment | null;
+};
+
+type StructureChange = {
+  type: 'structure';
+  id: string;
+  action: 'added' | 'removed' | 'moved';
+  tagName?: string;
+  parentId?: string | null;
+  oldParentId?: string | null;
+  newParentId?: string | null;
+};
+
+type StyleChange = {
+  type: 'style';
+  id: string;
+  property: string;
+  oldValue: StyleValue | undefined;
+  newValue: StyleValue | undefined;
+};
+
+type TextChange = {
+  type: 'text';
+  id: string;
+  oldValue: string;
+  newValue: string;
+};
+
+type AstChange = StructureChange | StyleChange | TextChange;
+
+function extractIdFromNode(node: t.JSXOpeningElement | null | undefined): string | null {
   if (!node || !node.attributes) return null;
 
   for (const attr of node.attributes) {
-    if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name)) {
-      if (attr.name.name === 'data-no-code-ui-id' || attr.name.name === 'data-mrpak-id') {
-        const value = attr.value;
-        if (t.isStringLiteral(value)) {
-          return value.value;
-        }
-      }
-    }
+    if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) continue;
+    if (attr.name.name !== 'data-no-code-ui-id' && attr.name.name !== 'data-mrpak-id') continue;
+    const value = attr.value;
+    if (t.isStringLiteral(value)) return value.value;
+    if (t.isJSXExpressionContainer(value) && t.isStringLiteral(value.expression)) return value.expression.value;
   }
   return null;
 }
 
-/**
- * Извлекает стили из JSX элемента
- * @param {t.JSXOpeningElement} node - узел открывающего тега
- * @returns {Object} объект со стилями
- */
-function extractStylesFromNode(node: any) {
-  const styles: any = {};
-
+function extractStylesFromNode(node: t.JSXOpeningElement | null | undefined): StyleMap {
+  const styles: StyleMap = {};
   if (!node || !node.attributes) return styles;
 
   for (const attr of node.attributes) {
-    if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'style') {
-      const value = attr.value;
+    if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name) || attr.name.name !== 'style') continue;
+    if (!t.isJSXExpressionContainer(attr.value) || !t.isObjectExpression(attr.value.expression)) continue;
 
-      if (t.isJSXExpressionContainer(value)) {
-        const expr = value.expression;
+    for (const prop of attr.value.expression.properties) {
+      if (!t.isObjectProperty(prop)) continue;
+      const keyName = t.isIdentifier(prop.key)
+        ? prop.key.name
+        : (t.isStringLiteral(prop.key) ? prop.key.value : null);
+      if (!keyName) continue;
 
-        if (t.isObjectExpression(expr)) {
-          for (const prop of expr.properties) {
-            if (t.isObjectProperty(prop)) {
-              const key = prop.key;
-              const val = prop.value;
-
-              let keyName: any = null;
-              if (t.isIdentifier(key)) {
-                keyName = key.name;
-              } else if (t.isStringLiteral(key)) {
-                keyName = key.value;
-              }
-
-              if (keyName) {
-                if (t.isStringLiteral(val)) {
-                  styles[keyName] = val.value;
-                } else if (t.isNumericLiteral(val)) {
-                  styles[keyName] = val.value;
-                } else if (t.isBooleanLiteral(val)) {
-                  styles[keyName] = val.value;
-                }
-              }
-            }
-          }
-        }
-      }
+      if (t.isStringLiteral(prop.value)) styles[keyName] = prop.value.value;
+      else if (t.isNumericLiteral(prop.value)) styles[keyName] = prop.value.value;
+      else if (t.isBooleanLiteral(prop.value)) styles[keyName] = prop.value.value;
     }
   }
 
   return styles;
 }
 
-/**
- * Извлекает текстовое содержимое JSX элемента
- * @param {t.JSXElement} node - JSX элемент
- * @returns {string} текст
- */
-function extractTextFromNode(node: any) {
+function extractTextFromNode(node: t.JSXElement | t.JSXFragment | null): string {
   if (!node || !node.children) return '';
 
   let text = '';
   for (const child of node.children) {
-    if (t.isJSXText(child)) {
-      text += child.value;
-    } else if (t.isJSXExpressionContainer(child)) {
-      // Для выражений возвращаем маркер
-      text += '{...}';
-    }
+    if (t.isJSXText(child)) text += child.value;
+    else if (t.isJSXExpressionContainer(child)) text += '{...}';
   }
-
   return text.trim();
 }
 
-/**
- * Создает карту элементов по ID из AST
- * @param {Object} ast - AST дерево
- * @returns {Map<string, Object>} карта ID → { node, path, parentId }
- */
-function createElementMap(ast: any) {
-  const map = new Map();
-  const parentStack: any[] = [];
+function getTagName(name: t.JSXTagNameExpression): string {
+  if (t.isJSXIdentifier(name)) return name.name;
+  if (t.isJSXMemberExpression(name)) {
+    let obj = name.object;
+    while (t.isJSXMemberExpression(obj)) obj = obj.object;
+    return t.isJSXIdentifier(obj) ? obj.name : 'MemberExpr';
+  }
+  if (t.isJSXNamespacedName(name)) return `${name.namespace.name}:${name.name.name}`;
+  return 'Unknown';
+}
+
+function findJsxContainer(path: NodePath<t.Node>): NodePath<t.JSXElement> | NodePath<t.JSXFragment> | null {
+  let current: NodePath<t.Node> | null = path;
+  while (current && !current.isJSXElement() && !current.isJSXFragment()) {
+    current = current.parentPath;
+  }
+  if (!current) return null;
+  return current.isJSXElement()
+    ? (current as NodePath<t.JSXElement>)
+    : (current as NodePath<t.JSXFragment>);
+}
+
+function createElementMap(ast: t.File): Map<string, ElementData> {
+  const map = new Map<string, ElementData>();
+  const parentStack: Array<{ id: string }> = [];
 
   traverse(ast, {
-    JSXOpeningElement(path: any) {
-      const node = path.node;
-      const id = extractIdFromNode(node);
+    JSXOpeningElement: {
+      enter(path: NodePath<t.JSXOpeningElement>) {
+        const id = extractIdFromNode(path.node);
+        if (!id) return;
 
-      if (id) {
-        // Находим родительский элемент с ID
-        let parentId: any = null;
-        for (let i = parentStack.length - 1; i >= 0; i--) {
+        let parentId: string | null = null;
+        for (let i = parentStack.length - 1; i >= 0; i -= 1) {
           const parent = parentStack[i];
-          if (parent && parent.id) {
+          if (parent?.id) {
             parentId = parent.id;
             break;
           }
         }
 
-        // Находим полный JSX элемент
-        let jsxElementPath = path;
-        while (jsxElementPath && !t.isJSXElement(jsxElementPath.node) && !t.isJSXFragment(jsxElementPath.node)) {
-          jsxElementPath = jsxElementPath.parentPath;
-        }
-
+        const jsxContainerPath = findJsxContainer(path);
         map.set(id, {
           id,
-          node,
-          path,
-          jsxElement: jsxElementPath?.node || null,
           parentId,
-          styles: extractStylesFromNode(node),
-          tagName: getTagName(node.name),
+          styles: extractStylesFromNode(path.node),
+          tagName: getTagName(path.node.name),
+          jsxElement: jsxContainerPath ? jsxContainerPath.node : null,
         });
 
-        parentStack.push({ id, node });
-      }
-    },
-    JSXClosingElement() {
-      // Убираем из стека при закрытии элемента
-      if (parentStack.length > 0) {
-        parentStack.pop();
-      }
+        parentStack.push({ id });
+      },
+      exit(path: NodePath<t.JSXOpeningElement>) {
+        const id = extractIdFromNode(path.node);
+        if (!id) return;
+        const top = parentStack[parentStack.length - 1];
+        if (top?.id === id) parentStack.pop();
+      },
     }
   });
 
   return map;
 }
 
-/**
- * Получает имя тега из JSX имени
- */
-function getTagName(name: any) {
-  if (t.isJSXIdentifier(name)) {
-    return name.name;
-  }
-  if (t.isJSXMemberExpression(name)) {
-    let obj = name.object;
-    while (t.isJSXMemberExpression(obj)) {
-      obj = obj.object;
-    }
-    if (t.isJSXIdentifier(obj)) {
-      return obj.name;
-    }
-    return 'MemberExpr';
-  }
-  if (t.isJSXNamespacedName(name)) {
-    return `${name.namespace.name}:${name.name.name}`;
-  }
-  return 'Unknown';
-}
-
-/**
- * Сравнивает два AST дерева и находит различия
- * @param {Object} oldAst - старое AST дерево
- * @param {Object} newAst - новое AST дерево
- * @returns {Object} { changes: Array, added: Array, removed: Array, modified: Array }
- */
-export function diffAst(oldAst: any, newAst: any) {
+export function diffAst(oldAst: t.File | null | undefined, newAst: t.File | null | undefined) {
   if (!oldAst || !newAst) {
-    return { changes: [], added: [], removed: [], modified: [] };
+    return { changes: [] as AstChange[], added: [] as AstChange[], removed: [] as AstChange[], modified: [] as AstChange[] };
   }
 
   const oldMap = createElementMap(oldAst);
   const newMap = createElementMap(newAst);
 
-  const changes: any[] = [];
-  const added: any[] = [];
-  const removed: any[] = [];
-  const modified: any[] = [];
+  const changes: AstChange[] = [];
+  const added: AstChange[] = [];
+  const removed: AstChange[] = [];
+  const modified: AstChange[] = [];
 
-  // Находим добавленные элементы
-  for (const [id, newData] of newMap) {
-    if (!oldMap.has(id)) {
-      added.push({
-        type: 'structure',
-        id,
-        action: 'added',
-        tagName: newData.tagName,
-        parentId: newData.parentId,
-      });
-      changes.push({
-        type: 'structure',
-        id,
-        action: 'added',
-        tagName: newData.tagName,
-        parentId: newData.parentId,
-      });
-    }
+  for (const [id, newData] of newMap.entries()) {
+    if (oldMap.has(id)) continue;
+    const change: StructureChange = {
+      type: 'structure',
+      id,
+      action: 'added',
+      tagName: newData.tagName,
+      parentId: newData.parentId,
+    };
+    added.push(change);
+    changes.push(change);
   }
 
-  // Находим удаленные элементы
-  for (const [id, oldData] of oldMap) {
-    if (!newMap.has(id)) {
-      removed.push({
-        type: 'structure',
-        id,
-        action: 'removed',
-        tagName: oldData.tagName,
-      });
-      changes.push({
-        type: 'structure',
-        id,
-        action: 'removed',
-        tagName: oldData.tagName,
-      });
-    }
+  for (const [id, oldData] of oldMap.entries()) {
+    if (newMap.has(id)) continue;
+    const change: StructureChange = {
+      type: 'structure',
+      id,
+      action: 'removed',
+      tagName: oldData.tagName,
+    };
+    removed.push(change);
+    changes.push(change);
   }
 
-  // Находим измененные элементы
-  for (const [id, newData] of newMap) {
+  for (const [id, newData] of newMap.entries()) {
     const oldData = oldMap.get(id);
-    if (oldData) {
-      const styleChanges: any[] = [];
+    if (!oldData) continue;
 
-      // Сравниваем стили
-      const oldStyles = oldData.styles || {};
-      const newStyles = newData.styles || {};
+    if (oldData.parentId !== newData.parentId) {
+      const moveChange: StructureChange = {
+        type: 'structure',
+        id,
+        action: 'moved',
+        oldParentId: oldData.parentId,
+        newParentId: newData.parentId,
+      };
+      changes.push(moveChange);
+      modified.push(moveChange);
+    }
 
-      // Находим измененные стили
-      const allStyleKeys = new Set([...Object.keys(oldStyles), ...Object.keys(newStyles)]);
-      for (const key of allStyleKeys) {
-        const oldValue = oldStyles[key];
-        const newValue = newStyles[key];
+    const allStyleKeys = new Set([...Object.keys(oldData.styles || {}), ...Object.keys(newData.styles || {})]);
+    for (const key of allStyleKeys) {
+      const oldValue = oldData.styles[key];
+      const newValue = newData.styles[key];
+      if (oldValue === newValue) continue;
+      const styleChange: StyleChange = {
+        type: 'style',
+        id,
+        property: key,
+        oldValue,
+        newValue,
+      };
+      changes.push(styleChange);
+      modified.push(styleChange);
+    }
 
-        if (oldValue !== newValue) {
-          styleChanges.push({
-            property: key,
-            oldValue,
-            newValue,
-          });
-        }
-      }
-
-      // Сравниваем родителя (перемещение)
-      if (oldData.parentId !== newData.parentId) {
-        changes.push({
-          type: 'structure',
+    if (oldData.jsxElement && newData.jsxElement) {
+      const oldText = extractTextFromNode(oldData.jsxElement);
+      const newText = extractTextFromNode(newData.jsxElement);
+      if (oldText !== newText) {
+        const textChange: TextChange = {
+          type: 'text',
           id,
-          action: 'moved',
-          oldParentId: oldData.parentId,
-          newParentId: newData.parentId,
-        });
-        modified.push({
-          type: 'structure',
-          id,
-          action: 'moved',
-          oldParentId: oldData.parentId,
-          newParentId: newData.parentId,
-        });
-      }
-
-      // Если есть изменения стилей
-      if (styleChanges.length > 0) {
-        for (const styleChange of styleChanges) {
-          changes.push({
-            type: 'style',
-            id,
-            property: styleChange.property,
-            oldValue: styleChange.oldValue,
-            newValue: styleChange.newValue,
-          });
-          modified.push({
-            type: 'style',
-            id,
-            property: styleChange.property,
-            oldValue: styleChange.oldValue,
-            newValue: styleChange.newValue,
-          });
-        }
-      }
-
-      // Сравниваем текст (если есть)
-      if (oldData.jsxElement && newData.jsxElement) {
-        const oldText = extractTextFromNode(oldData.jsxElement);
-        const newText = extractTextFromNode(newData.jsxElement);
-
-        if (oldText !== newText) {
-          changes.push({
-            type: 'text',
-            id,
-            oldValue: oldText,
-            newValue: newText,
-          });
-          modified.push({
-            type: 'text',
-            id,
-            oldValue: oldText,
-            newValue: newText,
-          });
-        }
+          oldValue: oldText,
+          newValue: newText,
+        };
+        changes.push(textChange);
+        modified.push(textChange);
       }
     }
   }
 
   return { changes, added, removed, modified };
 }
-
-

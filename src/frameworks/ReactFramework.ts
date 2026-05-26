@@ -25,6 +25,39 @@ import reactIconsHiUrl from 'react-icons/hi?url';
 import reactIconsHi2Url from 'react-icons/hi2?url';
 import reactIconsIo5Url from 'react-icons/io5?url';
 
+interface InstrumentOptions {
+  projectRoot?: string;
+}
+
+interface MapEntry {
+  start: number;
+  end: number;
+  tagName: string;
+  [key: string]: unknown;
+}
+
+interface StylePatch {
+  [key: string]: unknown;
+}
+
+interface DependencyMap {
+  [key: string]: string;
+}
+
+interface PathMap {
+  [key: string]: string;
+}
+
+interface ActualPathMap {
+  [key: string]: string;
+}
+
+interface StagedOp {
+  type: string;
+  op?: 'insert' | 'delete' | 'reparent' | 'setText' | 'style';
+  [key: string]: unknown;
+}
+
 function parseRuntimeNamedImports(importSpec: string): Array<{ orig: string; alias: string }> {
   return importSpec
     .replace(/[{}]/g, '')
@@ -167,7 +200,7 @@ export class ReactFramework extends Framework {
    * @param {string} filePath - путь к файлу
    * @param {Object} opts - опции (projectRoot?: string)
    */
-  instrument(code: string, filePath: string, opts: any = {}) {
+  instrument(code: string, filePath: string, opts: InstrumentOptions = {}) {
     // Используем AST парсинг для JavaScript/TypeScript файлов
     if (isJavaScriptFile(filePath)) {
       try {
@@ -292,7 +325,7 @@ export class ReactFramework extends Framework {
    * Вспомогательная функция для поиска модуля по различным путям
    * Синхронная версия, использует уже разрешенные пути из pathMap
    */
-  findModulePath(importPath: string, basePath: string, pathMap: any, dependencyModules: any) {
+  findModulePath(importPath: string, basePath: string, pathMap: PathMap, dependencyModules: DependencyMap) {
     // Пробуем найти по оригинальному пути (включая @ пути, которые уже разрешены)
     if (pathMap[importPath]) {
       return pathMap[importPath];
@@ -403,7 +436,7 @@ export class ReactFramework extends Framework {
   /**
    * Рекурсивная функция для загрузки всех зависимостей
    */
-  async loadAllDependencies(importPath: string, basePath: string, loadedDeps: Set<string> = new Set(), dependencyMap: any = {}, dependencyPaths: string[] = [], pathMap: any = {}, actualPathMap: any = {}) {
+  async loadAllDependencies(importPath: string, basePath: string, loadedDeps: Set<string> = new Set(), dependencyMap: DependencyMap = {}, dependencyPaths: string[] = [], pathMap: PathMap = {}, actualPathMap: ActualPathMap = {}) {
     const baseFileName = basePath.split('/').pop() || basePath.split('\\').pop() || 'unknown';
     
     console.log(`[LoadAllDependencies] Starting to load dependency:`, {
@@ -432,7 +465,7 @@ export class ReactFramework extends Framework {
     loadedDeps.add(resolvedPath);
     
     // Загружаем зависимость по разрешенному пути
-    const depResult: any = await this.loadDependency(basePath, importPath);
+    const depResult = await this.loadDependency(basePath, importPath);
     if (!depResult.success) {
       console.warn(`[LoadAllDependencies] Failed to load dependency from ${baseFileName}:`, {
         importPath,
@@ -559,7 +592,7 @@ export class ReactFramework extends Framework {
    * Обрабатывает зависимости React файла
    * Перенесено из RenderFile.jsx: processReactCode
    */
-  async processDependencies(code: string, filePath: string): Promise<{ processedCode: string; dependencyPaths: string[]; modulesCode?: string; defaultExportInfo?: any }> {
+  async processDependencies(code: string, filePath: string): Promise<{ processedCode: string; dependencyPaths: string[]; modulesCode?: string; defaultExportInfo?: unknown }> {
     // Вызываем processReactCode для обработки зависимостей
     return await this.processReactCode(code, filePath);
   }
@@ -2131,7 +2164,7 @@ export class ReactFramework extends Framework {
    * Применяет патч стилей к JSX элементу
    */
   applyStylePatch({ code, mapEntry, patch, externalStylesMap }
-    : {code: string, mapEntry: any, patch: any, externalStylesMap: any}
+    : {code: string, mapEntry: MapEntry, patch: StylePatch, externalStylesMap: Record<string, unknown>}
   ) {
     return applyStylePatch({
       fileType: 'react',
@@ -2146,7 +2179,7 @@ export class ReactFramework extends Framework {
    * Вставляет новый элемент в JSX
    */
   applyInsert({ code, targetEntry, targetId, mode, snippet }
-    : {code: string, targetEntry: any, targetId: string, mode: string, snippet: string}
+    : {code: string, targetEntry: MapEntry, targetId: string, mode: string, snippet: string}
   ) {
     return applyJsxInsert({
       code,
@@ -2160,7 +2193,7 @@ export class ReactFramework extends Framework {
    * Удаляет элемент из JSX
    */
   applyDelete({ code, entry, blockId }
-    : {code: string, entry: any, blockId: string}
+    : {code: string, entry: MapEntry, blockId: string}
   ) {
     return applyJsxDelete({ code, entry });
   }
@@ -2169,7 +2202,7 @@ export class ReactFramework extends Framework {
    * Переносит элемент в другого родителя
    */
   applyReparent({ code, sourceEntry, sourceId, targetEntry, targetId, targetBeforeEntry, targetBeforeId }
-    : {code: string, sourceEntry: any, sourceId: string, targetEntry: any, targetId: string, targetBeforeEntry?: any, targetBeforeId?: string | null}
+    : {code: string, sourceEntry: MapEntry, sourceId: string, targetEntry: MapEntry, targetId: string, targetBeforeEntry?: MapEntry, targetBeforeId?: string | null}
   ) {
     return applyJsxReparent({ code, sourceEntry, targetEntry, targetBeforeEntry, targetBeforeId });
   }
@@ -2178,7 +2211,7 @@ export class ReactFramework extends Framework {
    * Изменяет текст элемента
    */
   applySetText({ code, entry, blockId, text }
-    : {code: string, entry: any, blockId: string, text: string}
+    : {code: string, entry: MapEntry, blockId: string, text: string}
   ) {
     return applyJsxSetText({ code, entry, text: String(text ?? '') });
   }
@@ -2219,7 +2252,7 @@ export class ReactFramework extends Framework {
    * Перенесено из RenderFile.jsx: commitStagedPatches для React/React Native
    */
   async commitPatches({ originalCode, stagedPatches, stagedOps, blockMapForFile, externalStylesMap, filePath, resolvePath, readFile, writeFile }
-    : {originalCode: string, stagedPatches: Record<string, Record<string, any>>, stagedOps: any[], blockMapForFile: any, externalStylesMap: any, filePath: string, resolvePath: (path: string, base?: string) => string, readFile: (path: string) => { success: boolean, content: string }, writeFile: (path: string, content: string) => { success: boolean, error?: string }}
+    : {originalCode: string, stagedPatches: Record<string, Record<string, unknown>>, stagedOps: any[], blockMapForFile: Record<string, MapEntry>, externalStylesMap: Record<string, unknown>, filePath: string, resolvePath: (path: string, base?: string) => string, readFile: (path: string) => { success: boolean, content: string }, writeFile: (path: string, content: string) => { success: boolean, error?: string }}
   ): Promise<CommitPatchesResult> {
     const entries = Object.entries(stagedPatches || {}).filter(
       ([id, p]) => id && p && Object.keys(p).length > 0
@@ -2308,12 +2341,13 @@ export class ReactFramework extends Framework {
         | { 
             ok: boolean; 
             needsExternalPatch?: boolean; 
-            externalStylePath?: string; 
-            styleKey?: string; 
-            styleReference?: string; 
-            patch?: any;
+            externalStylePath?: string;
+            styleKey?: string;
+            styleReference?: string;
+            patch?: Record<string, unknown>;
             code?: string;
             html?: string;
+            error?: string;
           };
 
       // Then use this type for the res variable

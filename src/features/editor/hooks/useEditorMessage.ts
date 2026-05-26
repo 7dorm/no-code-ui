@@ -103,6 +103,12 @@ export function useEditorMessage({
         if (data.tree) {
           const nextTree = enrichLayersTree(data.tree, filePath, dependencyPaths);
           setLayersTree(nextTree);
+          
+          // Re-apply selection to the iframe after tree builds (essential for ensuring selection overlays appear)
+          const state = useEditorStore.getState();
+          if (state.selectedBlock?.id) {
+            state.sendIframeCommand({ type: 'mrpak:select', id: state.selectedBlock.id });
+          }
         }
         return;
       }
@@ -280,7 +286,7 @@ export function useEditorMessage({
           });
         }
 
-        if (!projectRoot && !isIntermediate) {
+        if ((projectRoot === null || projectRoot === undefined) && !isIntermediate) {
           setError('Cannot apply changes: project is not loaded yet. Please wait and try again.');
           return;
         }

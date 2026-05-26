@@ -60,6 +60,8 @@ interface EditorState {
   stagedPatches: Record<string, StylePatch>;
   setStagedPatches: (patches: Record<string, StylePatch>) => void;
   updateStagedPatches: (updater: ((prev: Record<string, StylePatch>) => Record<string, StylePatch>) | Record<string, StylePatch>) => void;
+  skipPreviewGeneration: boolean;
+  setSkipPreviewGeneration: (skip: boolean) => void;
 
   // UI interaction data
   livePosition: LivePosition;
@@ -155,8 +157,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   stagedPatches: {},
   setStagedPatches: (patches) => set({ stagedPatches: patches }),
   updateStagedPatches: (updater) => set((state) => ({
-    stagedPatches: typeof updater === 'function' ? updater(state.stagedPatches) : updater
+    stagedPatches: typeof updater === 'function' ? updater(state.stagedPatches) : updater,
   })),
+  skipPreviewGeneration: false,
+  setSkipPreviewGeneration: (skip) => set({ skipPreviewGeneration: skip }),
 
   // UI interaction data
   livePosition: { left: null, top: null, width: null, height: null },
@@ -194,11 +198,11 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   // Logging and History
   changesLog: [],
-  setChangesLog: (log) => set({ changesLog: log }),
+  setChangesLog: (log) => set((state) => ({ changesLog: typeof log === 'function' ? log(state.changesLog) : log })),
   undoStack: [],
-  setUndoStack: (stack) => set({ undoStack: stack }),
+  setUndoStack: (stack) => set((state) => ({ undoStack: typeof stack === 'function' ? stack(state.undoStack) : stack })),
   redoStack: [],
-  setRedoStack: (stack) => set({ redoStack: stack }),
+  setRedoStack: (stack) => set((state) => ({ redoStack: typeof stack === 'function' ? stack(state.redoStack) : stack })),
 
   // AST and Previews
   editorHTML: '',
