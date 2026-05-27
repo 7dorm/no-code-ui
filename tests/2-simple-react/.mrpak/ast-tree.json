@@ -97,5 +97,133 @@
     },
     "astType": "File",
     "programBodyLength": 1
+  },
+  "tests/2-simple-react/App.jsx": {
+    "timestamp": "2026-05-27T07:15:59.642Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 817,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 30,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:415:717:div": {
+        "filePath": "tests/2-simple-react/App.jsx",
+        "start": 415,
+        "end": 717,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:724:800:ExtractedBlock": {
+        "filePath": "tests/2-simple-react/App.jsx",
+        "start": 724,
+        "end": 800,
+        "tagName": "ExtractedBlock",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 3
+  },
+  "tests/2-simple-react/ExtractedBlock.jsx": {
+    "timestamp": "2026-05-27T07:17:18.566Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 2087,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 89,
+          "column": 30
+        }
+      }
+    },
+    "map": {
+      "mrpak:ExtractedBlock.jsx:101:286:div": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 101,
+        "end": 286,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:305:520:div": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 305,
+        "end": 520,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:531:671:h2": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 531,
+        "end": 671,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:694:932:p": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 694,
+        "end": 932,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:963:971:strong": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 963,
+        "end": 971,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1013:1283:button": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1013,
+        "end": 1283,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1357:1457:p": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1357,
+        "end": 1457,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1524:1682:div": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1524,
+        "end": 1682,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1693:1762:h3": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1693,
+        "end": 1762,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1785:1858:p": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1785,
+        "end": 1858,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 3
   }
 }

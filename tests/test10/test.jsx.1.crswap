@@ -1,0 +1,18 @@
+import React from 'react';
+function Test() {
+  return <div data-no-code-ui-id="mrpak:test.jsx:61:66:div">
+      
+    <div data-no-code-ui-id="mrpak:temp:1773729980311:c38253" style={{
+      width: 766,
+      height: 86,
+      position: "relative",
+      left: "",
+      top: "",
+      marginLeft: 0,
+      marginTop: 0
+    }}></div><h1 data-no-code-ui-id="mrpak:test.jsx:73:77:h1" style={{
+      width: 780,
+      height: 129
+    }}>Test</h1></div>;
+}
+export default Test;

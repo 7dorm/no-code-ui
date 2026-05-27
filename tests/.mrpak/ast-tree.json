@@ -97,5 +97,97 @@
     },
     "astType": "File",
     "programBodyLength": 1
+  },
+  "tests/VariablesTest.tsx": {
+    "timestamp": "2026-05-27T07:23:20.086Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 2431,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 54,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:VariablesTest.tsx:376:435:div": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 788,
+        "end": 914,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:442:492:h1": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 921,
+        "end": 1037,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:511:514:p": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 1056,
+        "end": 1114,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:541:639:div": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 1141,
+        "end": 1324,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:648:652:h2": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 1333,
+        "end": 1393,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:673:676:p": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 1414,
+        "end": 1472,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:711:714:p": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 1507,
+        "end": 1565,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:765:911:button": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 1616,
+        "end": 1822,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:967:1095:button": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 1879,
+        "end": 2060,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:VariablesTest.tsx:1163:1231:div": {
+        "filePath": "tests/VariablesTest.tsx",
+        "start": 2129,
+        "end": 2278,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
   }
 }

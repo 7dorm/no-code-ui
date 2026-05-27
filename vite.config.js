@@ -14,9 +14,8 @@ export default defineConfig(({ mode }) => {
     },
 
     server: {
-      host: isProd ? '0.0.0.0' : 'localhost',
-      port: isProd ? Number(process.env.PORT) : 5173,
-      allowedHosts: isProd ? 'all' : undefined
+      host: '0.0.0.0',
+      port: 5173
     },
 
     preview: {

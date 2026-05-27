@@ -1,0 +1,26 @@
+import React from 'react';
+function Test() {
+  return <div data-no-code-ui-id="mrpak:test.jsx:61:66:div" style={{
+    position: "relative",
+    height: 500
+  }}>
+      
+    <div data-no-code-ui-id="mrpak:temp:1773734696593:d37a4b">Новый блок</div><h1 data-no-code-ui-id="mrpak:test.jsx:73:77:h1" style={{
+      width: 243.719,
+      height: 288,
+      position: "absolute",
+      left: 391,
+      top: 250,
+      marginLeft: "",
+      marginTop: "",
+      transform: "translate(-50%, -50%)",
+      paddingRight: 39,
+      paddingBottom: 53,
+      marginRight: 79,
+      marginBottom: 55,
+      paddingLeft: 0,
+      paddingTop: 0,
+      padding: "0px -39px -53px 0px"
+    }}>Test</h1></div>;
+}
+export default Test;

@@ -35,3 +35,7 @@ lerna-debug.log*
 
 # Electron
 *.asar
+
+# Editor state
+.mrpak/
+backend/
