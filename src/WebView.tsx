@@ -100,6 +100,8 @@ function WebView({
     
     // Double-buffering logic to avoid white flash
     const iframe = document.createElement('iframe');
+    iframe.id = 'mrpak-preview-frame';
+    iframe.name = 'preview-frame';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';
@@ -188,7 +190,7 @@ function WebView({
 
     const handleMessage = (event: MessageEvent) => {
       try {
-        if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
+        if (event.source !== iframe.contentWindow) return;
         if (onMessageRef.current) {
           onMessageRef.current({ nativeEvent: { data: event.data } });
         }

@@ -62,51 +62,61 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           window.__mrpak_mocks = window.__mrpak_mocks || {};
 
           window.__mrpakGetMock = function(comp, name, actualValue) {
-            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
-            window.__mrpak_live_vars[comp][name] = { type: typeof actualValue, value: actualValue, isState: false, componentName: comp, name };
+            // console.log('[__mrpakGetMock] Called for', comp, name, actualValue);
+            const liveComp = window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
+            const prev = liveComp[name];
             
-            clearTimeout(window.__mrpak_snap_timer);
-            window.__mrpak_snap_timer = setTimeout(() => {
-                const safeSnapshots = {};
-                const liveVars = window.__mrpak_live_vars || {};
-                for (const c of Object.keys(liveVars)) {
-                  safeSnapshots[c] = {};
-                  for (const k of Object.keys(liveVars[c])) {
-                    const { _setter, ...rest } = liveVars[c][k];
-                    safeSnapshots[c][k] = rest;
-                  }
-                }
-                post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
-            }, 300);
-
-            if (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) {
-              return window.__mrpak_mocks[comp][name];
+            let dropMock = false;
+            if (prev && 'baseValue' in prev) {
+               const isPrimitive = (v) => v === null || (typeof v !== 'object' && typeof v !== 'function');
+               if (isPrimitive(prev.baseValue) && isPrimitive(actualValue)) {
+                 if (prev.baseValue !== actualValue) dropMock = true;
+               } else if (!isPrimitive(prev.baseValue) && !isPrimitive(actualValue)) {
+                 try {
+                   if (JSON.stringify(prev.baseValue) !== JSON.stringify(actualValue)) dropMock = true;
+                 } catch(e) {}
+               } else {
+                 dropMock = true;
+               }
             }
-            return actualValue;
+
+            if (dropMock && window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) {
+               delete window.__mrpak_mocks[comp][name];
+               post('${MRPAK_MSG.CLEAR_MOCK}', { comp, name });
+               setTimeout(() => {
+                 const safeSnapshots = {};
+                 const liveVars = window.__mrpak_live_vars || {};
+                 for (const c of Object.keys(liveVars)) {
+                   safeSnapshots[c] = {};
+                   for (const k of Object.keys(liveVars[c])) {
+                     const { _setter, ...rest } = liveVars[c][k];
+                     safeSnapshots[c][k] = rest;
+                   }
+                 }
+                 post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
+               }, 10);
+            }
+
+            const mockValue = (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) 
+              ? window.__mrpak_mocks[comp][name] 
+              : undefined;
+            const effectiveValue = mockValue !== undefined ? mockValue : actualValue;
+
+            liveComp[name] = { type: typeof effectiveValue, value: effectiveValue, baseValue: actualValue, isState: false, componentName: comp, name };
+            
+            return effectiveValue;
           };
 
           window.__mrpakGetMockState = function(comp, name, stateTuple) {
             const actualValue = stateTuple[0];
             const setter = stateTuple[1];
-            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
-            window.__mrpak_live_vars[comp][name] = { type: typeof actualValue, value: actualValue, isState: true, componentName: comp, name, _setter: setter };
             const mockValue = (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) 
                 ? window.__mrpak_mocks[comp][name] 
                 : undefined;
-                
-            clearTimeout(window.__mrpak_snap_timer);
-            window.__mrpak_snap_timer = setTimeout(() => {
-                const safeSnapshots = {};
-                const liveVars = window.__mrpak_live_vars || {};
-                for (const c of Object.keys(liveVars)) {
-                  safeSnapshots[c] = {};
-                  for (const k of Object.keys(liveVars[c])) {
-                    const { _setter, ...rest } = liveVars[c][k];
-                    safeSnapshots[c][k] = rest;
-                  }
-                }
-                post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
-            }, 300);
+            const effectiveValue = mockValue !== undefined ? mockValue : actualValue;
+
+            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
+            window.__mrpak_live_vars[comp][name] = { type: typeof effectiveValue, value: effectiveValue, isState: true, componentName: comp, name, _setter: setter };
 
             if (mockValue !== undefined) {
               return [mockValue, setter];

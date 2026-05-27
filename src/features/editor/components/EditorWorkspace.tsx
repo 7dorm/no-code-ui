@@ -1250,7 +1250,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    minHeight: 200,
+    minHeight: 0,
+    height: '100%',
   },
   placeholderText: {
     fontSize: 16,
@@ -1292,7 +1293,7 @@ const styles = StyleSheet.create({
   htmlContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 400,
+    minHeight: 0,
     backgroundColor: '#ffffff',
     borderRadius: 8,
     overflow: 'hidden',
@@ -1372,7 +1373,7 @@ const styles = StyleSheet.create({
   editorContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 600,
+    minHeight: 0,
     backgroundColor: '#1e1e1e',
   },
   blockEditorPreviewContainer: {
@@ -1447,6 +1448,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1e1e1e',
     position: 'relative',
+    minHeight: 0,
   },
   splitContainer: {
     flex: 1,
@@ -1454,30 +1456,32 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#1e1e1e',
     overflow: 'hidden',
+    minHeight: 0,
   },
   splitSidebarPane: {
     minWidth: 240,
     maxWidth: 520,
-    height: '100%',
     overflow: 'hidden',
     backgroundColor: '#0f172a',
+    minHeight: 0,
   },
   splitMainPanels: {
     flex: 1,
     flexDirection: 'row',
     minWidth: 0,
+    minHeight: 0,
   },
   splitLeft: {
     minWidth: 300,
     backgroundColor: '#1e1e1e',
     overflow: 'hidden',
-    height: '100%',
+    minHeight: 0,
   },
   splitRight: {
     minWidth: 300,
     backgroundColor: '#1e1e1e',
     overflow: 'hidden',
-    height: '100%',
+    minHeight: 0,
   },
   splitDivider: {
     width: 4,
@@ -1516,7 +1520,7 @@ const styles = StyleSheet.create({
   changesContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 600,
+    minHeight: 0,
     backgroundColor: '#1e1e1e',
     padding: 16,
   },
@@ -1584,6 +1588,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#d4d4d4',
     lineHeight: 20,
+  },
+  htmlContainer: {
+    flex: 1,
+    width: '100%',
+    minHeight: 0,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  reactContainer: {
+    flex: 1,
+    width: '100%',
+    minHeight: 0,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   binaryContainer: {
     flex: 1,

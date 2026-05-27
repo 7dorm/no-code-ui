@@ -26,19 +26,40 @@ export function VariablesPanel() {
     // Send message to iframe to update mocks
     const state = useEditorStore.getState();
     const mergedMocks: Record<string, Record<string, any>> = {};
+
+    // First, apply values from variableSnapshots as defaults
+    // ONLY for state variables. Non-state variables (derived values) shouldn't be frozen.
+    for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
+      if (!mergedMocks[comp]) mergedMocks[comp] = {};
+      for (const [varName, varData] of Object.entries(vars)) {
+        if (varData.isState) {
+          mergedMocks[comp][varName] = varData.value;
+        }
+      }
+    }
+
+    // Then override with explicit mockVariables
     for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
       if (!mergedMocks[comp]) mergedMocks[comp] = {};
       for (const [varName, value] of Object.entries(vars)) {
         mergedMocks[comp][varName] = value;
       }
     }
-    
+
     state.sendIframeCommand({
       type: 'MRPAK_CMD_UPDATE_MOCKS',
       mocks: mergedMocks,
     });
     // Force WebView to reload with injected variables
     forceRenderVariables();
+    
+    // Request a fresh snapshot after React has had time to re-render inside the iframe.
+    // This allows derived variables (like doubledCount) to update in the UI.
+    setTimeout(() => {
+      useEditorStore.getState().sendIframeCommand({
+        type: 'MRPAK_CMD_REQUEST_VAR_SNAPSHOT',
+      });
+    }, 100);
   };
 
   const handleSelectVariable = (componentName: string, varName: string) => {

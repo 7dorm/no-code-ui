@@ -463,6 +463,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+    height: '100%',
+    minHeight: 0,
   },
   header: {
     flexDirection: 'row',
@@ -621,6 +623,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     zIndex: 0,
+    minHeight: 0,
   },
   sidebar: {
     backgroundColor: '#1e1e1e',
@@ -629,6 +632,7 @@ const styles = StyleSheet.create({
     transition: 'width 0.3s ease',
     position: 'relative',
     overflow: 'hidden',
+    minHeight: 0,
   },
   sidebarCollapsed: {
     width: 40,
@@ -687,6 +691,7 @@ const styles = StyleSheet.create({
     zIndex: -1,
     position: 'relative',
     overflow: 'hidden',
+    minHeight: 0,
   },
   rightPanel: {
     width: 400,

@@ -14,7 +14,7 @@ export function MonacoEditorWrapper({ value, language, onChange, filePath, onSav
 
   return (
     <View style={styles.editorContainer}>
-      <div style={{ width: '100%', height: '100%', minHeight: '600px' }}>
+      <div style={{ width: '100%', height: '100%' }}>
         <Editor
           height="100%"
           language={language}
@@ -144,6 +144,6 @@ const styles = StyleSheet.create({
   editorContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 600,
+    minHeight: 0,
   },
 });

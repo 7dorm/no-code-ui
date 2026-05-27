@@ -15,7 +15,6 @@ interface StyleLibraryEntry {
 
 interface StyleLibraryColumn {
   fileName: string;
-  entries: StyleLibraryEntry[];
 }
 
 const htmlInputStyle = {
@@ -1973,7 +1972,7 @@ export function BlockEditorSidebar(props: any) {
             )}
           </View>
         ) : sidebarTab === 'variables' ? (
-          <View style={[styles.section, { flex: 1, minHeight: 400 }]}>
+          <View style={[styles.section, { flex: 1, minHeight: 0 }]}>
             <VariablesPanel />
           </View>
         ) : null}

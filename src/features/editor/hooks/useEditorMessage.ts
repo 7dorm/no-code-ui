@@ -90,8 +90,20 @@ export function useEditorMessage({
       }
 
       if (data.type === MRPAK_MSG.READY) {
+        console.log('[useEditorMessage] Received READY, sending CMD_UPDATE_MOCKS');
         const state = useEditorStore.getState();
         const mergedMocks: Record<string, Record<string, any>> = {};
+
+        // First apply values from variableSnapshots as defaults
+        // ONLY for state variables. Non-state variables (derived values) shouldn't be frozen.
+        for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
+          if (!mergedMocks[comp]) mergedMocks[comp] = {};
+          for (const [varName, varData] of Object.entries(vars)) {
+            if (varData.isState) {
+              mergedMocks[comp][varName] = varData.value;
+            }
+          }
+        }
 
         // Only override with explicit mockVariables
         for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
@@ -101,15 +113,37 @@ export function useEditorMessage({
           }
         }
 
+        console.log('[useEditorMessage] Sending mergedMocks:', mergedMocks);
         state.sendIframeCommand({
           type: 'MRPAK_CMD_UPDATE_MOCKS',
           mocks: mergedMocks,
         });
 
-        // Request a fresh snapshot from the iframe now that it has been populated with restored state
-        state.sendIframeCommand({
-          type: 'MRPAK_CMD_REQUEST_VAR_SNAPSHOT',
-        });
+        // Automatically request a snapshot shortly after initialization
+        // This ensures the Variables Panel is always populated without needing to manually click "Make Snapshot"
+        setTimeout(() => {
+          useEditorStore.getState().sendIframeCommand({
+            type: 'MRPAK_CMD_REQUEST_VAR_SNAPSHOT',
+          });
+        }, 100);
+
+        return;
+      }
+
+      if (data.type === MRPAK_MSG.CLEAR_MOCK) {
+        if (data.comp && data.name) {
+          console.log('[useEditorMessage] Clearing mock for', data.comp, data.name);
+          useEditorStore.getState().updateMockVariables((prev: any) => {
+            const newMocks = { ...prev };
+            if (newMocks[data.comp]) {
+              newMocks[data.comp] = { ...newMocks[data.comp] };
+              delete newMocks[data.comp][data.name];
+            }
+            return newMocks;
+          });
+          // Also trigger a UI refresh
+          useEditorStore.getState().forceRenderVariables();
+        }
         return;
       }
 

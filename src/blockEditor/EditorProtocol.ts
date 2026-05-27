@@ -14,6 +14,7 @@ export const MRPAK_MSG = {
   CANVAS_ZOOM: 'MRPAK_CANVAS_ZOOM',
   CANVAS_PAN: 'MRPAK_CANVAS_PAN',
   VAR_SNAPSHOT: 'MRPAK_VAR_SNAPSHOT',
+  CLEAR_MOCK: 'MRPAK_CLEAR_MOCK',
 };
 
 // Команды из UI -> iframe (локальные изменения, без записи в файлы)
