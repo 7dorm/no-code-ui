@@ -139,3 +139,13 @@ export type StyleTemplate = {
   cssText: string;
 };
 
+export type VariableSnapshot = {
+  name: string;
+  type: string;
+  value: any;
+  isState: boolean;
+  componentName: string;
+};
+
+export type ComponentVariables = Record<string, VariableSnapshot>;
+

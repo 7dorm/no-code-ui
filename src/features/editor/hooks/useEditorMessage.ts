@@ -73,7 +73,7 @@ export function useEditorMessage({
           if (monacoEditorRef?.current) {
             try {
               contentToSave = monacoEditorRef.current.getValue();
-            } catch {}
+            } catch { }
           }
           if (!contentToSave) {
             contentToSave = unsavedContent !== null ? unsavedContent : fileContent;
@@ -86,6 +86,38 @@ export function useEditorMessage({
         if (viewMode === 'preview' && isModified) {
           void saveFileRef.current?.();
         }
+        return;
+      }
+
+      if (data.type === MRPAK_MSG.READY) {
+        const state = useEditorStore.getState();
+        const mergedMocks: Record<string, Record<string, any>> = {};
+
+        // 1. Fill with variableSnapshots (preserving the state user had before reload)
+        for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
+          mergedMocks[comp] = {};
+          for (const [varName, varData] of Object.entries(vars)) {
+            mergedMocks[comp][varName] = varData.value;
+          }
+        }
+
+        // 2. Override with explicit mockVariables
+        for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
+          if (!mergedMocks[comp]) mergedMocks[comp] = {};
+          for (const [varName, value] of Object.entries(vars)) {
+            mergedMocks[comp][varName] = value;
+          }
+        }
+
+        state.sendIframeCommand({
+          type: 'MRPAK_CMD_UPDATE_MOCKS',
+          mocks: mergedMocks,
+        });
+
+        // Request a fresh snapshot from the iframe now that it has been populated with restored state
+        state.sendIframeCommand({
+          type: 'MRPAK_CMD_REQUEST_VAR_SNAPSHOT',
+        });
         return;
       }
 
@@ -103,7 +135,7 @@ export function useEditorMessage({
         if (data.tree) {
           const nextTree = enrichLayersTree(data.tree, filePath, dependencyPaths);
           setLayersTree(nextTree);
-          
+
           // Re-apply selection to the iframe after tree builds (essential for ensuring selection overlays appear)
           const state = useEditorStore.getState();
           if (state.selectedBlock?.id) {
@@ -115,6 +147,7 @@ export function useEditorMessage({
 
       if (data.type === MRPAK_MSG.STYLE_SNAPSHOT) {
         if (data.id) {
+          console.log('[useEditorMessage] Received STYLE_SNAPSHOT for:', data.id, data);
           setStyleSnapshots({
             ...useEditorStore.getState().styleSnapshots,
             [data.id]: (() => {
@@ -136,12 +169,21 @@ export function useEditorMessage({
 
       if (data.type === MRPAK_MSG.TEXT_SNAPSHOT) {
         if (data.id) {
+          console.log('[useEditorMessage] Received TEXT_SNAPSHOT for:', data.id, data.text);
           setTextSnapshots({
             ...useEditorStore.getState().textSnapshots,
             [data.id]: useEditorStore.getState().textSnapshots?.[data.id] === (data.text ?? '')
               ? useEditorStore.getState().textSnapshots?.[data.id] || ''
               : (data.text ?? ''),
           });
+        }
+        return;
+      }
+
+      if (data.type === MRPAK_MSG.VAR_SNAPSHOT) {
+        console.log('[useEditorMessage] Received VAR_SNAPSHOT:', data.snapshots);
+        if (data.snapshots) {
+          useEditorStore.getState().setVariableSnapshots(data.snapshots);
         }
         return;
       }
@@ -179,7 +221,7 @@ export function useEditorMessage({
               return;
             }
             const snippet = supportsStyleOnlyArg ? `<${componentName} style={{}} />` : `<${componentName} />`;
-            
+
             await stageInsertBlock({ targetId: id, mode: 'child', snippet, skipIframeInsert: true });
             updateStagedComponentImports((prev) => {
               const exists = prev.some(
@@ -197,6 +239,7 @@ export function useEditorMessage({
               setFileContent(liveCode);
             }
             setRenderVersion((v) => v + 1);
+            void commitStagedPatches();
             return;
           }
 
@@ -236,6 +279,7 @@ export function useEditorMessage({
               setFileContent(liveCode);
             }
             setRenderVersion((v) => v + 1);
+            void commitStagedPatches();
             return;
           }
 
@@ -245,7 +289,8 @@ export function useEditorMessage({
           if (!tag) {
             tag = fileType === 'react-native' ? 'View' : 'div';
           }
-          const snippet = `<${tag}></${tag}>`;
+          const isVoidTag = /^(img|input|hr|br|meta|link)$/i.test(tag);
+          const snippet = isVoidTag ? `<${tag} />` : `<${tag}>Новый блок</${tag}>`;
           await stageInsertBlock({ targetId: id, mode: 'child', snippet });
           return;
         }
@@ -292,6 +337,9 @@ export function useEditorMessage({
         }
 
         await applyBlockPatch(id, patch, isIntermediate);
+        if (!isIntermediate) {
+          void commitStagedPatches();
+        }
         return;
       }
 

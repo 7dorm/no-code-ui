@@ -8,7 +8,8 @@ import type {
   StagedOp,
   StagedComponentImport,
   StyleLibraryEntry,
-  LivePosition
+  LivePosition,
+  ComponentVariables
 } from './editorTypes';
 
 interface EditorState {
@@ -106,6 +107,15 @@ interface EditorState {
   setEditorHTML: (html: string) => void;
   blockMapForFile: BlockMap;
   setBlockMapForFile: (map: BlockMap) => void;
+
+  // Variables and Mocks
+  variableSnapshots: Record<string, ComponentVariables>;
+  setVariableSnapshots: (snapshots: Record<string, ComponentVariables>) => void;
+  mockVariables: Record<string, Record<string, any>>;
+  setMockVariables: (mocks: Record<string, Record<string, any>>) => void;
+  updateMockVariables: (updater: ((prev: Record<string, Record<string, any>>) => Record<string, Record<string, any>>) | Record<string, Record<string, any>>) => void;
+  variablesRenderVersion: number;
+  forceRenderVariables: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -209,5 +219,15 @@ export const useEditorStore = create<EditorState>((set) => ({
   setEditorHTML: (html) => set({ editorHTML: html }),
   blockMapForFile: {},
   setBlockMapForFile: (map) => set({ blockMapForFile: map }),
-}));
 
+  // Variables and Mocks
+  variableSnapshots: {},
+  setVariableSnapshots: (snapshots) => set({ variableSnapshots: snapshots }),
+  mockVariables: {},
+  setMockVariables: (mocks) => set({ mockVariables: mocks }),
+  updateMockVariables: (updater) => set((state) => ({
+    mockVariables: typeof updater === 'function' ? updater(state.mockVariables) : updater
+  })),
+  variablesRenderVersion: 0,
+  forceRenderVariables: () => set((state) => ({ variablesRenderVersion: state.variablesRenderVersion + 1 })),
+}));

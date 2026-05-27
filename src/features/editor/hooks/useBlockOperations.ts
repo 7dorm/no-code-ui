@@ -290,7 +290,11 @@ export function useBlockOperations({
       updateStagedOps([]);
       updateStagedComponentImports([]);
       setHasStagedChanges(false);
-      clearHistory();
+      
+      if (!isOnlyStylePatches) {
+        clearHistory();
+      }
+
       setShowSaveIndicator(true);
       setTimeout(() => setShowSaveIndicator(false), 2000);
     } catch (e) {
@@ -334,6 +338,33 @@ export function useBlockOperations({
 
   const stageDeleteBlock = useCallback((blockId: any, isUndoRedo = false) => {
     if (!blockId) return;
+
+    const isTempBlock = String(blockId).startsWith('mrpak:temp:');
+    if (isTempBlock) {
+      const state = useEditorStore.getState();
+      const insertOp = state.stagedOps.find((op: any) => op.type === 'insert' && op.blockId === blockId);
+      
+      updateStagedOps((prev) => prev.filter((op: any) => op.blockId !== blockId && op.sourceId !== blockId && op.targetId !== blockId));
+      updateStagedPatches((prev) => {
+        const next = { ...prev };
+        delete next[blockId];
+        return next;
+      });
+      
+      if (!isUndoRedo && insertOp) {
+        addToHistory({
+          type: 'delete',
+          blockId: blockId,
+          parentId: (insertOp as any).targetId,
+          snippet: (insertOp as any).snippet,
+          fileType,
+          filePath,
+        });
+      }
+      sendIframeCommand({ type: MRPAK_CMD.DELETE, id: blockId });
+      return;
+    }
+
     const mappedBlockId = resolveToMappedBlockId(blockId) || blockId;
     const now = Date.now();
     if (lastDeleteOperationRef.current) {

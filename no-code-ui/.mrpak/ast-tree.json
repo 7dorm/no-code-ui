@@ -1,0 +1,879 @@
+{
+  "tests/test10/test.jsx": {
+    "timestamp": "2026-03-19T04:38:09.578Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 763,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 24,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:test.jsx:208:269:div": {
+        "filePath": "tests/test10/test.jsx",
+        "start": 27,
+        "end": 136,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:test.jsx:281:286:div": {
+        "filePath": "tests/test10/test.jsx",
+        "start": 148,
+        "end": 201,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:test.jsx:302:662:h1": {
+        "filePath": "tests/test10/test.jsx",
+        "start": 217,
+        "end": 745,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  },
+  "tests/11-demo-project/App.jsx": {
+    "timestamp": "2026-03-19T06:02:36.618Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 357,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 14,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:82:192:div": {
+        "filePath": "tests/11-demo-project/App.jsx",
+        "start": 27,
+        "end": 183,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:204:209:div": {
+        "filePath": "tests/11-demo-project/App.jsx",
+        "start": 195,
+        "end": 247,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:230:234:h1": {
+        "filePath": "tests/11-demo-project/App.jsx",
+        "start": 268,
+        "end": 318,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  },
+  "tests/11-demo-project/Test.jsx": {
+    "timestamp": "2026-03-19T05:28:49.482Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 2180,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 60,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:Test.jsx:101:301:div": {
+        "filePath": "tests/11-demo-project/Test.jsx",
+        "start": 1631,
+        "end": 1879,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Test.jsx:316:321:div": {
+        "filePath": "tests/11-demo-project/Test.jsx",
+        "start": 1894,
+        "end": 1947,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:Test.jsx:1968:2139:MrpakImportedBoundary": {
+        "filePath": "tests/11-demo-project/Test.jsx",
+        "start": 1968,
+        "end": 2139,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 3
+  },
+  "tests/11-demo-project/ExtractedBlock.jsx": {
+    "timestamp": "2026-03-19T05:35:32.753Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 305,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 12,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:ExtractedBlock.jsx:92:272:div": {
+        "filePath": "tests/11-demo-project/ExtractedBlock.jsx",
+        "start": 37,
+        "end": 274,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  },
+  "tests/11-demo-project copy/Test.jsx": {
+    "timestamp": "2026-03-19T06:07:48.211Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 1839,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 46,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:Test.jsx:1641:1812:MrpakImportedBoundary": {
+        "filePath": "tests/11-demo-project copy/Test.jsx",
+        "start": 1641,
+        "end": 1812,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 3
+  },
+  "tests/11-demo-project copy/App.jsx": {
+    "timestamp": "2026-03-19T06:04:40.357Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 6400,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 125,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:583:610:div": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 4313,
+        "end": 4387,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:4394:4543:MrpakImportedBoundary": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 4394,
+        "end": 4543,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:635:747:main": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 4575,
+        "end": 4735,
+        "tagName": "main",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:756:788:section": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 4744,
+        "end": 4827,
+        "tagName": "section",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:799:828:span": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 4838,
+        "end": 4915,
+        "tagName": "span",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:858:885:h1": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 4945,
+        "end": 5018,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:5049:5190:MrpakImportedBoundary": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 5049,
+        "end": 5190,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:5225:5366:MrpakImportedBoundary": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 5225,
+        "end": 5366,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:990:1015:p": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 5415,
+        "end": 5486,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1139:1169:div": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 5610,
+        "end": 5689,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1182:1217:button": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 5702,
+        "end": 5789,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1253:1290:button": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 5825,
+        "end": 5914,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1361:1396:section": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 5985,
+        "end": 6073,
+        "tagName": "section",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:6103:6327:MrpakImportedBoundary": {
+        "filePath": "tests/11-demo-project copy/App.jsx",
+        "start": 6103,
+        "end": 6327,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 6
+  },
+  "tests/9-interaction-blocking/App.jsx": {
+    "timestamp": "2026-03-19T06:10:41.760Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 1788,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 46,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:1591:1761:MrpakImportedBoundary": {
+        "filePath": "tests/9-interaction-blocking/App.jsx",
+        "start": 1591,
+        "end": 1761,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 3
+  },
+  "tests/8-multi-component-jsx/App.jsx": {
+    "timestamp": "2026-03-19T06:17:39.196Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 4365,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 142,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:101:424:span": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 46,
+        "end": 461,
+        "tagName": "span",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:432:591:span": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 469,
+        "end": 648,
+        "tagName": "span",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:960:1214:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 991,
+        "end": 1259,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1222:1465:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1267,
+        "end": 1523,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1475:1506:StatusBadge": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1533,
+        "end": 1621,
+        "tagName": "StatusBadge",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1515:1577:h1": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1630,
+        "end": 1770,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1616:1679:p": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1809,
+        "end": 1949,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1722:1897:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1992,
+        "end": 2186,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1909:2088:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2198,
+        "end": 2394,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2102:2198:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2408,
+        "end": 2611,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2251:2313:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2664,
+        "end": 2821,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2355:2534:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2863,
+        "end": 3059,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2548:2644:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3073,
+        "end": 3276,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2699:2756:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3331,
+        "end": 3483,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2771:3104:button": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3498,
+        "end": 3821,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3179:3528:button": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3896,
+        "end": 4235,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  },
+  "src/AppRN.tsx": {
+    "timestamp": "2026-03-19T06:15:20.665Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 26312,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 656,
+          "column": 3
+        }
+      }
+    },
+    "map": {
+      "mrpak:AppRN.tsx:8515:8546:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8804,
+        "end": 8887,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8582:8610:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8923,
+        "end": 9003,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8619:8651:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9012,
+        "end": 9096,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8662:8707:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9107,
+        "end": 9204,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8766:8799:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9263,
+        "end": 9348,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8847:8879:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9386,
+        "end": 9470,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8894:9058:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9485,
+        "end": 9685,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9076:9169:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9703,
+        "end": 9848,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9231:9391:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9910,
+        "end": 10106,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9409:9500:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10124,
+        "end": 10267,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9561:9725:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10328,
+        "end": 10528,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9743:9836:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10546,
+        "end": 10691,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9938:9972:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10781,
+        "end": 10867,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9991:10167:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10886,
+        "end": 11093,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10189:10276:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11115,
+        "end": 11256,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10346:10522:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11326,
+        "end": 11534,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10544:10631:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11556,
+        "end": 11697,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10701:10871:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11767,
+        "end": 11969,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10893:10977:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11991,
+        "end": 12129,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11078:11114:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12217,
+        "end": 12307,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11131:11165:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12324,
+        "end": 12412,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11184:11367:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12431,
+        "end": 12644,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11389:11487:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12666,
+        "end": 12818,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11553:11734:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12884,
+        "end": 13095,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11756:11853:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13117,
+        "end": 13268,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11942:11976:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13357,
+        "end": 13445,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11995:12028:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13464,
+        "end": 13551,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12055:12407:TextInput": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13578,
+        "end": 13881,
+        "tagName": "TextInput",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12427:12460:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13901,
+        "end": 13988,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12487:12843:TextInput": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14015,
+        "end": 14322,
+        "tagName": "TextInput",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12965:13147:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14432,
+        "end": 14650,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13167:13259:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14670,
+        "end": 14816,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13443:13588:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 14966,
+        "end": 15153,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13604:13642:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15169,
+        "end": 15261,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13752:13852:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15360,
+        "end": 15502,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13866:13904:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15516,
+        "end": 15608,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14069:14120:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15763,
+        "end": 15868,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14268:14301:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 15999,
+        "end": 16086,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14312:14343:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16097,
+        "end": 16182,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14371:14420:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16210,
+        "end": 16325,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14433:14465:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16338,
+        "end": 16424,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14579:14612:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16531,
+        "end": 16618,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14667:14920:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16673,
+        "end": 16932,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:14985:15129:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 16997,
+        "end": 17145,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15143:15178:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 17159,
+        "end": 17248,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:15193:15227:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 17263,
+        "end": 17351,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17404:18220:MrpakImportedBoundary": {
+        "filePath": "src/AppRN.tsx",
+        "start": 17404,
+        "end": 18220,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:16197:16228:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 18317,
+        "end": 18402,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:16285:16314:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 18459,
+        "end": 18542,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:18579:19312:MrpakImportedBoundary": {
+        "filePath": "src/AppRN.tsx",
+        "start": 18579,
+        "end": 19312,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17157:17190:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 19339,
+        "end": 19426,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17205:17242:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 19441,
+        "end": 19532,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17266:17303:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 19556,
+        "end": 19647,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:17388:17425:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 19732,
+        "end": 19823,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:20041:20378:MrpakImportedBoundary": {
+        "filePath": "src/AppRN.tsx",
+        "start": 20041,
+        "end": 20378,
+        "tagName": "MrpakImportedBoundary",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 13
+  }
+}

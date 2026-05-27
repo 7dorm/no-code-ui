@@ -1,0 +1,59 @@
+{
+  "tests/test10/aa/aa.jsx": {
+    "timestamp": "2026-03-18T16:21:48.705Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 1326,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 63,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:aa.jsx:135:251:div": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 135,
+        "end": 251,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:aa.jsx:259:644:div": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 259,
+        "end": 644,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:aa.jsx:656:957:div": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 656,
+        "end": 957,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:aa.jsx:979:987:button": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 979,
+        "end": 987,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:aa.jsx:1015:1294:img": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 1015,
+        "end": 1294,
+        "tagName": "img",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 5
+  }
+}

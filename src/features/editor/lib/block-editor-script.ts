@@ -7,7 +7,7 @@ import { MRPAK_MSG, MRPAK_CMD } from '../../../blockEditor/EditorProtocol';
  */
 export function generateBlockEditorScript(type: string, mode: string = 'preview', rootFileBasename: string = '') {
   const isEditMode = mode === 'edit';
-  
+
   return `
       <style>
         [data-no-code-ui-id].mrpak-selected, [data-mrpak-id].mrpak-selected { outline: 2px solid #667eea !important; outline-offset: 2px; }
@@ -57,6 +57,62 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const INSTANCE_TOKEN = 'mrpak-editor:' + Date.now() + ':' + Math.random().toString(16).slice(2, 8);
           window.__MRPAK_BLOCK_EDITOR_ACTIVE_TOKEN__ = INSTANCE_TOKEN;
           const isActiveInstance = () => window.__MRPAK_BLOCK_EDITOR_ACTIVE_TOKEN__ === INSTANCE_TOKEN;
+
+          window.__mrpak_live_vars = window.__mrpak_live_vars || {};
+          window.__mrpak_mocks = window.__mrpak_mocks || {};
+
+          window.__mrpakGetMock = function(comp, name, actualValue) {
+            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
+            window.__mrpak_live_vars[comp][name] = { type: typeof actualValue, value: actualValue, isState: false, componentName: comp, name };
+            
+            clearTimeout(window.__mrpak_snap_timer);
+            window.__mrpak_snap_timer = setTimeout(() => {
+                const safeSnapshots = {};
+                const liveVars = window.__mrpak_live_vars || {};
+                for (const c of Object.keys(liveVars)) {
+                  safeSnapshots[c] = {};
+                  for (const k of Object.keys(liveVars[c])) {
+                    const { _setter, ...rest } = liveVars[c][k];
+                    safeSnapshots[c][k] = rest;
+                  }
+                }
+                post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
+            }, 300);
+
+            if (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) {
+              return window.__mrpak_mocks[comp][name];
+            }
+            return actualValue;
+          };
+
+          window.__mrpakGetMockState = function(comp, name, stateTuple) {
+            const actualValue = stateTuple[0];
+            const setter = stateTuple[1];
+            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
+            window.__mrpak_live_vars[comp][name] = { type: typeof actualValue, value: actualValue, isState: true, componentName: comp, name, _setter: setter };
+            const mockValue = (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) 
+                ? window.__mrpak_mocks[comp][name] 
+                : undefined;
+                
+            clearTimeout(window.__mrpak_snap_timer);
+            window.__mrpak_snap_timer = setTimeout(() => {
+                const safeSnapshots = {};
+                const liveVars = window.__mrpak_live_vars || {};
+                for (const c of Object.keys(liveVars)) {
+                  safeSnapshots[c] = {};
+                  for (const k of Object.keys(liveVars[c])) {
+                    const { _setter, ...rest } = liveVars[c][k];
+                    safeSnapshots[c][k] = rest;
+                  }
+                }
+                post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
+            }, 300);
+
+            if (mockValue !== undefined) {
+              return [mockValue, setter];
+            }
+            return stateTuple;
+          };
           try {
             Array.from(document.querySelectorAll('.mrpak-selected, .mrpak-multi-selected')).forEach((el) => {
               try {
@@ -177,6 +233,9 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const MSG_STYLE_SNAPSHOT = '${MRPAK_MSG.STYLE_SNAPSHOT}';
           const MSG_TEXT_SNAPSHOT = '${MRPAK_MSG.TEXT_SNAPSHOT}';
           const MSG_DROP_TARGET = '${MRPAK_MSG.DROP_TARGET}';
+          const MSG_CANVAS_ZOOM = '${MRPAK_MSG.CANVAS_ZOOM}';
+          const MSG_CANVAS_PAN = '${MRPAK_MSG.CANVAS_PAN}';
+          const MSG_VAR_SNAPSHOT = '${MRPAK_MSG.VAR_SNAPSHOT}';
           const CMD_SELECT = '${MRPAK_CMD.SELECT}';
           const CMD_INSERT = '${MRPAK_CMD.INSERT}';
           const CMD_DELETE = '${MRPAK_CMD.DELETE}';
@@ -191,6 +250,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_END_DRAG = '${MRPAK_CMD.END_DRAG}';
           const CMD_UPDATE_EXTERNAL_POINTER = '${MRPAK_CMD.UPDATE_EXTERNAL_POINTER}';
           const CMD_SET_RESIZE_TARGET = '${MRPAK_CMD.SET_RESIZE_TARGET}';
+          const CMD_REQ_VAR_SNAPSHOT = '${MRPAK_CMD.REQUEST_VAR_SNAPSHOT}';
+          const CMD_UPDATE_MOCKS = '${MRPAK_CMD.UPDATE_MOCKS}';
           let selected = null;
           let selectedGroup = [];
           let selectedIds = [];
@@ -1302,6 +1363,9 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           };
 
           function isInteractive(el) {
+            if (EDIT_MODE) {
+              document.body.style.backgroundColor = '#1e1e1e'; // Default dark theme for editor
+            }
             if (!el || el.nodeType !== 1) return false;
             const tag = (el.tagName || '').toUpperCase();
             if (['A','BUTTON','INPUT','SELECT','TEXTAREA','LABEL','FORM','SUMMARY'].includes(tag)) return true;
@@ -1607,8 +1671,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             if (!isActiveInstance()) return;
             if (!EDIT_MODE) return; // В preview режиме не обрабатываем
 
-            // Обработка панорамирования холста (Средняя кнопка мыши или Space+Click или Alt+Click)
-            if (ev.button === 1 || ev.altKey || isSpacePressed) {
+            // Обработка панорамирования холста (Средняя кнопка мыши или Space+Click)
+            if (ev.button === 1 || isSpacePressed) {
               try {
                 ev.preventDefault();
                 ev.stopPropagation();
@@ -1779,6 +1843,14 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
 
           document.addEventListener('mousemove', (ev) => {
             if (!isActiveInstance()) return;
+            if (canvasPanning) {
+              const panDx = ev.clientX - canvasPanStartX;
+              const panDy = ev.clientY - canvasPanStartY;
+              canvasPanStartX = ev.clientX;
+              canvasPanStartY = ev.clientY;
+              post(MSG_CANVAS_PAN, { dx: panDx, dy: panDy });
+              return;
+            }
             if (!drag || !selected) return;
             const dx = ev.clientX - drag.sx;
             const dy = ev.clientY - drag.sy;
@@ -1845,6 +1917,16 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   right: nextMr,
                   bottom: nextMb,
                 };
+                applyToSelectedGroup((node) => {
+                  if (drag.startWidth !== undefined && drag.startHeight !== undefined) {
+                    node.style.width = drag.startWidth + 'px';
+                    node.style.height = drag.startHeight + 'px';
+                  }
+                  node.style.marginLeft = nextMl + 'px';
+                  node.style.marginTop = nextMt + 'px';
+                  node.style.marginRight = nextMr + 'px';
+                  node.style.marginBottom = nextMb + 'px';
+                });
                 updateBoxOverlay();
                 const baseRect = getElementVisualRect(selected);
                 if (baseRect) {
@@ -2892,6 +2974,47 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 );
                 return;
               }
+              if (data.type === CMD_REQ_VAR_SNAPSHOT) {
+                const safeSnapshots = {};
+                const liveVars = window.__mrpak_live_vars || {};
+                for (const comp of Object.keys(liveVars)) {
+                  safeSnapshots[comp] = {};
+                  for (const key of Object.keys(liveVars[comp])) {
+                    const { _setter, ...rest } = liveVars[comp][key];
+                    safeSnapshots[comp][key] = rest;
+                  }
+                }
+                post(MSG_VAR_SNAPSHOT, {
+                  snapshots: safeSnapshots
+                });
+                return;
+              }
+              if (data.type === CMD_UPDATE_MOCKS) {
+                if (data.mocks) {
+                  window.__mrpak_mocks = data.mocks;
+                  
+                  // Force a re-render by temporarily altering and restoring state
+                  if (window.__mrpak_live_vars) {
+                     for (const comp of Object.keys(window.__mrpak_live_vars)) {
+                        for (const key of Object.keys(window.__mrpak_live_vars[comp])) {
+                           const v = window.__mrpak_live_vars[comp][key];
+                           if (v.isState && typeof v._setter === 'function') {
+                              const old = v.value;
+                              if (typeof old === 'number') v._setter(old + 0.0000001);
+                              else if (typeof old === 'string') v._setter(old + ' ');
+                              else if (typeof old === 'boolean') v._setter(!old);
+                              else v._setter((prev) => Array.isArray(prev) ? [...prev] : typeof prev === 'object' && prev !== null ? {...prev} : prev);
+                              
+                              if (typeof old === 'number' || typeof old === 'string' || typeof old === 'boolean') {
+                                setTimeout(() => v._setter(old), 0);
+                              }
+                           }
+                        }
+                     }
+                  }
+                }
+                return;
+              }
               if (data.type === CMD_START_DRAG) {
                 const source = String(data.source || 'library');
                 if (source === 'component') {
@@ -3003,7 +3126,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         })();
       </script>
      `;
- }
+}
 
 /**
  * РРЅР¶РµРєС‚РёСЂСѓРµС‚ СЃРєСЂРёРїС‚ Р±Р»РѕС‡РЅРѕРіРѕ СЂРµРґР°РєС‚РѕСЂР° РІ HTML

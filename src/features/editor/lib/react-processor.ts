@@ -636,6 +636,92 @@ export function wrapImportedComponentUsages(code: string): {
   }
 }
 
+export function instrumentVariablesForPreview(code: string): string {
+  try {
+    const ast = parseModule(code);
+    
+    traverse(ast, {
+      VariableDeclarator(path) {
+        // Only instrument top-level variables inside components
+        const functionParent = path.getFunctionParent();
+        if (!functionParent) return;
+
+        // Ensure it's a renderable component
+        const fnNode = functionParent.node;
+        let compName = 'UnknownComponent';
+        if (t.isFunctionDeclaration(fnNode) && fnNode.id) {
+          compName = fnNode.id.name;
+        } else if (t.isVariableDeclarator(functionParent.parentPath?.node)) {
+          const id = (functionParent.parentPath.node as t.VariableDeclarator).id;
+          if (t.isIdentifier(id)) compName = id.name;
+        }
+
+        if (!/^[A-Z]/.test(compName)) return; // Only pascal case components
+
+        const id = path.node.id;
+        const init = path.node.init;
+        if (!init) return;
+
+        // Check for useState
+        let isUseState = false;
+        if (t.isCallExpression(init)) {
+          const callee = init.callee;
+          if (t.isIdentifier(callee) && callee.name === 'useState') isUseState = true;
+          if (t.isMemberExpression(callee) && t.isIdentifier(callee.object, { name: 'React' }) && t.isIdentifier(callee.property, { name: 'useState' })) isUseState = true;
+        }
+
+        if (isUseState && t.isArrayPattern(id)) {
+          const stateVar = id.elements[0];
+          if (t.isIdentifier(stateVar)) {
+            const varName = stateVar.name;
+            path.node.init = t.logicalExpression(
+              '||',
+              t.callExpression(
+                t.memberExpression(
+                  t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMockState')),
+                  t.identifier('call')
+                ),
+                [t.nullLiteral(), t.stringLiteral(compName), t.stringLiteral(varName), init]
+              ),
+              init
+            );
+            // Actually, simpler to just emit `window.__mrpakGetMockState ? window.__mrpakGetMockState(...) : init`
+            path.node.init = t.conditionalExpression(
+              t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMockState')),
+              t.callExpression(
+                t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMockState')),
+                [t.stringLiteral(compName), t.stringLiteral(varName), init]
+              ),
+              init
+            );
+          }
+        } else if (t.isIdentifier(id) && !isUseState) {
+          // Simple variable
+          const varName = id.name;
+          path.node.init = t.conditionalExpression(
+            t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+            t.callExpression(
+              t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+              [t.stringLiteral(compName), t.stringLiteral(varName), init]
+            ),
+            init
+          );
+        }
+      }
+    });
+
+    return generate(ast, {
+      retainLines: false,
+      compact: false,
+      concise: false,
+      comments: true,
+    }).code;
+  } catch (error) {
+    console.warn('[instrumentVariablesForPreview] AST transform failed, skipping:', error);
+    return code;
+  }
+}
+
 export function detectComponents(code: string): DetectedComponent[] {
   const components: DetectedComponent[] = [];
   const seen = new Set<string>();

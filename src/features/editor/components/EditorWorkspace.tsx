@@ -80,6 +80,7 @@ export function EditorWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [unsavedContent, setUnsavedContent] = useState<string | null>(null);
   const [showSaveIndicator, setShowSaveIndicator] = useState<boolean>(false);
+  const [snapshotFeedback, setSnapshotFeedback] = useState<boolean>(false);
   const [renderVersion, setRenderVersion] = useState<number>(0);
 
   // Local HTML/React/React-Native preview content and states
@@ -960,24 +961,20 @@ export function EditorWorkspace({
                   canvasDeviceStore === 'mobile' && styles.previewViewportFrameMobile,
                 ]}
               >
-                <WebView
-                  key={`html-${filePath}-${htmlDependencyPaths.length}-${renderVersion}-${(htmlToRender || '').length}`}
-                  source={{ html: htmlToRender }}
-                  style={styles.webview}
-                  javaScriptEnabled={true}
-                  domStorageEnabled={true}
-                  startInLoadingState={false}
-                  allowExternalScripts={true}
-                  onLoad={() => {
-                    console.log('RenderFile: HTML content loaded successfully');
-                  }}
-                  onError={(syntheticEvent) => {
-                    const { nativeEvent } = syntheticEvent;
-                    console.error('RenderFile: WebView error:', nativeEvent);
-                  }}
-                />
+                {renderBlockEditorPreview('html', editorHTML || htmlToRender)}
+                {renderPreviewFallbackOverlay()}
               </View>
             </View>
+            <TouchableOpacity
+              style={[styles.snapshotButton, snapshotFeedback && { backgroundColor: '#22c55e' }]}
+              onPress={() => {
+                sendIframeCommand({ type: MRPAK_CMD.REQUEST_VAR_SNAPSHOT });
+                setSnapshotFeedback(true);
+                setTimeout(() => setSnapshotFeedback(false), 1500);
+              }}
+            >
+              <Text style={styles.snapshotButtonText}>{snapshotFeedback ? '✓ Snapshotted' : 'Make Snapshot'}</Text>
+            </TouchableOpacity>
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('html', editorHTML || htmlToRender)
@@ -1046,7 +1043,7 @@ export function EditorWorkspace({
     })();
 
     return (
-      <View style={styles.htmlContainer}>
+      <View style={styles.reactContainer}>
         {renderContentMetaOverlay('React', detectedComponentName)}
         {viewMode === 'preview' ? (
           <View style={styles.blockEditorPreviewContainer}>
@@ -1058,31 +1055,20 @@ export function EditorWorkspace({
                   canvasDeviceStore === 'mobile' && styles.previewViewportFrameMobile,
                 ]}
               >
-                <WebView
-                  key={`react-${filePath}-${renderVersion}-${reactHTML?.length || 0}`}
-                  source={{ html: reactHTML }}
-                  style={styles.webview}
-                  javaScriptEnabled={true}
-                  domStorageEnabled={true}
-                  startInLoadingState={true}
-                  allowExternalScripts={true}
-                  renderLoading={() => (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color="#667eea" />
-                    </View>
-                  )}
-                  onLoad={() => {
-                    console.log('RenderFile: React component loaded successfully');
-                  }}
-                  onError={(syntheticEvent) => {
-                    const { nativeEvent } = syntheticEvent;
-                    console.error('RenderFile: WebView error:', nativeEvent);
-                    setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
-                  }}
-                />
+                {renderBlockEditorPreview('react', editorHTML || reactHTML)}
                 {renderPreviewFallbackOverlay()}
               </View>
             </View>
+            <TouchableOpacity
+              style={[styles.snapshotButton, snapshotFeedback && { backgroundColor: '#22c55e' }]}
+              onPress={() => {
+                sendIframeCommand({ type: MRPAK_CMD.REQUEST_VAR_SNAPSHOT });
+                setSnapshotFeedback(true);
+                setTimeout(() => setSnapshotFeedback(false), 1500);
+              }}
+            >
+              <Text style={styles.snapshotButtonText}>{snapshotFeedback ? '✓ Snapshotted' : 'Make Snapshot'}</Text>
+            </TouchableOpacity>
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react', editorHTML || reactHTML)
@@ -1158,31 +1144,16 @@ export function EditorWorkspace({
                   canvasDeviceStore === 'mobile' && styles.previewViewportFrameMobile,
                 ]}
               >
-                <WebView
-                  key={`react-native-${filePath}-${renderVersion}-${reactNativeHTML?.length || 0}`}
-                  source={{ html: reactNativeHTML }}
-                  style={styles.webview}
-                  javaScriptEnabled={true}
-                  domStorageEnabled={true}
-                  startInLoadingState={true}
-                  allowExternalScripts={true}
-                  renderLoading={() => (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color="#667eea" />
-                    </View>
-                  )}
-                  onLoad={() => {
-                    console.log('RenderFile: React Native component loaded successfully');
-                  }}
-                  onError={(syntheticEvent) => {
-                    const { nativeEvent } = syntheticEvent;
-                    console.error('RenderFile: WebView error:', nativeEvent);
-                    setPreviewOpenError(nativeEvent?.description || nativeEvent?.message || 'WebView failed to load preview');
-                  }}
-                />
+                {renderBlockEditorPreview('react-native', editorHTML || reactNativeHTML)}
                 {renderPreviewFallbackOverlay()}
               </View>
             </View>
+            <TouchableOpacity
+              style={styles.snapshotButton}
+              onPress={() => sendIframeCommand({ type: MRPAK_CMD.REQUEST_VAR_SNAPSHOT })}
+            >
+              <Text style={styles.snapshotButtonText}>Make Snapshot</Text>
+            </TouchableOpacity>
           </View>
         ) : viewMode === 'split' ? (
           renderBlockEditorSplitMode('react-native', editorHTML || reactNativeHTML)
@@ -1412,7 +1383,6 @@ const styles = StyleSheet.create({
   previewViewportHost: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     padding: 12,
     overflow: 'auto',
     backgroundColor: '#0f1115',
@@ -1425,6 +1395,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     boxShadow: '0 12px 30px rgba(0,0,0,0.28)',
+    marginVertical: 'auto',
   },
   previewViewportFrameMobile: {
     borderRadius: 18,
@@ -1717,6 +1688,26 @@ const styles = StyleSheet.create({
   },
   saveSuccessText: {
     color: '#ffffff',
+  },
+  snapshotButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: '#667eea',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    zIndex: 1000,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  snapshotButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

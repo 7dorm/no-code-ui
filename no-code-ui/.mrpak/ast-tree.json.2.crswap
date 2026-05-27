@@ -1,0 +1,911 @@
+{
+  "tests/2-simple-react/App.jsx": {
+    "timestamp": "2026-03-16T14:37:25.778Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 817,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 30,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:415:717:div": {
+        "filePath": "tests/2-simple-react/App.jsx",
+        "start": 415,
+        "end": 717,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:724:800:ExtractedBlock": {
+        "filePath": "tests/2-simple-react/App.jsx",
+        "start": 724,
+        "end": 800,
+        "tagName": "ExtractedBlock",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 3
+  },
+  "tests/2-simple-react/ExtractedBlock.jsx": {
+    "timestamp": "2026-03-16T14:38:26.790Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 2560,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 86,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:ExtractedBlock.jsx:101:286:div": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 74,
+        "end": 317,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:305:522:div": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 336,
+        "end": 609,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:533:673:h2": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 620,
+        "end": 817,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:696:878:p": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 840,
+        "end": 1078,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:909:917:strong": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1109,
+        "end": 1178,
+        "tagName": "strong",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:959:1229:button": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1220,
+        "end": 1552,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1303:1403:p": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1626,
+        "end": 1784,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1470:1628:div": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 1851,
+        "end": 2069,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1639:1708:h3": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 2080,
+        "end": 2208,
+        "tagName": "h3",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:ExtractedBlock.jsx:1731:1804:p": {
+        "filePath": "tests/2-simple-react/ExtractedBlock.jsx",
+        "start": 2231,
+        "end": 2362,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  },
+  "tests/8-multi-component-jsx/App.jsx": {
+    "timestamp": "2026-03-16T15:46:10.004Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 4406,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 129,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.jsx:101:450:span": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 50,
+        "end": 441,
+        "tagName": "span",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:457:623:span": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 449,
+        "end": 656,
+        "tagName": "span",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:993:1253:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1010,
+        "end": 1312,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1260:1511:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1320,
+        "end": 1612,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1520:1551:StatusBadge": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1622,
+        "end": 1710,
+        "tagName": "StatusBadge",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1560:1622:h1": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1719,
+        "end": 1829,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1661:1724:p": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 1868,
+        "end": 1978,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1767:1952:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2021,
+        "end": 2245,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:1963:2154:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2257,
+        "end": 2485,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2167:2263:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2499,
+        "end": 2644,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2316:2378:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2697,
+        "end": 2808,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2420:2611:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 2850,
+        "end": 3078,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2624:2720:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3092,
+        "end": 3237,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2775:2832:div": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3292,
+        "end": 3398,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:2847:3196:button": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3413,
+        "end": 3798,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.jsx:3270:3635:button": {
+        "filePath": "tests/8-multi-component-jsx/App.jsx",
+        "start": 3873,
+        "end": 4274,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 2
+  },
+  "tests/7-simple-typescript/App.tsx": {
+    "timestamp": "2026-03-16T17:20:59.719Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 14795,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 326,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.tsx:2015:2243:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 8370,
+        "end": 8641,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:2250:2325:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 8649,
+        "end": 8773,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:2334:2362:section": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 8782,
+        "end": 8863,
+        "tagName": "section",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:2373:2594:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 8874,
+        "end": 9132,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:2607:2612:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 9146,
+        "end": 9200,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:2627:2845:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 9215,
+        "end": 9466,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:2913:2963:h1": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 9535,
+        "end": 9633,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:2999:3042:p": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 9669,
+        "end": 9759,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:3177:3443:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 9894,
+        "end": 10327,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:3458:3506:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 10343,
+        "end": 10440,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:3537:3584:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 10471,
+        "end": 10567,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:3667:3695:section": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 10650,
+        "end": 10731,
+        "tagName": "section",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:3706:3766:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 10742,
+        "end": 10851,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:3779:4020:input": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 10864,
+        "end": 11144,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:4034:4229:select": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 11159,
+        "end": 11393,
+        "tagName": "select",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:4295:4331:option": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 11456,
+        "end": 11544,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:4438:4627:select": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 11650,
+        "end": 11878,
+        "tagName": "select",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:4642:4662:option": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 11894,
+        "end": 11966,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:4689:4710:option": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 11993,
+        "end": 12066,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:4738:4759:option": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 12094,
+        "end": 12167,
+        "tagName": "option",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:4808:5173:button": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 12216,
+        "end": 12619,
+        "tagName": "button",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:5264:5292:section": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 12711,
+        "end": 12792,
+        "tagName": "section",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:5303:5345:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 12803,
+        "end": 12894,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:5402:5836:label": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 12947,
+        "end": 13488,
+        "tagName": "label",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:5853:5917:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 13506,
+        "end": 13619,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:5936:6096:input": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 13638,
+        "end": 13825,
+        "tagName": "input",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:6116:6121:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 13846,
+        "end": 13900,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:6142:6175:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 13921,
+        "end": 14003,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:6214:6262:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 14042,
+        "end": 14139,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:6400:6719:div": {
+        "filePath": "tests/7-simple-typescript/App.tsx",
+        "start": 14277,
+        "end": 14634,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 9
+  },
+  "src/App.tsx": {
+    "timestamp": "2026-03-16T17:22:11.313Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 956,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 18,
+          "column": 1
+        }
+      }
+    },
+    "map": {
+      "mrpak:App.tsx:53:74:div": {
+        "filePath": "src/App.tsx",
+        "start": 32,
+        "end": 98,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:81:112:header": {
+        "filePath": "src/App.tsx",
+        "start": 105,
+        "end": 185,
+        "tagName": "header",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:121:125:h1": {
+        "filePath": "src/App.tsx",
+        "start": 194,
+        "end": 244,
+        "tagName": "h1",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:152:155:p": {
+        "filePath": "src/App.tsx",
+        "start": 271,
+        "end": 319,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:239:266:main": {
+        "filePath": "src/App.tsx",
+        "start": 403,
+        "end": 478,
+        "tagName": "main",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:275:305:div": {
+        "filePath": "src/App.tsx",
+        "start": 487,
+        "end": 564,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:316:320:h2": {
+        "filePath": "src/App.tsx",
+        "start": 575,
+        "end": 625,
+        "tagName": "h2",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:353:356:p": {
+        "filePath": "src/App.tsx",
+        "start": 658,
+        "end": 706,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:App.tsx:451:454:p": {
+        "filePath": "src/App.tsx",
+        "start": 801,
+        "end": 849,
+        "tagName": "p",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 1
+  },
+  "src/AppRN.tsx": {
+    "timestamp": "2026-03-17T05:04:55.065Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 18713,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 590,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:AppRN.tsx:6526:6557:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 6526,
+        "end": 6557,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:6593:6621:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 6593,
+        "end": 6621,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:6630:6662:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 6630,
+        "end": 6662,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:6673:6718:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 6673,
+        "end": 6718,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:6784:6817:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 6784,
+        "end": 6817,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:6869:6901:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 6869,
+        "end": 6901,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:6916:7099:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 6916,
+        "end": 7099,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:7116:7209:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 7116,
+        "end": 7209,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:7271:7450:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 7271,
+        "end": 7450,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:7467:7558:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 7467,
+        "end": 7558,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:7619:7802:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 7619,
+        "end": 7802,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:7819:7912:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 7819,
+        "end": 7912,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8020:8054:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8020,
+        "end": 8054,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8073:8276:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8073,
+        "end": 8276,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8297:8384:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8297,
+        "end": 8384,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8454:8657:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8454,
+        "end": 8657,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8678:8765:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8678,
+        "end": 8765,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:8835:9032:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 8835,
+        "end": 9032,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9053:9137:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9053,
+        "end": 9137,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9307:9514:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9307,
+        "end": 9514,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9533:9625:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9533,
+        "end": 9625,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9817:9980:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9817,
+        "end": 9980,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:9995:10033:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 9995,
+        "end": 10033,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10144:10256:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10144,
+        "end": 10256,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10269:10307:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10269,
+        "end": 10307,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10476:10527:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10476,
+        "end": 10527,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10680:10713:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10680,
+        "end": 10713,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10724:10755:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10724,
+        "end": 10755,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10783:10832:TouchableOpacity": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10783,
+        "end": 10832,
+        "tagName": "TouchableOpacity",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10845:10877:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10845,
+        "end": 10877,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:10992:11025:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 10992,
+        "end": 11025,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11080:11347:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11080,
+        "end": 11347,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11411:11571:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11411,
+        "end": 11571,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11584:11619:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11584,
+        "end": 11619,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11634:11668:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11634,
+        "end": 11668,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:11721:11967:FileTree": {
+        "filePath": "src/AppRN.tsx",
+        "start": 11721,
+        "end": 11967,
+        "tagName": "FileTree",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12039:12070:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12039,
+        "end": 12070,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12127:12156:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12127,
+        "end": 12156,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12207:12797:RenderFile": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12207,
+        "end": 12797,
+        "tagName": "RenderFile",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12826:12859:View": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12826,
+        "end": 12859,
+        "tagName": "View",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12874:12911:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12874,
+        "end": 12911,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:12935:12972:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 12935,
+        "end": 12972,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13057:13094:Text": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13057,
+        "end": 13094,
+        "tagName": "Text",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:AppRN.tsx:13324:13498:CreateProjectDialog": {
+        "filePath": "src/AppRN.tsx",
+        "start": 13324,
+        "end": 13498,
+        "tagName": "CreateProjectDialog",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 10
+  }
+}

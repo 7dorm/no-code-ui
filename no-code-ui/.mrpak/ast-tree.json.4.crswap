@@ -1,0 +1,52 @@
+{
+  "tests/test10/aa/aa.jsx": {
+    "timestamp": "2026-03-18T11:59:15.695Z",
+    "ast": {
+      "type": "File",
+      "start": 0,
+      "end": 1102,
+      "loc": {
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 52,
+          "column": 0
+        }
+      }
+    },
+    "map": {
+      "mrpak:aa.jsx:135:251:div": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 135,
+        "end": 251,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:aa.jsx:259:380:div": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 259,
+        "end": 380,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:aa.jsx:392:839:div": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 392,
+        "end": 839,
+        "tagName": "div",
+        "kind": "jsx-opening-element"
+      },
+      "mrpak:aa.jsx:868:1070:img": {
+        "filePath": "tests/test10/aa/aa.jsx",
+        "start": 868,
+        "end": 1070,
+        "tagName": "img",
+        "kind": "jsx-opening-element"
+      }
+    },
+    "astType": "File",
+    "programBodyLength": 5
+  }
+}

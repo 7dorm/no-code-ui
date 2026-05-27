@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { MRPAK_CMD } from '../../blockEditor/EditorProtocol';
+import { VariablesPanel } from '../../features/editor/components/VariablesPanel';
 
 interface StyleLibraryEntry {
   id: string;
@@ -523,7 +524,7 @@ export function BlockEditorSidebar(props: any) {
     onSetText({ blockId: selectedBlock.id, text: textValue });
   };
 
-  const [sidebarTab, setSidebarTab] = React.useState<'inspector' | 'library' | 'styles'>('inspector');
+  const [sidebarTab, setSidebarTab] = React.useState<'inspector' | 'library' | 'styles' | 'variables'>('inspector');
   const [libraryDragTag, setLibraryDragTag] = React.useState<string | null>(null);
   const [iconSearch, setIconSearch] = React.useState('');
   const [librarySearch, setLibrarySearch] = React.useState('');
@@ -879,6 +880,12 @@ export function BlockEditorSidebar(props: any) {
             onPress={() => setSidebarTab('styles')}
           >
             <Text style={styles.stylesTabText}>Styles</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.stylesTab, sidebarTab === 'variables' && styles.stylesTabActive]}
+            onPress={() => setSidebarTab('variables')}
+          >
+            <Text style={styles.stylesTabText}>Variables</Text>
           </TouchableOpacity>
         </View>
 
@@ -1882,7 +1889,7 @@ export function BlockEditorSidebar(props: any) {
               </View>
             ) : null}
           </View>
-        ) : (
+        ) : sidebarTab === 'styles' ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Styles Library</Text>
             <Text style={styles.hint}>Импортируйте шаблон или CSS файл, затем примените стиль к выбранному блоку.</Text>
@@ -1965,7 +1972,11 @@ export function BlockEditorSidebar(props: any) {
               </div>
             )}
           </View>
-        )}
+        ) : sidebarTab === 'variables' ? (
+          <View style={[styles.section, { flex: 1, minHeight: 400 }]}>
+            <VariablesPanel />
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

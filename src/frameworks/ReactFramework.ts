@@ -14,7 +14,7 @@ import {
   applyExternalStylePatch, 
   replaceStyleReferenceInJsx 
 } from '../blockEditor/PatchEngine';
-import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages } from '../features/editor/lib/react-processor';
+import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages, instrumentVariablesForPreview } from '../features/editor/lib/react-processor';
 import { readFile, readFileBase64, writeFile } from '../shared/api/electron-api';
 import { resolvePath, resolvePathSync } from '../features/editor/lib/path-resolver';
 import { injectBlockEditorScript } from '../features/editor/lib/block-editor-script';
@@ -679,6 +679,10 @@ export class ReactFramework extends Framework {
 
     const wrappedMainModule = wrapImportedComponentUsages(processedCode);
     processedCode = wrappedMainModule.code;
+    
+    // Instrument variables for the preview panel
+    processedCode = instrumentVariablesForPreview(processedCode);
+
     if (wrappedMainModule.wrappedCount > 0) {
       processedCode = `${IMPORTED_COMPONENT_BOUNDARY_HELPER}\n${processedCode}`;
     }

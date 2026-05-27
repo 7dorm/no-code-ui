@@ -1270,7 +1270,7 @@ export function useBlockEditorSidebarController({
   };
 }
 
-import { useState, useRef, useEffect, useMemo, memo } from 'react';
+
 
 function BlockEditorPanelComponent({
   fileType,
