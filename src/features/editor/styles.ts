@@ -138,14 +138,15 @@ export const styles = StyleSheet.create({
   },
   previewViewportHost: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
     padding: 12,
     overflow: 'auto',
     backgroundColor: '#0f1115',
   },
   previewViewportFrame: {
     position: 'relative',
+    margin: 'auto',
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',

@@ -26,15 +26,6 @@ export function VariablesPanel() {
     // Send message to iframe to update mocks
     const state = useEditorStore.getState();
     const mergedMocks: Record<string, Record<string, any>> = {};
-    for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
-      mergedMocks[comp] = {};
-      for (const [varName, varData] of Object.entries(vars)) {
-        mergedMocks[comp][varName] = varData.value;
-      }
-    }
-    // We must use the PREV mocks we just calculated, because the state update might not be synchronous
-    // but wait! handleUpdateMock calls `updateMockVariables` which is synchronous in zustand!
-    // Let's just use the updated mockVariables from the state.
     for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
       if (!mergedMocks[comp]) mergedMocks[comp] = {};
       for (const [varName, value] of Object.entries(vars)) {

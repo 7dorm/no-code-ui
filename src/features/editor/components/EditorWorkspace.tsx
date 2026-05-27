@@ -72,9 +72,9 @@ export function EditorWorkspace({
   const normalizedCanvasWidth = Math.max(240, Math.min(3840, Math.round(Number(canvasWidth) || 1280)));
   const normalizedCanvasHeight = Math.max(240, Math.min(3840, Math.round(Number(canvasHeight) || 800)));
   const previewViewportFrameStyle = useMemo(() => ({
-    width: normalizedCanvasWidth,
-    height: normalizedCanvasHeight,
-  }), [normalizedCanvasHeight, normalizedCanvasWidth]);
+    width: viewMode === 'split' ? '100%' : normalizedCanvasWidth,
+    height: viewMode === 'split' ? '100%' : normalizedCanvasHeight,
+  }), [normalizedCanvasHeight, normalizedCanvasWidth, viewMode]);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);

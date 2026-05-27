@@ -93,15 +93,7 @@ export function useEditorMessage({
         const state = useEditorStore.getState();
         const mergedMocks: Record<string, Record<string, any>> = {};
 
-        // 1. Fill with variableSnapshots (preserving the state user had before reload)
-        for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
-          mergedMocks[comp] = {};
-          for (const [varName, varData] of Object.entries(vars)) {
-            mergedMocks[comp][varName] = varData.value;
-          }
-        }
-
-        // 2. Override with explicit mockVariables
+        // Only override with explicit mockVariables
         for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
           if (!mergedMocks[comp]) mergedMocks[comp] = {};
           for (const [varName, value] of Object.entries(vars)) {
