@@ -673,6 +673,20 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               }
             }
           };
+          let lastIntermediateApplyAt = 0;
+          let lastIntermediateApplyKey = '';
+          const postIntermediateApply = (id, patch) => {
+            try {
+              if (!id || !patch || typeof patch !== 'object') return;
+              const now = Date.now();
+              const key = String(id) + ':' + JSON.stringify(patch);
+              if (key === lastIntermediateApplyKey && (now - lastIntermediateApplyAt) < 80) return;
+              if ((now - lastIntermediateApplyAt) < 80) return;
+              lastIntermediateApplyAt = now;
+              lastIntermediateApplyKey = key;
+              post(MSG_APPLY, { id, patch, isIntermediate: true });
+            } catch (e) {}
+          };
           const ensureOffsetParent = (el) => {
             const parent = el && el.parentElement;
             if (!parent || parent === document.body || parent === document.documentElement) return;
@@ -1862,6 +1876,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               return;
             }
             if (!drag || !selected) return;
+            const id = ensureId(selected);
+            if (!id) return;
             const dx = ev.clientX - drag.sx;
             const dy = ev.clientY - drag.sy;
             
@@ -1898,6 +1914,45 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 if (rect) {
                   setShiftBadge('offset left:' + Math.round(futureLeft) + ' top:' + Math.round(futureTop), rect.left - toNum(cs.marginLeft), rect.top - toNum(cs.marginTop) - 24);
                 }
+                const liveLeft = snap(futureLeft);
+                const liveTop = snap(futureTop);
+                const liveLeftValue = formatMoveValue(
+                  liveLeft,
+                  getMoveAxisReferenceSize('relative', 'x', contentRight - contentLeft, contentBottom - contentTop),
+                  'relative'
+                );
+                const liveTopValue = formatMoveValue(
+                  liveTop,
+                  getMoveAxisReferenceSize('relative', 'y', contentRight - contentLeft, contentBottom - contentTop),
+                  'relative'
+                );
+                const moveKeys = getMovePatchKeys('relative');
+                postIntermediateApply(id, {
+                  position: 'relative',
+                  left: '',
+                  top: '',
+                  [moveKeys.x]: liveLeftValue,
+                  [moveKeys.y]: liveTopValue,
+                });
+              } else {
+                const startLeft = drag.rect.left - parentRect.left - padLeft;
+                const startTop = drag.rect.top - parentRect.top - padTop;
+                const liveLeft = snap(startLeft + constrainedDx);
+                const liveTop = snap(startTop + constrainedDy);
+                const liveLeftValue = formatMoveValue(
+                  liveLeft,
+                  getMoveAxisReferenceSize('absolute', 'x', contentRight - contentLeft, contentBottom - contentTop),
+                  'absolute'
+                );
+                const liveTopValue = formatMoveValue(
+                  liveTop,
+                  getMoveAxisReferenceSize('absolute', 'y', contentRight - contentLeft, contentBottom - contentTop),
+                  'absolute'
+                );
+                drag.finalLeft = liveLeft;
+                drag.finalTop = liveTop;
+                drag.finalPosition = 'absolute';
+                postIntermediateApply(id, { position: 'absolute', left: liveLeftValue, top: liveTopValue });
               }
             } else {
               const resizeTarget = drag.resizeTarget || resizeTargetMode;
@@ -1937,6 +1992,21 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   node.style.marginRight = nextMr + 'px';
                   node.style.marginBottom = nextMb + 'px';
                 });
+                postIntermediateApply(id, '${type}' === 'html'
+                  ? {
+                    ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth + 'px', height: drag.startHeight + 'px' } : {}),
+                    marginLeft: nextMl + 'px',
+                    marginTop: nextMt + 'px',
+                    marginRight: nextMr + 'px',
+                    marginBottom: nextMb + 'px',
+                  }
+                  : {
+                    ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth, height: drag.startHeight } : {}),
+                    marginLeft: nextMl,
+                    marginTop: nextMt,
+                    marginRight: nextMr,
+                    marginBottom: nextMb,
+                  });
                 updateBoxOverlay();
                 const baseRect = getElementVisualRect(selected);
                 if (baseRect) {
@@ -1967,6 +2037,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   node.style.paddingRight = nextPr + 'px';
                   node.style.paddingBottom = nextPb + 'px';
                 });
+                postIntermediateApply(id, '${type}' === 'html'
+                  ? {
+                    paddingLeft: nextPl + 'px',
+                    paddingTop: nextPt + 'px',
+                    paddingRight: nextPr + 'px',
+                    paddingBottom: nextPb + 'px',
+                  }
+                  : {
+                    paddingLeft: nextPl,
+                    paddingTop: nextPt,
+                    paddingRight: nextPr,
+                    paddingBottom: nextPb,
+                  });
               } else if (resizeTarget === 'content-lock') {
                 const handleStr = String(handle || 'se');
                 let nextPl = drag.startPaddingLeft || 0;
@@ -2005,6 +2088,23 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   node.style.width = widthStyle + 'px';
                   node.style.height = heightStyle + 'px';
                 });
+                postIntermediateApply(id, '${type}' === 'html'
+                  ? {
+                    paddingLeft: nextPl + 'px',
+                    paddingTop: nextPt + 'px',
+                    paddingRight: nextPr + 'px',
+                    paddingBottom: nextPb + 'px',
+                    width: widthStyle + 'px',
+                    height: heightStyle + 'px',
+                  }
+                  : {
+                    paddingLeft: nextPl,
+                    paddingTop: nextPt,
+                    paddingRight: nextPr,
+                    paddingBottom: nextPb,
+                    width: widthStyle,
+                    height: heightStyle,
+                  });
                 drag.finalContentLock = {
                   paddingLeft: nextPl,
                   paddingTop: nextPt,
@@ -2026,6 +2126,29 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                     node.style.marginTop = snap((drag.startMarginTop || 0) + shiftY) + 'px';
                   }
                 });
+                const intermediatePatch = {};
+                if ('${type}' === 'html') {
+                  intermediatePatch.width = w + 'px';
+                  intermediatePatch.height = h + 'px';
+                  if ((drag.moveMode || getElementMoveMode(selected)) === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.left = snap((drag.startLeft || 0) + shiftX) + 'px';
+                    intermediatePatch.top = snap((drag.startTop || 0) + shiftY) + 'px';
+                  } else if ((drag.moveMode || getElementMoveMode(selected)) === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.marginLeft = snap((drag.startMarginLeft || 0) + shiftX) + 'px';
+                    intermediatePatch.marginTop = snap((drag.startMarginTop || 0) + shiftY) + 'px';
+                  }
+                } else {
+                  intermediatePatch.width = w;
+                  intermediatePatch.height = h;
+                  if ((drag.moveMode || getElementMoveMode(selected)) === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.left = snap((drag.startLeft || 0) + shiftX);
+                    intermediatePatch.top = snap((drag.startTop || 0) + shiftY);
+                  } else if ((drag.moveMode || getElementMoveMode(selected)) === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.marginLeft = snap((drag.startMarginLeft || 0) + shiftX);
+                    intermediatePatch.marginTop = snap((drag.startMarginTop || 0) + shiftY);
+                  }
+                }
+                postIntermediateApply(id, intermediatePatch);
               }
               if (resizeTarget !== 'margin') {
                 updateBoxOverlay();
@@ -2799,11 +2922,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             dropTarget = null;
           }, true);
 
-          // РџРѕРґСЃРєР°Р·РєР°
+          // Подсказка
           try {
             const hint = document.createElement('div');
             hint.className = 'mrpak-hint';
-            hint.textContent = 'MRPAK Editor: РєР»РёРє = РІС‹Р±СЂР°С‚СЊ, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize, в†ђ/в†’ = resize mode (margin/size/padding/content-lock).';
+            hint.textContent = 'MRPAK Editor: клик = выбрать, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize, ←/→ = resize mode (margin/size/padding/content-lock).';
             document.body.appendChild(hint);
           } catch(e) {}
 

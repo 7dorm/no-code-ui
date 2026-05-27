@@ -80,7 +80,10 @@ export function useMonacoEditor({
     }
   }, [monacoEditorRef]);
 
-  const revealSelectedBlockInCode = useCallback((blockId: string | null | undefined) => {
+  const revealSelectedBlockInCode = useCallback((
+    blockId: string | null | undefined,
+    options?: { center?: boolean; focus?: boolean; moveCursor?: boolean; select?: boolean }
+  ) => {
     clearMonacoBlockSelection();
     if (!blockId || !monacoEditorRef?.current) return;
 
@@ -92,9 +95,23 @@ export function useMonacoEditor({
       const entry = (blockMapForFile && blockMapForFile[blockId]) || (blockMap && blockMap[blockId]);
       if (!entry || typeof entry.start !== 'number') return;
 
-      const offset = Math.max(0, Math.min(entry.start, model.getValueLength()));
-      const position = model.getPositionAt(offset);
-      if (!position) return;
+      const startOffset = Math.max(0, Math.min(entry.start, model.getValueLength()));
+      const endOffset = typeof entry.end === 'number'
+        ? Math.max(startOffset, Math.min(entry.end, model.getValueLength()))
+        : startOffset;
+      const startPos = model.getPositionAt(startOffset);
+      const endPos = model.getPositionAt(endOffset);
+      if (!startPos || !endPos) return;
+      const range = {
+        startLineNumber: startPos.lineNumber,
+        startColumn: startPos.column,
+        endLineNumber: endPos.lineNumber,
+        endColumn: endPos.column,
+      };
+      const shouldCenter = options?.center !== false;
+      const shouldFocus = options?.focus !== false;
+      const shouldMoveCursor = options?.moveCursor !== false;
+      const shouldSelect = options?.select !== false;
 
       suppressCodeSelectionSyncRef.current = true;
       if (typeof editor.deltaDecorations === 'function') {
@@ -102,38 +119,39 @@ export function useMonacoEditor({
           monacoSelectionDecorationsRef.current,
           [
             {
-              range: {
-                startLineNumber: position.lineNumber,
-                startColumn: 1,
-                endLineNumber: position.lineNumber,
-                endColumn: model.getLineMaxColumn(position.lineNumber),
-              },
+              range,
               options: {
-                isWholeLine: true,
+                isWholeLine: range.startLineNumber !== range.endLineNumber,
                 className: 'monaco-block-selection',
                 linesDecorationsClassName: 'monaco-block-selection-glyph',
+                inlineClassName: 'monaco-block-selection-inline',
               },
             },
           ]
         );
       }
-      editor.setPosition(position);
-      if (typeof editor.revealPositionInCenter === 'function') {
-        editor.revealPositionInCenter(position);
+      if (shouldMoveCursor && typeof editor.setPosition === 'function') {
+        editor.setPosition(startPos);
+      }
+      if (shouldCenter && typeof editor.revealRangeInCenter === 'function') {
+        editor.revealRangeInCenter(range);
+      } else if (shouldCenter && typeof editor.revealPositionInCenter === 'function') {
+        editor.revealPositionInCenter(startPos);
       } else if (typeof editor.revealLineInCenter === 'function') {
-        editor.revealLineInCenter(position.lineNumber);
+        editor.revealLineInCenter(startPos.lineNumber);
       }
 
-      if (typeof editor.setSelection === 'function') {
+      if (shouldSelect && typeof editor.setSelection === 'function') {
         editor.setSelection({
-          startLineNumber: position.lineNumber,
-          startColumn: 1,
-          endLineNumber: position.lineNumber,
-          endColumn: model.getLineMaxColumn(position.lineNumber),
+          startLineNumber: range.startLineNumber,
+          startColumn: range.startColumn,
+          endLineNumber: range.endLineNumber,
+          endColumn: range.endColumn,
         });
       }
 
       try {
+        if (!shouldFocus) throw new Error('skip-focus');
         editor.focus();
       } catch {}
       requestAnimationFrame(() => {
@@ -189,7 +207,7 @@ export function useMonacoEditor({
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [selectedBlock?.id, revealSelectedBlockInCode, clearMonacoBlockSelection]);
+  }, [selectedBlock, revealSelectedBlockInCode, clearMonacoBlockSelection]);
 
   return {
     updateMonacoEditorWithScroll,

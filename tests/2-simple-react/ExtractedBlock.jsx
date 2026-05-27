@@ -35,11 +35,12 @@ function ExtractedBlock({
         color: "#495057",
         fontSize: "18px",
         position: "relative",
-        left: 25,
+        left: 166,
         width: 421.94998931884766,
         height: 115.89999389648438,
         marginLeft: 27,
-        marginTop: 18
+        marginTop: 18,
+        top: -7
       }}>
             Текущее значение: <strong>{count}</strong>
           </p>

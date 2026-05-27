@@ -219,7 +219,7 @@ export function EditorWorkspace({
     setShowSaveIndicator,
   });
 
-  const { handleMonacoCtrlClick, revealSelectedBlockInCode } = useMonacoEditor({
+  const { handleMonacoCtrlClick, revealSelectedBlockInCode, updateMonacoEditorWithScroll: monacoUpdateWithScroll } = useMonacoEditor({
     monacoEditorRef,
     isUpdatingFromFileRef,
   });
@@ -229,17 +229,9 @@ export function EditorWorkspace({
   } = useDependencies();
 
   const updateMonacoEditorWithScroll = useCallback((newContent: string) => {
-    if (monacoEditorRef.current) {
-      isUpdatingFromFileRef.current = true;
-      const scroll = monacoEditorRef.current.getScrollTop();
-      monacoEditorRef.current.setValue(newContent);
-      monacoEditorRef.current.setScrollTop(scroll);
-      setUnsavedContent(newContent);
-      setTimeout(() => {
-        isUpdatingFromFileRef.current = false;
-      }, 100);
-    }
-  }, [setUnsavedContent]);
+    monacoUpdateWithScroll(newContent);
+    setUnsavedContent(newContent);
+  }, [monacoUpdateWithScroll, setUnsavedContent]);
 
   const {
     resolveToMappedBlockId,
@@ -1375,6 +1367,7 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 0,
     backgroundColor: '#1e1e1e',
+    overflow: 'hidden',
   },
   blockEditorPreviewContainer: {
     flex: 1,
@@ -1564,7 +1557,7 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 400,
+    minHeight: 0,
     backgroundColor: '#1e1e1e',
     borderRadius: 8,
     overflow: 'hidden',
@@ -1589,16 +1582,6 @@ const styles = StyleSheet.create({
     color: '#d4d4d4',
     lineHeight: 20,
   },
-  htmlContainer: {
-    flex: 1,
-    width: '100%',
-    minHeight: 0,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
   reactContainer: {
     flex: 1,
     width: '100%',
@@ -1612,7 +1595,7 @@ const styles = StyleSheet.create({
   binaryContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 400,
+    minHeight: 0,
     backgroundColor: '#1e1e1e',
     borderRadius: 8,
     overflow: 'hidden',

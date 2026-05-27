@@ -72,7 +72,8 @@ export function usePreviewGeneration({
         }
       };
       
-      // Debounce HTML generation to prevent excessive iframe reloads during visual editing
+      // Keep split-mode preview reactive while still avoiding constant iframe reloads.
+      const debounceMs = viewMode === 'split' ? 120 : 350;
       timer = setTimeout(() => {
         const state = useEditorStore.getState();
         if (state.skipPreviewGeneration) {
@@ -80,7 +81,7 @@ export function usePreviewGeneration({
           return;
         }
         void generateHTML();
-      }, 500);
+      }, debounceMs);
     } else {
       setReactHTML('');
       setIsProcessingReact(false);

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { instrumentHtml } from '../../../blockEditor/HtmlInstrumenter';
 import { useEditorStore } from '../../../store/editorStore';
 import { injectBlockEditorScript } from '../lib/block-editor-script';
@@ -17,6 +17,7 @@ export function useSplitEditorHtml({
   reactHTML,
   reactNativeHTML,
 }: UseSplitEditorHtmlParams) {
+  const lastInjectedHtmlRef = useRef<string>('');
   const {
     viewMode,
     fileType,
@@ -41,22 +42,32 @@ export function useSplitEditorHtml({
         setBlockMap(inst.map || {});
         setBlockMapForFile(inst.map || {});
         const nextHtml = injectBlockEditorScript(inst.html, 'html', scriptMode, getPathBasename(filePath));
-        setEditorHTML(nextHtml);
+        if (lastInjectedHtmlRef.current !== nextHtml) {
+          lastInjectedHtmlRef.current = nextHtml;
+          setEditorHTML(nextHtml);
+        }
         return;
       }
 
       if (fileType === 'react' && reactHTML) {
         const nextHtml = injectBlockEditorScript(reactHTML, 'react', scriptMode, getPathBasename(filePath));
-        setEditorHTML(nextHtml);
+        if (lastInjectedHtmlRef.current !== nextHtml) {
+          lastInjectedHtmlRef.current = nextHtml;
+          setEditorHTML(nextHtml);
+        }
         return;
       }
 
       if (fileType === 'react-native' && reactNativeHTML) {
         const nextHtml = injectBlockEditorScript(reactNativeHTML, 'react-native', scriptMode, getPathBasename(filePath));
-        setEditorHTML(nextHtml);
+        if (lastInjectedHtmlRef.current !== nextHtml) {
+          lastInjectedHtmlRef.current = nextHtml;
+          setEditorHTML(nextHtml);
+        }
         return;
       }
     } catch {
+      lastInjectedHtmlRef.current = '';
       setEditorHTML('');
     }
   }, [

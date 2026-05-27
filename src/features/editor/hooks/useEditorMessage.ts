@@ -364,6 +364,12 @@ export function useEditorMessage({
 
         await applyBlockPatch(id, patch, isIntermediate);
         if (!isIntermediate) {
+          setSelectedBlock({
+            id: String(id),
+            meta: useEditorStore.getState().selectedBlock?.meta || null,
+          });
+        }
+        if (!isIntermediate) {
           void commitStagedPatches();
         }
         return;
