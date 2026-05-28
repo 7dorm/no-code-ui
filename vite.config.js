@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { configDefaults } from 'vitest/config';
 
 export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
@@ -44,6 +45,14 @@ export default defineConfig(({ mode }) => {
         nextTick: (fn) => setTimeout(fn, 0),
         cwd: () => '/'
       })
+    },
+
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: './src/test/setup.ts',
+      include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+      exclude: [...configDefaults.exclude, 'tests/**']
     }
   };
 });
