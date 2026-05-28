@@ -1,0 +1,44 @@
+/* 
+  Demo Theme - Cyberpunk / Neon Glow
+  Импортируйте этот файл (import './demo-theme.css') или перетащите его в редактор, 
+  затем добавьте класс 'neon-theme' к главному контейнеру виджета.
+*/
+
+.neon-theme {
+  background-color: #050510 !important;
+  background-image: 
+    linear-gradient(45deg, rgba(255, 0, 128, 0.1) 0%, transparent 40%),
+    linear-gradient(-45deg, rgba(0, 255, 255, 0.1) 0%, transparent 40%) !important;
+}
+
+.neon-theme > div {
+  background: rgba(10, 10, 20, 0.6) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(0, 255, 255, 0.2) !important;
+  box-shadow: 
+    0 0 20px rgba(0, 255, 255, 0.1),
+    inset 0 0 20px rgba(255, 0, 128, 0.1) !important;
+  border-radius: 16px !important;
+}
+
+.neon-theme h2 {
+  color: #fff !important;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.8) !important;
+}
+
+.neon-theme span {
+  text-shadow: 0 0 20px rgba(0, 255, 255, 0.5) !important;
+}
+
+/* Эффект для кнопок в неоновой теме */
+.neon-theme button {
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(255, 0, 128, 0.2)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 0 15px rgba(255, 0, 128, 0.4) !important;
+  color: #fff !important;
+}
+
+.neon-theme button:hover {
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.6) !important;
+  transform: scale(1.05);
+}
