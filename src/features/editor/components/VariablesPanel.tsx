@@ -83,7 +83,7 @@ export function VariablesPanel() {
   const selectedBlockSnippet = selectedBlock?.id ? blockMapForFile?.[selectedBlock.id]?.snippet || '' : '';
   const selectedBlockComponentName = selectedBlock?.id ? blockMapForFile?.[selectedBlock.id]?.componentName || '' : '';
 
-  if (Object.keys(variableSnapshots).length === 0) {
+  if (!variableSnapshots || Object.keys(variableSnapshots).length === 0) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Variables</Text>

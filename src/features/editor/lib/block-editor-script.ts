@@ -3137,9 +3137,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                               else if (typeof old === 'string') v._setter(old + ' ');
                               else if (typeof old === 'boolean') v._setter(!old);
                               else v._setter((prev) => Array.isArray(prev) ? [...prev] : typeof prev === 'object' && prev !== null ? {...prev} : prev);
-                              
                               if (typeof old === 'number' || typeof old === 'string' || typeof old === 'boolean') {
-                                setTimeout(() => v._setter(old), 0);
+                                requestAnimationFrame(() => {
+                                  requestAnimationFrame(() => {
+                                    v._setter(old);
+                                  });
+                                });
                               }
                            }
                         }

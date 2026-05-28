@@ -197,18 +197,17 @@ export function useMonacoEditor({
       const wordInfo = typeof model.getWordAtPosition === 'function' ? model.getWordAtPosition(position) : null;
       if (wordInfo && wordInfo.word) {
         let isVariable = false;
+        // compVars can be undefined if variableSnapshots is missing
         for (const compVars of Object.values(variableSnapshots || {})) {
-          if (compVars[wordInfo.word]) {
+          if (compVars && compVars[wordInfo.word]) {
             isVariable = true;
             break;
           }
         }
         if (isVariable) {
           setSelectedVariableName(wordInfo.word);
-          // Don't return here, so it can ALSO select the block if needed, or we can just return.
-          // The prompt says "в коде ктрл + лкм по переменной выделит ее на панели", so selecting the block is secondary.
-          // Let's just return to make variable selection precise.
-          return;
+          // Allow the rest of the function to execute so it also selects the block
+          // if they clicked a variable inside a block's code.
         }
       }
 
@@ -233,7 +232,15 @@ export function useMonacoEditor({
     } catch (e) {
       console.warn('[handleMonacoCtrlClick] sync failed:', e);
     }
-  }, [blockMapForFile, monacoEditorRef, selectedBlock, setSelectedBlock, sendIframeCommand]);
+  }, [
+    blockMapForFile, 
+    monacoEditorRef, 
+    selectedBlock, 
+    setSelectedBlock, 
+    sendIframeCommand,
+    variableSnapshots,
+    setSelectedVariableName
+  ]);
 
   useEffect(() => {
     if (!selectedBlock?.id) {

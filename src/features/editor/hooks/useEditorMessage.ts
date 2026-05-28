@@ -209,7 +209,39 @@ export function useEditorMessage({
       if (data.type === MRPAK_MSG.VAR_SNAPSHOT) {
         console.log('[useEditorMessage] Received VAR_SNAPSHOT:', data.snapshots);
         if (data.snapshots) {
-          useEditorStore.getState().setVariableSnapshots(data.snapshots);
+          const state = useEditorStore.getState();
+          const viewMode = state.viewMode;
+          
+          if (viewMode === 'preview') {
+            // In preview mode, the iframe has the "real" running state. 
+            // We want to overwrite everything with the fresh snapshot.
+            state.setVariableSnapshots(data.snapshots);
+          } else {
+            // In split mode (edit mode), the iframe may return initial states (e.g. 0).
+            // We want to add NEW variables or update derived variables, but preserve the values 
+            // of EXISTING state variables so we don't wipe out the snapshot from preview mode.
+            const currentSnapshots = state.variableSnapshots || {};
+            const merged: any = { ...currentSnapshots };
+            
+            for (const [comp, vars] of Object.entries(data.snapshots)) {
+              if (!merged[comp]) merged[comp] = {};
+              for (const [varName, varData] of Object.entries(vars as any)) {
+                const existing = merged[comp][varName];
+                // Preserve value of existing variables (especially state) so we don't reset to 0
+                if (existing && existing.isState && (varData as any).isState) {
+                  merged[comp][varName] = {
+                    ...(varData as any),
+                    value: existing.value,
+                    baseValue: existing.baseValue,
+                  };
+                } else {
+                  // For derived variables (isState: false) or new variables, always take the incoming value
+                  merged[comp][varName] = varData;
+                }
+              }
+            }
+            state.setVariableSnapshots(merged);
+          }
         }
         return;
       }
