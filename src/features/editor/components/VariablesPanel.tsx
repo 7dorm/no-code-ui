@@ -91,12 +91,12 @@ export function VariablesPanel() {
     const state = useEditorStore.getState();
     const mergedMocks: Record<string, Record<string, any>> = {};
 
-    // First, apply values from variableSnapshots as defaults
-    // ONLY for state variables. Non-state variables (derived values) shouldn't be frozen.
+    // First, apply values from variableSnapshots as defaults.
+    // State and props should be stable/editable across reloads; derived variables should not be frozen.
     for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
       if (!mergedMocks[comp]) mergedMocks[comp] = {};
       for (const [varName, varData] of Object.entries(vars)) {
-        if (varData.isState) {
+        if (varData.isState || varData.isProp) {
           mergedMocks[comp][varName] = varData.value;
         }
       }
@@ -198,7 +198,9 @@ export function VariablesPanel() {
                 <View key={varName} style={[styles.variableRow, isHighlighted && styles.variableRowHighlighted]}>
                   <TouchableOpacity onPress={() => handleSelectVariable(componentName, varName)} style={styles.variableHeader}>
                     <Text style={[styles.variableName, isHighlighted && styles.variableNameHighlighted]}>{varName}</Text>
-                    <Text style={styles.variableType}>{varData.type} {varData.isState ? '(State)' : ''}</Text>
+                    <Text style={styles.variableType}>
+                      {varData.type} {varData.isState ? '(State)' : varData.isProp ? '(Prop)' : ''}
+                    </Text>
                   </TouchableOpacity>
                   {varData.type === 'boolean' ? (
                     <TouchableOpacity 

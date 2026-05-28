@@ -73,6 +73,28 @@ describe('react-processor', () => {
     expect(result).toContain('"title"');
   });
 
+  it('instruments destructured component props with defaults and prop mocks', () => {
+    const result = instrumentVariablesForPreview(`
+      function FeatureCard({ title, text = 'Body copy' }) {
+        return (
+          <article>
+            <h2 data-no-code-ui-id="title-block">{title}</h2>
+            <p data-no-code-ui-id="text-block">{text}</p>
+          </article>
+        );
+      }
+    `);
+
+    expect(result).toMatch(/function FeatureCard\([^)]*=\s*\{\}\)/);
+    expect(result).toMatch(/let\s*\{\s*title\s*=\s*"Title",\s*text\s*=\s*'Body copy'|let\s*\{\s*title\s*=\s*"Title",\s*text\s*=\s*"Body copy"/s);
+    expect(result).toMatch(/window\.__mrpakGetMock\(\s*"FeatureCard",\s*"title",\s*title,\s*"prop"\s*\)/);
+    expect(result).toMatch(/window\.__mrpakGetMock\(\s*"FeatureCard",\s*"text",\s*text,\s*"prop"\s*\)/);
+
+    const usages = extractVariableUsages(result);
+    expect(usages.title.getters).toEqual(['title-block']);
+    expect(usages.text.getters).toEqual(['text-block']);
+  });
+
   it('detects exported and local component declarations', () => {
     const components = detectComponents(`
       import React from 'react';

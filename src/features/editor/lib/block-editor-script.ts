@@ -63,7 +63,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           window.__mrpak_live_vars = window.__mrpak_live_vars || {};
           window.__mrpak_mocks = window.__mrpak_mocks || {};
 
-          window.__mrpakGetMock = function(comp, name, actualValue) {
+          window.__mrpakGetMock = function(comp, name, actualValue, kind) {
             // console.log('[__mrpakGetMock] Called for', comp, name, actualValue);
             const liveComp = window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
             const prev = liveComp[name];
@@ -104,7 +104,15 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               : undefined;
             const effectiveValue = mockValue !== undefined ? mockValue : actualValue;
 
-            liveComp[name] = { type: typeof effectiveValue, value: effectiveValue, baseValue: actualValue, isState: false, componentName: comp, name };
+            liveComp[name] = {
+              type: typeof effectiveValue,
+              value: effectiveValue,
+              baseValue: actualValue,
+              isState: false,
+              isProp: kind === 'prop',
+              componentName: comp,
+              name
+            };
             
             return effectiveValue;
           };

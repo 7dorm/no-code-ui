@@ -179,6 +179,307 @@ function collectRuntimeNamesFromDeclaration(declaration: t.Declaration) {
   return names;
 }
 
+function humanizeIdentifier(name: string) {
+  const normalized = String(name || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .trim();
+
+  if (!normalized) {
+    return 'Value';
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function createDefaultValueForPropName(name: string): t.Expression {
+  const normalized = String(name || '').trim();
+  const lower = normalized.toLowerCase();
+
+  if (!normalized) {
+    return t.stringLiteral('Value');
+  }
+
+  if (lower === 'children') {
+    return t.stringLiteral('Content');
+  }
+
+  if (/^(is|has|can|should|did|will|show|hide|allow)/.test(normalized) || /(enabled|disabled|visible|checked|active|loading|open|selected)$/i.test(lower)) {
+    return t.booleanLiteral(false);
+  }
+
+  if (/(count|total|index|size|width|height|age|price|amount|score|rating|progress|step|level|number|num|id)$/i.test(lower)) {
+    return t.numericLiteral(0);
+  }
+
+  if (/(items|list|data|rows|columns|options|values|tabs|cards|features)$/i.test(lower)) {
+    return t.arrayExpression([]);
+  }
+
+  if (/(style|config|theme|params|payload|options|settings|item|user|record|meta|details|props)$/i.test(lower)) {
+    return t.objectExpression([]);
+  }
+
+  return t.stringLiteral(humanizeIdentifier(normalized));
+}
+
+function cloneExpressionOrDefault(node: t.Node | null | undefined, fallbackName: string): t.Expression {
+  const unwrapped = unwrapNode(node);
+  if (unwrapped && t.isExpression(unwrapped)) {
+    return t.cloneNode(unwrapped, true);
+  }
+  return createDefaultValueForPropName(fallbackName);
+}
+
+function getComponentNameFromFunctionPath(path: any): string | null {
+  const node = path?.node;
+  if ((t.isFunctionDeclaration(node) || t.isFunctionExpression(node)) && node.id?.name && isPascalCase(node.id.name)) {
+    return node.id.name;
+  }
+
+  let current = path?.parentPath || null;
+  while (current) {
+    const currentNode = current.node;
+    if (t.isVariableDeclarator(currentNode) && t.isIdentifier(currentNode.id) && isPascalCase(currentNode.id.name)) {
+      return currentNode.id.name;
+    }
+    if (t.isAssignmentExpression(currentNode) && t.isIdentifier(currentNode.left) && isPascalCase(currentNode.left.name)) {
+      return currentNode.left.name;
+    }
+    if (
+      t.isCallExpression(currentNode) ||
+      t.isExportDefaultDeclaration(currentNode) ||
+      t.isExportNamedDeclaration(currentNode) ||
+      t.isTSAsExpression(currentNode) ||
+      t.isTSSatisfiesExpression(currentNode) ||
+      t.isTSNonNullExpression(currentNode) ||
+      t.isParenthesizedExpression(currentNode)
+    ) {
+      current = current.parentPath;
+      continue;
+    }
+    break;
+  }
+
+  return null;
+}
+
+type PropBindingDescriptor = {
+  propName: string;
+  localName: string;
+};
+
+function collectPropsBindingsFromPattern(pattern: t.ObjectPattern) {
+  const clonedPattern = t.cloneNode(pattern, true) as t.ObjectPattern;
+  const bindings: PropBindingDescriptor[] = [];
+
+  pattern.properties.forEach((property, index) => {
+    const clonedProperty = clonedPattern.properties[index];
+    if (!t.isObjectProperty(property) || !t.isObjectProperty(clonedProperty) || property.computed) {
+      return;
+    }
+
+    const propName =
+      (t.isIdentifier(property.key) && property.key.name) ||
+      (t.isStringLiteral(property.key) && property.key.value) ||
+      '';
+    if (!propName) return;
+
+    if (t.isIdentifier(property.value) && t.isIdentifier(clonedProperty.value)) {
+      bindings.push({ propName, localName: property.value.name });
+      clonedProperty.value = t.assignmentPattern(
+        t.identifier(clonedProperty.value.name),
+        createDefaultValueForPropName(propName)
+      );
+      return;
+    }
+
+    if (t.isAssignmentPattern(property.value) && t.isIdentifier(property.value.left) && t.isAssignmentPattern(clonedProperty.value)) {
+      bindings.push({ propName, localName: property.value.left.name });
+      clonedProperty.value = t.assignmentPattern(
+        t.identifier(property.value.left.name),
+        cloneExpressionOrDefault(property.value.right, propName)
+      );
+    }
+  });
+
+  return { pattern: clonedPattern, bindings };
+}
+
+function ensureBlockStatementBody(path: any) {
+  if (t.isBlockStatement(path.node.body)) {
+    return path.node.body as t.BlockStatement;
+  }
+
+  const originalBody = path.node.body;
+  const blockBody = t.blockStatement([t.returnStatement(originalBody as t.Expression)]);
+  path.node.body = blockBody;
+  return blockBody;
+}
+
+function createMockAssignmentStatement(componentName: string, variableName: string, localName: string, kind: 'prop' | 'variable' = 'variable') {
+  return t.expressionStatement(
+    t.assignmentExpression(
+      '=',
+      t.identifier(localName),
+      t.conditionalExpression(
+        t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+        t.callExpression(
+          t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+          [t.stringLiteral(componentName), t.stringLiteral(variableName), t.identifier(localName), t.stringLiteral(kind)]
+        ),
+        t.identifier(localName)
+      )
+    )
+  );
+}
+
+function instrumentComponentPropsForPreview(path: any, componentName: string) {
+  if (!componentName || !isPascalCase(componentName) || !Array.isArray(path.node.params) || path.node.params.length === 0) {
+    return;
+  }
+
+  const firstParam = path.node.params[0];
+  const unwrappedParam = unwrapNode(firstParam as any);
+  if (!unwrappedParam) return;
+
+  const body = ensureBlockStatementBody(path);
+
+  if (t.isObjectPattern(unwrappedParam)) {
+    const propsIdentifier = path.scope.generateUidIdentifier('mrpakProps');
+    const fallbackExpression = t.objectExpression([]);
+    const { pattern, bindings } = collectPropsBindingsFromPattern(unwrappedParam);
+
+    path.node.params[0] = t.assignmentPattern(propsIdentifier, fallbackExpression);
+
+    body.body.unshift(
+      ...bindings.map((binding) =>
+        createMockAssignmentStatement(componentName, binding.propName, binding.localName, 'prop')
+      )
+    );
+    body.body.unshift(
+      t.variableDeclaration('let', [
+        t.variableDeclarator(
+          pattern,
+          t.logicalExpression('||', t.identifier(propsIdentifier.name), t.objectExpression([]))
+        ),
+      ])
+    );
+    return;
+  }
+
+  if (t.isAssignmentPattern(unwrappedParam) && t.isObjectPattern(unwrappedParam.left)) {
+    const propsIdentifier = path.scope.generateUidIdentifier('mrpakProps');
+    const fallbackExpression = cloneExpressionOrDefault(unwrappedParam.right, 'props');
+    const { pattern, bindings } = collectPropsBindingsFromPattern(unwrappedParam.left);
+
+    path.node.params[0] = t.assignmentPattern(propsIdentifier, fallbackExpression);
+
+    body.body.unshift(
+      ...bindings.map((binding) =>
+        createMockAssignmentStatement(componentName, binding.propName, binding.localName, 'prop')
+      )
+    );
+    body.body.unshift(
+      t.variableDeclaration('let', [
+        t.variableDeclarator(
+          pattern,
+          t.logicalExpression('||', t.identifier(propsIdentifier.name), t.objectExpression([]))
+        ),
+      ])
+    );
+    return;
+  }
+
+  if (t.isIdentifier(unwrappedParam)) {
+    path.node.params[0] = t.assignmentPattern(
+      t.identifier(unwrappedParam.name),
+      t.objectExpression([])
+    );
+    body.body.unshift(
+      t.expressionStatement(
+        t.assignmentExpression(
+          '=',
+          t.identifier(unwrappedParam.name),
+          t.conditionalExpression(
+            t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+            t.callExpression(
+              t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+              [t.stringLiteral(componentName), t.stringLiteral(unwrappedParam.name), t.identifier(unwrappedParam.name), t.stringLiteral('prop')]
+            ),
+            t.identifier(unwrappedParam.name)
+          )
+        )
+      )
+    );
+    return;
+  }
+
+  if (t.isAssignmentPattern(unwrappedParam) && t.isIdentifier(unwrappedParam.left)) {
+    path.node.params[0] = t.assignmentPattern(
+      t.identifier(unwrappedParam.left.name),
+      cloneExpressionOrDefault(unwrappedParam.right, unwrappedParam.left.name)
+    );
+    body.body.unshift(
+      t.expressionStatement(
+        t.assignmentExpression(
+          '=',
+          t.identifier(unwrappedParam.left.name),
+          t.conditionalExpression(
+            t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+            t.callExpression(
+              t.memberExpression(t.identifier('window'), t.identifier('__mrpakGetMock')),
+              [t.stringLiteral(componentName), t.stringLiteral(unwrappedParam.left.name), t.identifier(unwrappedParam.left.name), t.stringLiteral('prop')]
+            ),
+            t.identifier(unwrappedParam.left.name)
+          )
+        )
+      )
+    );
+  }
+}
+
+function collectBindingNamesFromPattern(node: t.Node | null | undefined): string[] {
+  const names: string[] = [];
+  const unwrapped = unwrapNode(node);
+  if (!unwrapped) return names;
+
+  if (t.isIdentifier(unwrapped)) {
+    names.push(unwrapped.name);
+    return names;
+  }
+
+  if (t.isAssignmentPattern(unwrapped)) {
+    return collectBindingNamesFromPattern(unwrapped.left);
+  }
+
+  if (t.isObjectPattern(unwrapped)) {
+    unwrapped.properties.forEach((property) => {
+      if (t.isRestElement(property)) {
+        names.push(...collectBindingNamesFromPattern(property.argument));
+        return;
+      }
+      if (t.isObjectProperty(property)) {
+        names.push(...collectBindingNamesFromPattern(property.value));
+      }
+    });
+    return names;
+  }
+
+  if (t.isArrayPattern(unwrapped)) {
+    unwrapped.elements.forEach((element) => {
+      if (!element) return;
+      if (t.isRestElement(element)) {
+        names.push(...collectBindingNamesFromPattern(element.argument));
+        return;
+      }
+      names.push(...collectBindingNamesFromPattern(element));
+    });
+  }
+
+  return names;
+}
+
 function hasRenderableReturn(fn: t.FunctionExpression | t.ArrowFunctionExpression | t.FunctionDeclaration) {
   if (t.isArrowFunctionExpression(fn) && !t.isBlockStatement(fn.body)) {
     const body = unwrapNode(fn.body);
@@ -641,6 +942,21 @@ export function instrumentVariablesForPreview(code: string): string {
     const ast = parseModule(code);
     
     traverse(ast, {
+      FunctionDeclaration(path) {
+        const componentName = getComponentNameFromFunctionPath(path);
+        if (!componentName) return;
+        instrumentComponentPropsForPreview(path, componentName);
+      },
+      FunctionExpression(path) {
+        const componentName = getComponentNameFromFunctionPath(path);
+        if (!componentName) return;
+        instrumentComponentPropsForPreview(path, componentName);
+      },
+      ArrowFunctionExpression(path) {
+        const componentName = getComponentNameFromFunctionPath(path);
+        if (!componentName) return;
+        instrumentComponentPropsForPreview(path, componentName);
+      },
       VariableDeclarator(path) {
         // Only instrument top-level variables inside components
         const functionParent = path.getFunctionParent();
@@ -1111,7 +1427,32 @@ export function extractVariableUsages(code: string): Record<string, { getters: s
       return id;
     };
 
+    const registerGetterUsages = (scopePath: any, varName: string) => {
+      if (!varName) return;
+      if (!usages[varName]) usages[varName] = { getters: [], setters: [] };
+
+      const binding = scopePath.scope.getBinding(varName);
+      if (!binding) return;
+      binding.referencePaths.forEach((ref: any) => {
+        const blockId = getBlockId(ref);
+        if (blockId && !usages[varName].getters.includes(blockId)) {
+          usages[varName].getters.push(blockId);
+        }
+      });
+    };
+
     traverse(ast, {
+      Function(path) {
+        const compName = getComponentNameFromFunctionPath(path);
+        if (!compName) return;
+
+        const firstParam = path.node.params?.[0];
+        if (!firstParam) return;
+
+        collectBindingNamesFromPattern(firstParam).forEach((varName) => {
+          registerGetterUsages(path, varName);
+        });
+      },
       VariableDeclarator(path) {
         const functionParent = path.getFunctionParent();
         if (!functionParent) return;
@@ -1157,16 +1498,7 @@ export function extractVariableUsages(code: string): Record<string, { getters: s
           if (t.isIdentifier(stateVar)) {
             const varName = stateVar.name;
             if (!usages[varName]) usages[varName] = { getters: [], setters: [] };
-            
-            const binding = path.scope.getBinding(varName);
-            if (binding) {
-              binding.referencePaths.forEach(ref => {
-                const blockId = getBlockId(ref);
-                if (blockId && !usages[varName].getters.includes(blockId)) {
-                  usages[varName].getters.push(blockId);
-                }
-              });
-            }
+            registerGetterUsages(path, varName);
           }
 
           if (t.isIdentifier(stateVar) && t.isIdentifier(setterVar)) {
@@ -1183,19 +1515,11 @@ export function extractVariableUsages(code: string): Record<string, { getters: s
               });
             }
           }
-        } else if (t.isIdentifier(id) && !isUseState) {
-          const varName = id.name;
-          if (!usages[varName]) usages[varName] = { getters: [], setters: [] };
-          
-          const binding = path.scope.getBinding(varName);
-          if (binding) {
-            binding.referencePaths.forEach(ref => {
-              const blockId = getBlockId(ref);
-              if (blockId && !usages[varName].getters.includes(blockId)) {
-                usages[varName].getters.push(blockId);
-              }
-            });
-          }
+        } else if (!isUseState) {
+          collectBindingNamesFromPattern(id).forEach((varName) => {
+            if (!usages[varName]) usages[varName] = { getters: [], setters: [] };
+            registerGetterUsages(path, varName);
+          });
         }
       }
     });

@@ -96,12 +96,12 @@ export function useEditorMessage({
 
         // Only send mocks in split mode to allow preview mode to be fully interactive
         if (state.viewMode === 'split') {
-          // First apply values from variableSnapshots as defaults
-          // ONLY for state variables. Non-state variables (derived values) shouldn't be frozen.
+          // First apply values from variableSnapshots as defaults.
+          // State and props should survive reloads; derived values should remain live.
           for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
             if (!mergedMocks[comp]) mergedMocks[comp] = {};
             for (const [varName, varData] of Object.entries(vars)) {
-              if (varData.isState) {
+              if (varData.isState || varData.isProp) {
                 mergedMocks[comp][varName] = varData.value;
               }
             }
@@ -230,8 +230,12 @@ export function useEditorMessage({
               if (!merged[comp]) merged[comp] = {};
               for (const [varName, varData] of Object.entries(vars as any)) {
                 const existing = merged[comp][varName];
-                // Preserve value of existing variables (especially state) so we don't reset to 0
-                if (existing && existing.isState && (varData as any).isState) {
+                // Preserve state/prop values so split-mode snapshots don't wipe stable inputs.
+                if (
+                  existing &&
+                  ((existing.isState && (varData as any).isState) ||
+                    (existing.isProp && (varData as any).isProp))
+                ) {
                   merged[comp][varName] = {
                     ...(varData as any),
                     value: existing.value,

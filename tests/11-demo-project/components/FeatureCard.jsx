@@ -1,6 +1,9 @@
 import React from 'react';
 
-function FeatureCard({ title, text }) {
+function FeatureCard({
+  title = 'Новая возможность',
+  text = 'Описание карточки доступно в панели переменных и может редактироваться в превью.',
+}) {
   return (
     <article className="feature-card">
       <div className="feature-icon" />

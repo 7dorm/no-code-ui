@@ -148,6 +148,8 @@ export type VariableSnapshot = {
   type: string;
   value: any;
   isState: boolean;
+  isProp?: boolean;
+  baseValue?: any;
   componentName: string;
 };
 
