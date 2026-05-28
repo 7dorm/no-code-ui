@@ -94,22 +94,25 @@ export function useEditorMessage({
         const state = useEditorStore.getState();
         const mergedMocks: Record<string, Record<string, any>> = {};
 
-        // First apply values from variableSnapshots as defaults
-        // ONLY for state variables. Non-state variables (derived values) shouldn't be frozen.
-        for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
-          if (!mergedMocks[comp]) mergedMocks[comp] = {};
-          for (const [varName, varData] of Object.entries(vars)) {
-            if (varData.isState) {
-              mergedMocks[comp][varName] = varData.value;
+        // Only send mocks in split mode to allow preview mode to be fully interactive
+        if (state.viewMode === 'split') {
+          // First apply values from variableSnapshots as defaults
+          // ONLY for state variables. Non-state variables (derived values) shouldn't be frozen.
+          for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
+            if (!mergedMocks[comp]) mergedMocks[comp] = {};
+            for (const [varName, varData] of Object.entries(vars)) {
+              if (varData.isState) {
+                mergedMocks[comp][varName] = varData.value;
+              }
             }
           }
-        }
 
-        // Only override with explicit mockVariables
-        for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
-          if (!mergedMocks[comp]) mergedMocks[comp] = {};
-          for (const [varName, value] of Object.entries(vars)) {
-            mergedMocks[comp][varName] = value;
+          // Only override with explicit mockVariables
+          for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
+            if (!mergedMocks[comp]) mergedMocks[comp] = {};
+            for (const [varName, value] of Object.entries(vars)) {
+              mergedMocks[comp][varName] = value;
+            }
           }
         }
 
