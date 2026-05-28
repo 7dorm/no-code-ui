@@ -24,6 +24,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         .mrpak-drop-label { position: fixed; z-index: 10000; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 8px; padding: 6px 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.25); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .mrpak-shift-badge { position: fixed; z-index: 10001; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(245, 158, 11, 0.65); border-radius: 6px; padding: 4px 6px; font: 11px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 3px 8px rgba(0,0,0,0.22); }
         .mrpak-hint { position: fixed; z-index: 9999; bottom: 10px; right: 10px; background: rgba(15,23,42,0.85); color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; }
+        .mrpak-var-getter { outline: 2px solid #c084fc !important; outline-offset: 4px; box-shadow: 0 0 12px rgba(192, 132, 252, 0.6); z-index: 9990; position: relative; }
+        .mrpak-var-setter { outline: 2px solid #fb923c !important; outline-offset: 4px; box-shadow: 0 0 12px rgba(251, 146, 60, 0.6); z-index: 9990; position: relative; }
         ${isEditMode ? `
         /* Р‘Р»РѕРєРёСЂСѓРµРј РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹ С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР° */
         [data-no-code-ui-id] button,
@@ -262,6 +264,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_SET_RESIZE_TARGET = '${MRPAK_CMD.SET_RESIZE_TARGET}';
           const CMD_REQ_VAR_SNAPSHOT = '${MRPAK_CMD.REQUEST_VAR_SNAPSHOT}';
           const CMD_UPDATE_MOCKS = '${MRPAK_CMD.UPDATE_MOCKS}';
+          const CMD_HIGHLIGHT_VAR_BLOCKS = '${MRPAK_CMD.HIGHLIGHT_VAR_BLOCKS}';
           let selected = null;
           let selectedGroup = [];
           let selectedIds = [];
@@ -3120,6 +3123,25 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 post(MSG_VAR_SNAPSHOT, {
                   snapshots: safeSnapshots
                 });
+                return;
+              }
+              if (data.type === CMD_HIGHLIGHT_VAR_BLOCKS) {
+                try {
+                  Array.from(document.querySelectorAll('.mrpak-var-getter, .mrpak-var-setter')).forEach((el) => {
+                    el.classList.remove('mrpak-var-getter');
+                    el.classList.remove('mrpak-var-setter');
+                  });
+                  if (data.getterIds && Array.isArray(data.getterIds)) {
+                    data.getterIds.forEach((id) => {
+                      getElementsById(String(id)).forEach(el => el.classList.add('mrpak-var-getter'));
+                    });
+                  }
+                  if (data.setterIds && Array.isArray(data.setterIds)) {
+                    data.setterIds.forEach((id) => {
+                      getElementsById(String(id)).forEach(el => el.classList.add('mrpak-var-setter'));
+                    });
+                  }
+                } catch(e) {}
                 return;
               }
               if (data.type === CMD_UPDATE_MOCKS) {

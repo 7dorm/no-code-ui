@@ -14,7 +14,7 @@ import {
   applyExternalStylePatch, 
   replaceStyleReferenceInJsx 
 } from '../blockEditor/PatchEngine';
-import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages, instrumentVariablesForPreview } from '../features/editor/lib/react-processor';
+import { extractImports, detectComponents, normalizeReactModuleCode, wrapImportedComponentUsages, instrumentVariablesForPreview, extractVariableUsages } from '../features/editor/lib/react-processor';
 import { readFile, readFileBase64, writeFile } from '../shared/api/electron-api';
 import { resolvePath, resolvePathSync } from '../features/editor/lib/path-resolver';
 import { injectBlockEditorScript } from '../features/editor/lib/block-editor-script';
@@ -2151,11 +2151,14 @@ export class ReactFramework extends Framework {
 </body>
 </html>
     `;
+    const variableUsages = extractVariableUsages(instProcessed.code);
+
     return {
       html: html,
       dependencyPaths,
       blockMapForEditor: instProcessed.map,
       blockMapForFile: instOriginal.map,
+      variableUsages,
     };
   }
 

@@ -60,6 +60,9 @@ export function usePreviewGeneration({
           setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths);
+          if (result.variableUsages) {
+            useEditorStore.getState().setVariableUsages(result.variableUsages);
+          }
           setPreviewOpenError(null);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
@@ -109,6 +112,9 @@ export function usePreviewGeneration({
           setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths);
+          if (result.variableUsages) {
+            useEditorStore.getState().setVariableUsages(result.variableUsages);
+          }
           setPreviewOpenError(null);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);

@@ -78,7 +78,29 @@ export function VariablesPanel() {
     
     // Select the variable
     setSelectedVariableName(varName);
+
+    // Send highlight command for getters and setters
+    const state = useEditorStore.getState();
+    const usages = state.variableUsages?.[varName] || { getters: [], setters: [] };
+    state.sendIframeCommand({
+      type: MRPAK_CMD.HIGHLIGHT_VAR_BLOCKS || 'MRPAK_CMD_HIGHLIGHT_VAR_BLOCKS',
+      getterIds: usages.getters,
+      setterIds: usages.setters,
+    });
   };
+
+  React.useEffect(() => {
+    return () => {
+      // Clear highlights when unmounting
+      const state = useEditorStore.getState();
+      state.setSelectedVariableName(null);
+      state.sendIframeCommand({
+        type: MRPAK_CMD.HIGHLIGHT_VAR_BLOCKS || 'MRPAK_CMD_HIGHLIGHT_VAR_BLOCKS',
+        getterIds: [],
+        setterIds: [],
+      });
+    };
+  }, []);
 
   const selectedBlockSnippet = selectedBlock?.id ? blockMapForFile?.[selectedBlock.id]?.snippet || '' : '';
   const selectedBlockComponentName = selectedBlock?.id ? blockMapForFile?.[selectedBlock.id]?.componentName || '' : '';
