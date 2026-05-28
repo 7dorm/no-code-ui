@@ -48,6 +48,8 @@ interface EditorState {
   setSelectedBlock: (block: { id: string; meta?: any } | null) => void;
   selectedBlockIds: string[];
   setSelectedBlockIds: (ids: string[]) => void;
+  selectedVariableName: string | null;
+  setSelectedVariableName: (name: string | null) => void;
 
   // Ast Data
   blockMap: BlockMap;
@@ -154,6 +156,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedBlock: (block) => set({ selectedBlock: block }),
   selectedBlockIds: [],
   setSelectedBlockIds: (ids) => set({ selectedBlockIds: ids }),
+  selectedVariableName: null,
+  setSelectedVariableName: (name) => set({ selectedVariableName: name }),
 
   // Ast Data
   blockMap: {},

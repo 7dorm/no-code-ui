@@ -11,7 +11,9 @@ export function VariablesPanel() {
     forceRenderVariables,
     blockMapForFile,
     selectedBlock,
-    setSelectedBlockIds
+    setSelectedBlockIds,
+    selectedVariableName,
+    setSelectedVariableName
   } = useEditorStore();
 
   
@@ -63,6 +65,7 @@ export function VariablesPanel() {
   };
 
   const handleSelectVariable = (componentName: string, varName: string) => {
+    // Select blocks using it
     const ids: string[] = [];
     if (blockMapForFile) {
       for (const [id, block] of Object.entries(blockMapForFile)) {
@@ -72,6 +75,9 @@ export function VariablesPanel() {
       }
     }
     setSelectedBlockIds(ids);
+    
+    // Select the variable
+    setSelectedVariableName(varName);
   };
 
   const selectedBlockSnippet = selectedBlock?.id ? blockMapForFile?.[selectedBlock.id]?.snippet || '' : '';
@@ -102,11 +108,13 @@ export function VariablesPanel() {
               const readOnly = !isPrimitive;
 
               const isUsedBySelectedBlock = selectedBlockComponentName === componentName && typeof selectedBlockSnippet === 'string' && selectedBlockSnippet.includes(varName);
+              const isSelectedVariable = selectedVariableName === varName;
+              const isHighlighted = isUsedBySelectedBlock || isSelectedVariable;
 
               return (
-                <View key={varName} style={[styles.variableRow, isUsedBySelectedBlock && styles.variableRowHighlighted]}>
+                <View key={varName} style={[styles.variableRow, isHighlighted && styles.variableRowHighlighted]}>
                   <TouchableOpacity onPress={() => handleSelectVariable(componentName, varName)} style={styles.variableHeader}>
-                    <Text style={[styles.variableName, isUsedBySelectedBlock && styles.variableNameHighlighted]}>{varName}</Text>
+                    <Text style={[styles.variableName, isHighlighted && styles.variableNameHighlighted]}>{varName}</Text>
                     <Text style={styles.variableType}>{varData.type} {varData.isState ? '(State)' : ''}</Text>
                   </TouchableOpacity>
                   {varData.type === 'boolean' ? (

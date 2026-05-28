@@ -17,10 +17,14 @@ export function useMonacoEditor({
     selectedBlock,
     setSelectedBlock,
     sendIframeCommand,
+    selectedVariableName,
+    setSelectedVariableName,
+    variableSnapshots,
   } = useEditorStore();
 
   const suppressCodeSelectionSyncRef = useRef<boolean>(false);
   const monacoSelectionDecorationsRef = useRef<string[]>([]);
+  const monacoVariableDecorationsRef = useRef<string[]>([]);
 
   const updateMonacoEditorWithScroll = useCallback((newContent: any) => {
     if (!monacoEditorRef?.current) return;
@@ -77,6 +81,22 @@ export function useMonacoEditor({
       }
     } catch (e) {
       console.warn('[clearMonacoBlockSelection] decorations clear failed:', e);
+    }
+  }, [monacoEditorRef]);
+
+  const clearMonacoVariableSelection = useCallback(() => {
+    const editor = monacoEditorRef?.current;
+    if (!editor) return;
+
+    try {
+      if (typeof editor.deltaDecorations === 'function') {
+        monacoVariableDecorationsRef.current = editor.deltaDecorations(
+          monacoVariableDecorationsRef.current,
+          []
+        );
+      }
+    } catch (e) {
+      console.warn('[clearMonacoVariableSelection] decorations clear failed:', e);
     }
   }, [monacoEditorRef]);
 
@@ -173,6 +193,25 @@ export function useMonacoEditor({
       if (!model || !position) return;
 
       const offset = model.getOffsetAt(position);
+      
+      const wordInfo = typeof model.getWordAtPosition === 'function' ? model.getWordAtPosition(position) : null;
+      if (wordInfo && wordInfo.word) {
+        let isVariable = false;
+        for (const compVars of Object.values(variableSnapshots || {})) {
+          if (compVars[wordInfo.word]) {
+            isVariable = true;
+            break;
+          }
+        }
+        if (isVariable) {
+          setSelectedVariableName(wordInfo.word);
+          // Don't return here, so it can ALSO select the block if needed, or we can just return.
+          // The prompt says "в коде ктрл + лкм по переменной выделит ее на панели", so selecting the block is secondary.
+          // Let's just return to make variable selection precise.
+          return;
+        }
+      }
+
       const entries = Object.entries(blockMapForFile || {});
       if (entries.length === 0) return;
 
@@ -208,6 +247,46 @@ export function useMonacoEditor({
 
     return () => cancelAnimationFrame(rafId);
   }, [selectedBlock, revealSelectedBlockInCode, clearMonacoBlockSelection]);
+
+  useEffect(() => {
+    if (!selectedVariableName) {
+      clearMonacoVariableSelection();
+      return;
+    }
+
+    const editor = monacoEditorRef?.current;
+    if (!editor) return;
+
+    const rafId = requestAnimationFrame(() => {
+      try {
+        const model = typeof editor.getModel === 'function' ? editor.getModel() : null;
+        if (!model || typeof model.findMatches !== 'function') return;
+
+        const matches = model.findMatches(selectedVariableName, false, false, true, null, true);
+        const newDecorations = matches.map((match: any) => ({
+          range: match.range,
+          options: {
+            inlineClassName: 'monaco-variable-selection-inline',
+            overviewRuler: {
+              color: 'rgba(102, 126, 234, 0.8)',
+              position: 1 // OverviewRulerLane.Left
+            }
+          }
+        }));
+
+        if (typeof editor.deltaDecorations === 'function') {
+          monacoVariableDecorationsRef.current = editor.deltaDecorations(
+            monacoVariableDecorationsRef.current,
+            newDecorations
+          );
+        }
+      } catch (e) {
+        console.warn('[highlightVariableInCode] failed:', e);
+      }
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [selectedVariableName, monacoEditorRef, clearMonacoVariableSelection]);
 
   return {
     updateMonacoEditorWithScroll,
