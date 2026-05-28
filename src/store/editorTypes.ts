@@ -125,7 +125,11 @@ export type StyleLibraryEntry = {
   name: string;
   path: string;
   sourceFileName: string;
-  className: string;
+  selector: string;
+  className?: string;
+  targetTag?: string | null;
+  pseudo?: string | null;
+  applyMode?: 'class' | 'patch' | 'preview-only';
   cssText: string;
   stylePatch: Record<string, any>;
 };
@@ -148,4 +152,3 @@ export type VariableSnapshot = {
 };
 
 export type ComponentVariables = Record<string, VariableSnapshot>;
-

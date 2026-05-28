@@ -9,6 +9,8 @@ import {
   ensureCssImportInCode,
   extractImportedCssPathsFromCode,
   getRelativeImportPath,
+  isStyleLibraryEntryApplicableToTag,
+  isThemeRootStyleLibraryEntry,
   parseCssLibraryEntries,
   STYLE_TEMPLATES,
   toPosixPath,
@@ -43,6 +45,7 @@ export function useStyleLibrary({
     fileContent,
     setFileContent,
     blockMapForFile,
+    layersTree,
     selectedBlock,
     setIsModified,
   } = useEditorStore();
@@ -314,15 +317,43 @@ export function useStyleLibrary({
 
   const handleApplyStyleLibraryEntry = useCallback((entryId: string) => {
     const entry = styleLibraryEntries.find((item) => item.id === entryId);
-    if (!entry || !selectedBlock?.id) return;
-    if (fileType !== 'react-native' && entry.className) {
-      applyStyleLibraryClassToBlock(selectedBlock.id, entry.className);
+    if (!entry) return;
+    const isThemeRootEntry = isThemeRootStyleLibraryEntry(entry, styleLibraryEntries);
+    const rootBlockId = layersTree?.rootIds?.[0]
+      ? resolveToMappedBlockId(layersTree.rootIds[0]) || layersTree.rootIds[0]
+      : null;
+    const targetBlockId = isThemeRootEntry ? rootBlockId : selectedBlock?.id;
+    if (!targetBlockId) {
+      setError(isThemeRootEntry ? 'Не найден корневой блок для применения темы.' : 'Сначала выберите блок.');
+      return;
+    }
+    const selectedTagName = String(
+      (isThemeRootEntry
+        ? blockMapForFile?.[targetBlockId]?.tagName
+        : selectedBlock?.meta?.tagName || blockMapForFile?.[targetBlockId]?.tagName) || ''
+    )
+      .trim()
+      .toLowerCase() || null;
+
+    if (!isStyleLibraryEntryApplicableToTag(entry, selectedTagName)) {
+      if (entry.applyMode === 'preview-only') {
+        setError('Этот селектор доступен только для предпросмотра и не применяется напрямую.');
+        return;
+      }
+      if (entry.targetTag) {
+        setError(`Этот стиль рассчитан на <${entry.targetTag}>, а выбран ${selectedTagName ? `<${selectedTagName}>` : 'другой блок'}.`);
+        return;
+      }
+    }
+
+    if (fileType !== 'react-native' && entry.applyMode === 'class' && entry.className) {
+      applyStyleLibraryClassToBlock(targetBlockId, entry.className);
       return;
     }
     const patch = entry.stylePatch || {};
     if (!patch || Object.keys(patch).length === 0) return;
-    void applyAndCommitPatch(selectedBlock.id, patch);
-  }, [applyAndCommitPatch, applyStyleLibraryClassToBlock, fileType, selectedBlock?.id, styleLibraryEntries]);
+    void applyAndCommitPatch(targetBlockId, patch);
+  }, [applyAndCommitPatch, applyStyleLibraryClassToBlock, blockMapForFile, fileType, layersTree?.rootIds, resolveToMappedBlockId, selectedBlock, setError, styleLibraryEntries]);
 
   useEffect(() => {
     void loadStyleLibraryEntries();

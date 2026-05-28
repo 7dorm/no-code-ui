@@ -137,6 +137,51 @@ export function parseCssRuleToPatch(cssText: string, fileType: string | null): R
   return patch;
 }
 
+function normalizeCssSelector(selectorText: string): string {
+  return String(selectorText || '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*([>+~])\s*/g, ' $1 ')
+    .trim();
+}
+
+function escapeRegExp(value: string): string {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function getStyleLibraryEntryMeta(selectorText: string): Pick<
+  StyleLibraryEntry,
+  'selector' | 'name' | 'className' | 'targetTag' | 'pseudo' | 'applyMode'
+> {
+  const selector = normalizeCssSelector(selectorText);
+  const simpleClassMatch = selector.match(/^\.([A-Za-z_-][A-Za-z0-9_-]*)(?:(::?[A-Za-z-]+(?:\([^)]*\))?)*)$/);
+  const className = simpleClassMatch ? simpleClassMatch[1] : '';
+  const tokens = selector.split(/\s*(?:>|\+|~)\s*|\s+/).filter(Boolean);
+  const lastToken = tokens[tokens.length - 1] || '';
+  const pseudoMatches = Array.from(lastToken.matchAll(/::?[A-Za-z-]+(?:\([^)]*\))?/g));
+  const pseudo = pseudoMatches.length > 0 ? pseudoMatches[pseudoMatches.length - 1][0] : null;
+  const structuralToken = lastToken
+    .replace(/::?[A-Za-z-]+(?:\([^)]*\))?/g, '')
+    .replace(/\[[^\]]*\]/g, '');
+  const targetTagMatch = structuralToken.match(/^([A-Za-z][A-Za-z0-9-]*)/);
+  const targetTag = targetTagMatch ? targetTagMatch[1].toLowerCase() : null;
+
+  let applyMode: 'class' | 'patch' | 'preview-only' = 'patch';
+  if (className) {
+    applyMode = 'class';
+  } else if (pseudo) {
+    applyMode = 'preview-only';
+  }
+
+  return {
+    selector,
+    name: selector,
+    className: className || undefined,
+    targetTag,
+    pseudo,
+    applyMode,
+  };
+}
+
 export function ensureCssImportInCode(sourceCode: string, importPath: string): string {
   const source = String(sourceCode || '');
   const normalizedImport = String(importPath || '').trim();
@@ -208,26 +253,105 @@ export function extractImportedCssPathsFromCode(sourceCode: string, fileType: st
 export function parseCssLibraryEntries(cssText: string, fileType: string | null, cssPath: string): StyleLibraryEntry[] {
   const entries: StyleLibraryEntry[] = [];
   const sourceFileName = getPathBasename(cssPath);
-  const ruleRegex = /\.([A-Za-z_-][A-Za-z0-9_-]*)\s*\{([^}]*)\}/g;
+  const source = String(cssText || '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const ruleRegex = /([^{}]+)\{([^{}]*)\}/g;
   let match: RegExpExecArray | null = null;
 
-  while ((match = ruleRegex.exec(String(cssText || '')))) {
-    const className = String(match[1] || '').trim();
+  while ((match = ruleRegex.exec(source))) {
+    const selectorGroup = String(match[1] || '').trim();
     const body = String(match[2] || '').trim();
-    if (!className || !body) continue;
+    if (!selectorGroup || !body) continue;
     const stylePatch = parseCssRuleToPatch(`{${body}}`, fileType);
-    entries.push({
-      id: `${cssPath}::${className}`,
-      name: `.${className}`,
-      path: cssPath,
-      sourceFileName,
-      className,
-      cssText,
-      stylePatch,
+    const selectors = selectorGroup
+      .split(',')
+      .map((item) => normalizeCssSelector(item))
+      .filter(Boolean);
+
+    selectors.forEach((selector) => {
+      if (!selector || selector.startsWith('@')) return;
+      const meta = getStyleLibraryEntryMeta(selector);
+      entries.push({
+        id: `${cssPath}::${meta.selector}`,
+        name: meta.name,
+        selector: meta.selector,
+        path: cssPath,
+        sourceFileName,
+        className: meta.className,
+        targetTag: meta.targetTag,
+        pseudo: meta.pseudo,
+        applyMode: meta.applyMode,
+        cssText,
+        stylePatch,
+      });
     });
   }
 
   return entries;
+}
+
+const STYLE_LIBRARY_PREVIEW_TAGS = new Set([
+  'a',
+  'article',
+  'aside',
+  'button',
+  'div',
+  'em',
+  'footer',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'header',
+  'label',
+  'main',
+  'nav',
+  'p',
+  'section',
+  'small',
+  'span',
+  'strong',
+]);
+
+export function getStyleLibraryEntryPreviewTag(
+  entry: Pick<StyleLibraryEntry, 'targetTag'> | null | undefined
+): string {
+  const targetTag = String(entry?.targetTag || '').trim().toLowerCase();
+  return STYLE_LIBRARY_PREVIEW_TAGS.has(targetTag) ? targetTag : 'div';
+}
+
+export function isStyleLibraryEntryApplicableToTag(
+  entry: Pick<StyleLibraryEntry, 'applyMode' | 'targetTag'> | null | undefined,
+  selectedTagName: string | null | undefined
+): boolean {
+  const applyMode = entry?.applyMode || 'patch';
+  if (applyMode === 'preview-only') return false;
+
+  const targetTag = String(entry?.targetTag || '').trim().toLowerCase();
+  if (!targetTag) return true;
+
+  const normalizedSelectedTag = String(selectedTagName || '').trim().toLowerCase();
+  if (!normalizedSelectedTag) return false;
+
+  return normalizedSelectedTag === targetTag;
+}
+
+export function isThemeRootStyleLibraryEntry(
+  entry: Pick<StyleLibraryEntry, 'id' | 'selector' | 'className' | 'applyMode'> | null | undefined,
+  allEntries: Array<Pick<StyleLibraryEntry, 'id' | 'selector'>> = []
+): boolean {
+  if (!entry || entry.applyMode !== 'class') return false;
+
+  const className = String(entry.className || '').trim();
+  const selector = normalizeCssSelector(String(entry.selector || ''));
+  if (!className || selector !== `.${className}`) return false;
+
+  const prefixRe = new RegExp(`^\\.${escapeRegExp(className)}(?:\\s|>|\\+|~|:|\\[)`);
+  return (allEntries || []).some((candidate) => {
+    if (!candidate || candidate.id === entry.id) return false;
+    return prefixRe.test(normalizeCssSelector(String(candidate.selector || '')));
+  });
 }
 
 export function upsertClassNameInJsxOpeningTag(openTag: string, classToken: string): { ok: true; text: string } | { ok: false; error: string } {

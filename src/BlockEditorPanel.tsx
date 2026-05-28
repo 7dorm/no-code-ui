@@ -101,8 +101,12 @@ export type BlockEditorPanelProps = {
     id: string;
     name: string;
     path: string;
+    selector?: string;
     sourceFileName?: string;
     className?: string;
+    targetTag?: string | null;
+    pseudo?: string | null;
+    applyMode?: 'class' | 'patch' | 'preview-only';
     cssText?: string;
     stylePatch?: StylePatch;
   }>;

@@ -2,19 +2,30 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { MRPAK_CMD } from '../../blockEditor/EditorProtocol';
 import { VariablesPanel } from '../../features/editor/components/VariablesPanel';
+import {
+  getStyleLibraryEntryPreviewTag,
+  isStyleLibraryEntryApplicableToTag,
+  isThemeRootStyleLibraryEntry,
+  kebabToCamel,
+} from '../../features/editor/utils';
 
 interface StyleLibraryEntry {
   id: string;
   name: string;
   path: string;
   sourceFileName?: string;
+  selector?: string;
   className?: string;
+  targetTag?: string | null;
+  pseudo?: string | null;
+  applyMode?: 'class' | 'patch' | 'preview-only';
   cssText?: string;
   stylePatch?: Record<string, unknown>;
 }
 
 interface StyleLibraryColumn {
   fileName: string;
+  entries: StyleLibraryEntry[];
 }
 
 const htmlInputStyle = {
@@ -28,6 +39,54 @@ const htmlInputStyle = {
   paddingRight: '10px',
   outline: 'none',
 };
+
+function normalizeStylePreviewPatch(stylePatch?: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(stylePatch || {}).map(([key, value]) => {
+      const normalizedKey = key.includes('-') ? kebabToCamel(key) : key;
+      const normalizedValue =
+        typeof value === 'string' ? value.replace(/\s*!important\s*$/i, '').trim() : value;
+      return [normalizedKey, normalizedValue];
+    })
+  );
+}
+
+function renderStyleLibraryPreview(entry: StyleLibraryEntry) {
+  const previewTag = getStyleLibraryEntryPreviewTag(entry);
+  const previewStyle = normalizeStylePreviewPatch(entry?.stylePatch) as React.CSSProperties;
+  const labelMap: Record<string, string> = {
+    a: 'Link Preview',
+    button: 'Button Preview',
+    h1: 'Heading Preview',
+    h2: 'Heading Preview',
+    h3: 'Heading Preview',
+    h4: 'Heading Preview',
+    h5: 'Heading Preview',
+    h6: 'Heading Preview',
+    label: 'Label Preview',
+    p: 'Paragraph Preview',
+    span: 'Inline Preview',
+  };
+  const previewLabel = labelMap[previewTag] || 'Preview';
+
+  if (previewTag === 'a') {
+    return (
+      <a href="#" onClick={(event) => event.preventDefault()} style={previewStyle}>
+        {previewLabel}
+      </a>
+    );
+  }
+
+  if (previewTag === 'button') {
+    return (
+      <button type="button" style={previewStyle}>
+        {previewLabel}
+      </button>
+    );
+  }
+
+  return React.createElement(previewTag, { style: previewStyle }, previewLabel);
+}
 
 export function BlockEditorSidebar(props: any) {
   const {
@@ -769,6 +828,14 @@ export function BlockEditorSidebar(props: any) {
     }
   };
   const styleLibraryColumns = React.useMemo(() => {
+    const selectedTagName = String(selectedBlock?.meta?.tagName || '').trim().toLowerCase();
+    const getEntryRank = (entry: StyleLibraryEntry) => {
+      const targetTag = String(entry?.targetTag || '').trim().toLowerCase();
+      if (selectedTagName && targetTag && targetTag === selectedTagName) return 0;
+      if (!targetTag) return 1;
+      return 2;
+    };
+
     const map = new Map<string, StyleLibraryEntry[]>();
     (styleLibraryEntries || []).forEach((entry: StyleLibraryEntry) => {
       const fileKey = String(entry?.sourceFileName || entry?.path || 'styles.css');
@@ -778,9 +845,13 @@ export function BlockEditorSidebar(props: any) {
     });
     return Array.from(map.entries()).map(([fileName, entries]) => ({
       fileName,
-      entries: entries.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''))),
+      entries: entries.sort((a, b) => {
+        const rankDiff = getEntryRank(a) - getEntryRank(b);
+        if (rankDiff !== 0) return rankDiff;
+        return String(a?.name || '').localeCompare(String(b?.name || ''));
+      }),
     })) as StyleLibraryColumn[];
-  }, [styleLibraryEntries]);
+  }, [selectedBlock?.meta?.tagName, styleLibraryEntries]);
 
   const startLibraryDrag = (tag: string) => {
     libraryDragMovedRef.current = false;
@@ -1906,7 +1977,7 @@ export function BlockEditorSidebar(props: any) {
               </TouchableOpacity>
             </View>
             {!styleLibraryColumns?.length ? (
-              <Text style={styles.hint}>Пока нет CSS классов. Импортируйте шаблон/файл или добавьте import '*.css' в код.</Text>
+              <Text style={styles.hint}>Пока нет CSS правил. Импортируйте шаблон/файл или добавьте import '*.css' в код.</Text>
             ) : (
               <div style={{ maxHeight: 420, overflow: 'auto' }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 'max-content' }}>
@@ -1925,7 +1996,19 @@ export function BlockEditorSidebar(props: any) {
                         {column.fileName}
                       </div>
                       {column.entries.map((entry: StyleLibraryEntry) => {
-                        const previewStyle = entry?.stylePatch || {};
+                        const selectedTagName = String(selectedBlock?.meta?.tagName || '').trim().toLowerCase() || null;
+                        const isThemeEntry = isThemeRootStyleLibraryEntry(entry, styleLibraryEntries || []);
+                        const hasRootBlock = !!layersTree?.rootIds?.length;
+                        const canApplyStyleEntry = isThemeEntry
+                          ? hasRootBlock
+                          : !!selectedBlock?.id && isStyleLibraryEntryApplicableToTag(entry, selectedTagName);
+                        const applyLabel = isThemeEntry
+                          ? 'Применить тему'
+                          : entry.applyMode === 'preview-only'
+                          ? 'Preview only'
+                          : entry.targetTag && (!selectedTagName || selectedTagName !== String(entry.targetTag).toLowerCase())
+                          ? `Нужен <${entry.targetTag}>`
+                          : 'Применить';
                         return (
                           <div
                             key={entry.id}
@@ -1937,6 +2020,41 @@ export function BlockEditorSidebar(props: any) {
                             }}
                           >
                             <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, marginBottom: 6 }}>{entry.name}</div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                              {entry.targetTag ? (
+                                <span style={{
+                                  background: 'rgba(255,255,255,0.10)',
+                                  color: '#fff',
+                                  padding: '2px 6px',
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                }}>
+                                  {`<${entry.targetTag}>`}
+                                </span>
+                              ) : null}
+                              {entry.pseudo ? (
+                                <span style={{
+                                  background: 'rgba(102,126,234,0.18)',
+                                  color: '#c7d2fe',
+                                  padding: '2px 6px',
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                }}>
+                                  {entry.pseudo}
+                                </span>
+                              ) : null}
+                              {entry.applyMode === 'class' && entry.className ? (
+                                <span style={{
+                                  background: 'rgba(16,185,129,0.18)',
+                                  color: '#a7f3d0',
+                                  padding: '2px 6px',
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                }}>
+                                  {isThemeEntry ? 'theme' : 'class'}
+                                </span>
+                              ) : null}
+                            </div>
                             <div
                               style={{
                                 background: '#ffffff',
@@ -1951,16 +2069,14 @@ export function BlockEditorSidebar(props: any) {
                                 justifyContent: 'center',
                               }}
                             >
-                              <div style={{ ...previewStyle }}>
-                                Preview
-                              </div>
+                              {renderStyleLibraryPreview(entry)}
                             </div>
                             <TouchableOpacity
-                              style={[styles.layerSaveBtn, !selectedBlock?.id && styles.layerOpBtnDisabled]}
-                              disabled={!selectedBlock?.id}
+                              style={[styles.layerSaveBtn, !canApplyStyleEntry && styles.layerOpBtnDisabled]}
+                              disabled={!canApplyStyleEntry}
                               onPress={() => onApplyStyleLibraryEntry?.(entry.id)}
                             >
-                              <Text style={styles.layerSaveBtnText}>Применить</Text>
+                              <Text style={styles.layerSaveBtnText}>{applyLabel}</Text>
                             </TouchableOpacity>
                           </div>
                         );

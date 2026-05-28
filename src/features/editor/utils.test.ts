@@ -7,8 +7,12 @@ import {
   enrichLayersTree,
   extractImportedCssPathsFromCode,
   formatContentForWrite,
+  getStyleLibraryEntryPreviewTag,
   getRelativeAssetImportPath,
   getRelativeImportPath,
+  isStyleLibraryEntryApplicableToTag,
+  isThemeRootStyleLibraryEntry,
+  parseCssLibraryEntries,
   resolveSourceFilePathFromDependencies,
   toSafeIdentifier,
   upsertClassNameInJsxOpeningTag,
@@ -61,6 +65,85 @@ describe('editor utils', () => {
       ok: false,
       error: 'Dynamic className expressions are not supported for style library apply yet.',
     });
+  });
+
+  it('parses style library entries for class, tag and pseudo selectors', () => {
+    const entries = parseCssLibraryEntries(`
+      .neon-theme {
+        background-color: #050510 !important;
+      }
+
+      .neon-theme > div {
+        border-radius: 16px !important;
+      }
+
+      .neon-theme h2 {
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.8) !important;
+      }
+
+      .neon-theme button:hover {
+        transform: scale(1.05);
+      }
+    `, 'react', '/app/src/demo-theme.css');
+
+    expect(entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        selector: '.neon-theme',
+        className: 'neon-theme',
+        applyMode: 'class',
+        targetTag: null,
+        stylePatch: { backgroundColor: '#050510' },
+      }),
+      expect.objectContaining({
+        selector: '.neon-theme > div',
+        applyMode: 'patch',
+        targetTag: 'div',
+        stylePatch: { borderRadius: '16px' },
+      }),
+      expect.objectContaining({
+        selector: '.neon-theme h2',
+        applyMode: 'patch',
+        targetTag: 'h2',
+      }),
+      expect.objectContaining({
+        selector: '.neon-theme button:hover',
+        applyMode: 'preview-only',
+        targetTag: 'button',
+        pseudo: ':hover',
+      }),
+    ]));
+  });
+
+  it('derives preview tags and applicability for style entries', () => {
+    expect(getStyleLibraryEntryPreviewTag({ targetTag: 'button' })).toBe('button');
+    expect(getStyleLibraryEntryPreviewTag({ targetTag: 'custom-widget' })).toBe('div');
+
+    expect(isStyleLibraryEntryApplicableToTag({ applyMode: 'class', targetTag: null }, 'h2')).toBe(true);
+    expect(isStyleLibraryEntryApplicableToTag({ applyMode: 'patch', targetTag: 'button' }, 'button')).toBe(true);
+    expect(isStyleLibraryEntryApplicableToTag({ applyMode: 'patch', targetTag: 'button' }, 'h2')).toBe(false);
+    expect(isStyleLibraryEntryApplicableToTag({ applyMode: 'preview-only', targetTag: 'button' }, 'button')).toBe(false);
+  });
+
+  it('detects theme root entries that should apply to the root container', () => {
+    const entries = parseCssLibraryEntries(`
+      .neon-theme {
+        background-color: #050510;
+      }
+
+      .neon-theme > div {
+        border-radius: 16px;
+      }
+
+      .plain-card {
+        color: red;
+      }
+    `, 'react', '/app/src/demo-theme.css');
+
+    const themeEntry = entries.find((entry) => entry.selector === '.neon-theme');
+    const plainClassEntry = entries.find((entry) => entry.selector === '.plain-card');
+
+    expect(isThemeRootStyleLibraryEntry(themeEntry || null, entries)).toBe(true);
+    expect(isThemeRootStyleLibraryEntry(plainClassEntry || null, entries)).toBe(false);
   });
 
   it('computes relative import and asset paths', () => {
