@@ -2151,13 +2151,8 @@ export class ReactFramework extends Framework {
 </body>
 </html>
     `;
-    
-    // Инжектируем скрипт блочного редактора
-    const rootBasename = String(filePath || '').replace(/\\/g, '/').split('/').pop() || '';
-    const htmlWithEditor = injectBlockEditorScript(html, 'react', viewMode === 'edit' ? 'edit' : 'preview', rootBasename);
-    
     return {
-      html: htmlWithEditor,
+      html: html,
       dependencyPaths,
       blockMapForEditor: instProcessed.map,
       blockMapForFile: instOriginal.map,
