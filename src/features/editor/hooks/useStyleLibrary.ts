@@ -72,31 +72,13 @@ export function useStyleLibrary({
         return;
       }
 
-      const dirResult = await readDirectory(currentDir);
-      if (!dirResult?.success || !Array.isArray(dirResult.items)) {
-        setStyleLibraryEntries([]);
-        return;
-      }
-
-      const styleDirs = dirResult.items
-        .filter((item: any) => item?.isDirectory && /^styles\d+$/i.test(String(item.name || '')))
-        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
-
       const cssPaths = new Set<string>();
       const collected: StyleLibraryEntry[] = [];
-      for (const styleDir of styleDirs) {
-        const dirPath = currentDir ? `${currentDir}/${styleDir.name}` : styleDir.name;
-        const filesResult = await readDirectory(dirPath);
-        if (!filesResult?.success || !Array.isArray(filesResult.items)) continue;
-        for (const item of filesResult.items) {
-          if (!item?.isFile || !/\.css$/i.test(String(item.name || ''))) continue;
-          const cssPath = `${dirPath}/${item.name}`;
-          cssPaths.add(cssPath);
-        }
-      }
-
+      
       const currentCode = monacoEditorRef?.current?.getValue?.() || fileContent || '';
+      console.log('loadStyleLibraryEntries: fileType', fileType, 'filePath', filePath, 'codeLength:', currentCode.length);
       const importedCssPaths = extractImportedCssPathsFromCode(currentCode, fileType, filePath);
+      console.log('importedCssPaths:', importedCssPaths);
       importedCssPaths.forEach((path) => cssPaths.add(path));
 
       for (const cssPath of Array.from(cssPaths)) {
@@ -194,21 +176,28 @@ export function useStyleLibrary({
     try {
       const pickRes = await openFileDialog([{ name: 'CSS', extensions: ['css'] } as any]);
       if (!pickRes || pickRes.canceled || !pickRes.fileHandle) return;
-      const pickedFile = await pickRes.fileHandle.getFile();
-      const cssText = await pickedFile.text();
-      const cssFileName = String(pickedFile.name || 'imported-style.css').replace(/[^a-zA-Z0-9._-]/g, '_');
 
-      const targetDir = await ensureNextStylesDir();
-      if (!targetDir) {
-        setError('Failed to create stylesN folder for imported file.');
-        return;
-      }
+      let cssPath = '';
 
-      const cssPath = `${targetDir}/${cssFileName}`;
-      const writeRes = await writeFile(cssPath, cssText, { backup: false });
-      if (!writeRes?.success) {
-        setError(`Failed to save selected CSS: ${writeRes?.error || 'unknown error'}`);
-        return;
+      if (pickRes.isProjectFile && pickRes.filePath) {
+        cssPath = pickRes.filePath;
+      } else {
+        const pickedFile = await pickRes.fileHandle.getFile();
+        const cssText = await pickedFile.text();
+        const cssFileName = String(pickedFile.name || 'imported-style.css').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+        const targetDir = await ensureNextStylesDir();
+        if (!targetDir) {
+          setError('Failed to create stylesN folder for imported file.');
+          return;
+        }
+
+        cssPath = `${targetDir}/${cssFileName}`;
+        const writeRes = await writeFile(cssPath, cssText, { backup: false });
+        if (!writeRes?.success) {
+          setError(`Failed to save selected CSS: ${writeRes?.error || 'unknown error'}`);
+          return;
+        }
       }
 
       const relativeImportPath = getRelativeImportPath(filePath, cssPath);

@@ -186,9 +186,27 @@ export async function openDirectoryDialog() {
 }
 
 /**
+ * Рекурсивно ищет handle в директории и возвращает его относительный путь
+ */
+async function findPathByHandle(dirHandle, targetHandle, currentPath = '') {
+  try {
+    for await (const [name, handle] of dirHandle.entries()) {
+      if (await handle.isSameEntry(targetHandle)) {
+        return currentPath ? `${currentPath}/${name}` : name;
+      }
+      if (handle.kind === 'directory') {
+        const subPath = await findPathByHandle(handle, targetHandle, currentPath ? `${currentPath}/${name}` : name);
+        if (subPath) return subPath;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
  * Открытие диалога выбора файла
- * @param {Array} filters - фильтры файлов (для обратной совместимости, в File System API не используются)
- * @returns {Promise<{canceled: boolean, fileHandle?: FileSystemFileHandle, error?: string}>}
+ * @param {Array} filters - фильтры файлов
+ * @returns {Promise<{canceled: boolean, fileHandle?: FileSystemFileHandle, filePath?: string, isProjectFile?: boolean, error?: string}>}
  */
 export async function openFileDialog(filters) {
   if (!isFileSystemAPIAvailable()) {
@@ -201,10 +219,16 @@ export async function openFileDialog(filters) {
     });
     
     if (handles.length > 0) {
+      const fileHandle = handles[0];
+      let relativePath = null;
+      if (rootDirectoryHandle) {
+        relativePath = await findPathByHandle(rootDirectoryHandle, fileHandle);
+      }
       return { 
         canceled: false, 
-        fileHandle: handles[0],
-        filePath: handles[0].name // Для обратной совместимости
+        fileHandle,
+        filePath: relativePath || fileHandle.name,
+        isProjectFile: !!relativePath
       };
     }
     

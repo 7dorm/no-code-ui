@@ -37,7 +37,19 @@ export function useMonacoEditor({
       const scrollLeft = editor.getScrollLeft();
       const position = editor.getPosition();
 
-      editor.setValue(newContent);
+      const model = typeof editor.getModel === 'function' ? editor.getModel() : null;
+      if (model && typeof model.pushEditOperations === 'function') {
+        if (model.getValue() !== newContent) {
+          const fullRange = model.getFullModelRange();
+          model.pushEditOperations(
+            [],
+            [{ range: fullRange, text: newContent }],
+            () => null
+          );
+        }
+      } else {
+        editor.setValue(newContent);
+      }
 
       if (viewState) {
         requestAnimationFrame(() => {

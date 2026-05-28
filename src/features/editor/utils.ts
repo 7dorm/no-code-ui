@@ -127,8 +127,12 @@ export function parseCssRuleToPatch(cssText: string, fileType: string | null): R
       const rawKey = line.slice(0, idx).trim();
       const rawValue = line.slice(idx + 1).trim();
       if (!rawKey || !rawValue) return;
+      let cleanValue = rawValue;
+      if (cleanValue.toLowerCase().endsWith('!important')) {
+        cleanValue = cleanValue.substring(0, cleanValue.length - 10).trim();
+      }
       const key = fileType === 'html' ? rawKey : kebabToCamel(rawKey);
-      patch[key] = rawValue;
+      patch[key] = cleanValue;
     });
   return patch;
 }
@@ -171,7 +175,7 @@ export function extractImportedCssPathsFromCode(sourceCode: string, fileType: st
   const currentDir = toPosixPath(filePath).split('/').slice(0, -1).join('/');
   const results = new Set<string>();
 
-  if (!currentDir) return [];
+  if (currentDir === null || currentDir === undefined) return [];
 
   const pushCssPath = (rawPath: string) => {
     const value = String(rawPath || '').trim();
