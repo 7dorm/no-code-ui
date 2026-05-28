@@ -14,6 +14,7 @@ export const MRPAK_MSG = {
   CANVAS_ZOOM: 'MRPAK_CANVAS_ZOOM',
   CANVAS_PAN: 'MRPAK_CANVAS_PAN',
   VAR_SNAPSHOT: 'MRPAK_VAR_SNAPSHOT',
+  CLEAR_MOCK: 'MRPAK_CLEAR_MOCK',
 };
 
 // Команды из UI -> iframe (локальные изменения, без записи в файлы)
@@ -34,6 +35,7 @@ export const MRPAK_CMD = {
   SET_RESIZE_TARGET: 'MRPAK_CMD_SET_RESIZE_TARGET',
   REQUEST_VAR_SNAPSHOT: 'MRPAK_CMD_REQUEST_VAR_SNAPSHOT',
   UPDATE_MOCKS: 'MRPAK_CMD_UPDATE_MOCKS',
+  HIGHLIGHT_VAR_BLOCKS: 'MRPAK_CMD_HIGHLIGHT_VAR_BLOCKS',
 };
 
 export function isMrpakMessage(data: any) {

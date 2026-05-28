@@ -77,6 +77,11 @@ body,
   border-radius: 999px;
 }
 
+.monaco-variable-selection-inline {
+  background-color: rgba(102, 126, 234, 0.4) !important;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.9);
+}
+
 @keyframes save-flash {
   0% {
     background-color: rgba(76, 175, 80, 0.4);

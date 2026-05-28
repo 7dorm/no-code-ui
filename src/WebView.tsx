@@ -97,45 +97,40 @@ function WebView({
       htmlLength: source.html?.length,
       allowExternalScripts 
     });
+    let isCancelled = false;
     
     // Double-buffering logic to avoid white flash
     const iframe = document.createElement('iframe');
+    iframe.id = 'mrpak-preview-frame';
+    iframe.name = 'preview-frame';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';
-    iframe.style.backgroundColor = '#ffffff';
-    iframe.style.overflow = 'auto';
-    iframe.setAttribute('scrolling', 'yes');
-    // Hide initially and position absolute so it overlays or renders silently
-    iframe.style.opacity = '0';
     iframe.style.position = 'absolute';
     iframe.style.top = '0';
     iframe.style.left = '0';
-    
-    if (source.html && allowExternalScripts) {
-      const sandboxValues = [];
-      if (javaScriptEnabled) sandboxValues.push('allow-scripts');
-      sandboxValues.push('allow-same-origin', 'allow-forms', 'allow-popups', 'allow-modals');
+    iframe.style.opacity = '0'; // Hide initially
+    iframe.style.pointerEvents = 'auto';
+    iframe.style.backgroundColor = '#ffffff';
+
+    if (!allowExternalScripts) {
+      const sandboxValues = ['allow-scripts'];
+      if (javaScriptEnabled) sandboxValues.push('allow-same-origin');
+      sandboxValues.push('allow-forms', 'allow-popups', 'allow-modals');
       iframe.setAttribute('sandbox', sandboxValues.join(' '));
     } else {
       iframe.removeAttribute('sandbox');
     }
 
     // Обработчики событий
-    const handleLoad = (e?: Event) => {
-      try {
-        if (!iframe.src || iframe.src === 'about:blank' || iframe.src === window.location.href) {
-          return;
-        }
-      } catch (e) {}
+    const commitIframe = () => {
+      if (isCancelled) return;
+      if (iframeRef.current === iframe) return;
 
-      console.log('WebView iframe: load event fired - iframe загружен!');
-      setLoading(false);
-      
-      // Once loaded, show the new iframe
+      console.log('WebView iframe: promoting new iframe to active');
       iframe.style.opacity = '1';
       iframe.style.position = 'relative'; 
-      
+
       // Restore scroll position from old iframe if possible
       if (iframeRef.current && iframeRef.current.contentWindow) {
         try {
@@ -168,6 +163,20 @@ function WebView({
           } catch (e) {}
         }
       }
+    };
+
+    const handleLoad = (e?: Event) => {
+      if (isCancelled) return;
+      try {
+        if ((!iframe.src && !iframe.srcdoc) || iframe.src === 'about:blank' || iframe.src === window.location.href) {
+          return;
+        }
+      } catch (e) {}
+
+      console.log('WebView iframe: load event fired - iframe загружен!');
+      setLoading(false);
+      
+      commitIframe();
 
       if (onLoad) onLoad({ nativeEvent: {} });
       if (onLoadEnd) onLoadEnd();
@@ -175,6 +184,7 @@ function WebView({
     };
 
     const handleError = (error: Event | Error) => {
+      if (isCancelled) return;
       setLoading(false);
       console.error('WebView iframe error:', error);
       if (onError) {
@@ -187,8 +197,13 @@ function WebView({
     iframe.addEventListener('error', handleError);
 
     const handleMessage = (event: MessageEvent) => {
+      if (isCancelled) return;
       try {
-        if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
+        if (event.source !== iframe.contentWindow) return;
+        
+        // Promote it immediately so outgoing messages route correctly!
+        commitIframe();
+
         if (onMessageRef.current) {
           onMessageRef.current({ nativeEvent: { data: event.data } });
         }
@@ -199,6 +214,7 @@ function WebView({
     container.appendChild(iframe);
 
     requestAnimationFrame(() => {
+      if (isCancelled) return;
       if (source.html) {
         try {
           const blob = new Blob([source.html], { type: 'text/html;charset=utf-8' });
@@ -220,15 +236,19 @@ function WebView({
     });
 
     return () => {
-      // Cleanup happens when component unmounts, not on every source change
-      // So we don't clear container.innerHTML here anymore to allow double buffering across renders!
-      // But we must clear Blob URL to avoid memory leaks.
+      isCancelled = true;
       if ((iframe as any)._mrpakBlobUrl) {
          URL.revokeObjectURL((iframe as any)._mrpakBlobUrl);
       }
       window.removeEventListener('message', handleMessage);
+      
+      if (iframeRef.current !== iframe) {
+        try {
+          iframe.remove();
+        } catch(e) {}
+      }
     };
-  }, [source, javaScriptEnabled, startInLoadingState, allowExternalScripts]);
+  }, [source?.html, source?.uri, javaScriptEnabled, startInLoadingState, allowExternalScripts]);
 
   // Отправка сообщений В iframe (без пересоздания iframe)
   useEffect(() => {

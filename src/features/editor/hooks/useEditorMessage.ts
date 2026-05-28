@@ -90,26 +90,63 @@ export function useEditorMessage({
       }
 
       if (data.type === MRPAK_MSG.READY) {
+        console.log('[useEditorMessage] Received READY, sending CMD_UPDATE_MOCKS');
         const state = useEditorStore.getState();
         const mergedMocks: Record<string, Record<string, any>> = {};
 
-        // Only override with explicit mockVariables
-        for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
-          if (!mergedMocks[comp]) mergedMocks[comp] = {};
-          for (const [varName, value] of Object.entries(vars)) {
-            mergedMocks[comp][varName] = value;
+        // Only send mocks in split mode to allow preview mode to be fully interactive
+        if (state.viewMode === 'split') {
+          // First apply values from variableSnapshots as defaults
+          // ONLY for state variables. Non-state variables (derived values) shouldn't be frozen.
+          for (const [comp, vars] of Object.entries(state.variableSnapshots || {})) {
+            if (!mergedMocks[comp]) mergedMocks[comp] = {};
+            for (const [varName, varData] of Object.entries(vars)) {
+              if (varData.isState) {
+                mergedMocks[comp][varName] = varData.value;
+              }
+            }
+          }
+
+          // Only override with explicit mockVariables
+          for (const [comp, vars] of Object.entries(state.mockVariables || {})) {
+            if (!mergedMocks[comp]) mergedMocks[comp] = {};
+            for (const [varName, value] of Object.entries(vars)) {
+              mergedMocks[comp][varName] = value;
+            }
           }
         }
 
+        console.log('[useEditorMessage] Sending mergedMocks:', mergedMocks);
         state.sendIframeCommand({
           type: 'MRPAK_CMD_UPDATE_MOCKS',
           mocks: mergedMocks,
         });
 
-        // Request a fresh snapshot from the iframe now that it has been populated with restored state
-        state.sendIframeCommand({
-          type: 'MRPAK_CMD_REQUEST_VAR_SNAPSHOT',
-        });
+        // Automatically request a snapshot shortly after initialization
+        // This ensures the Variables Panel is always populated without needing to manually click "Make Snapshot"
+        setTimeout(() => {
+          useEditorStore.getState().sendIframeCommand({
+            type: 'MRPAK_CMD_REQUEST_VAR_SNAPSHOT',
+          });
+        }, 100);
+
+        return;
+      }
+
+      if (data.type === MRPAK_MSG.CLEAR_MOCK) {
+        if (data.comp && data.name) {
+          console.log('[useEditorMessage] Clearing mock for', data.comp, data.name);
+          useEditorStore.getState().updateMockVariables((prev: any) => {
+            const newMocks = { ...prev };
+            if (newMocks[data.comp]) {
+              newMocks[data.comp] = { ...newMocks[data.comp] };
+              delete newMocks[data.comp][data.name];
+            }
+            return newMocks;
+          });
+          // Also trigger a UI refresh
+          useEditorStore.getState().forceRenderVariables();
+        }
         return;
       }
 
@@ -175,7 +212,39 @@ export function useEditorMessage({
       if (data.type === MRPAK_MSG.VAR_SNAPSHOT) {
         console.log('[useEditorMessage] Received VAR_SNAPSHOT:', data.snapshots);
         if (data.snapshots) {
-          useEditorStore.getState().setVariableSnapshots(data.snapshots);
+          const state = useEditorStore.getState();
+          const viewMode = state.viewMode;
+          
+          if (viewMode === 'preview') {
+            // In preview mode, the iframe has the "real" running state. 
+            // We want to overwrite everything with the fresh snapshot.
+            state.setVariableSnapshots(data.snapshots);
+          } else {
+            // In split mode (edit mode), the iframe may return initial states (e.g. 0).
+            // We want to add NEW variables or update derived variables, but preserve the values 
+            // of EXISTING state variables so we don't wipe out the snapshot from preview mode.
+            const currentSnapshots = state.variableSnapshots || {};
+            const merged: any = { ...currentSnapshots };
+            
+            for (const [comp, vars] of Object.entries(data.snapshots)) {
+              if (!merged[comp]) merged[comp] = {};
+              for (const [varName, varData] of Object.entries(vars as any)) {
+                const existing = merged[comp][varName];
+                // Preserve value of existing variables (especially state) so we don't reset to 0
+                if (existing && existing.isState && (varData as any).isState) {
+                  merged[comp][varName] = {
+                    ...(varData as any),
+                    value: existing.value,
+                    baseValue: existing.baseValue,
+                  };
+                } else {
+                  // For derived variables (isState: false) or new variables, always take the incoming value
+                  merged[comp][varName] = varData;
+                }
+              }
+            }
+            state.setVariableSnapshots(merged);
+          }
         }
         return;
       }
@@ -329,6 +398,12 @@ export function useEditorMessage({
         }
 
         await applyBlockPatch(id, patch, isIntermediate);
+        if (!isIntermediate) {
+          setSelectedBlock({
+            id: String(id),
+            meta: useEditorStore.getState().selectedBlock?.meta || null,
+          });
+        }
         if (!isIntermediate) {
           void commitStagedPatches();
         }

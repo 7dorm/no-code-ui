@@ -128,7 +128,7 @@ export const styles = StyleSheet.create({
   editorContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 600,
+    minHeight: 0,
     backgroundColor: '#1e1e1e',
   },
   blockEditorPreviewContainer: {
@@ -216,7 +216,7 @@ export const styles = StyleSheet.create({
     minWidth: 240,
     maxWidth: 520,
     height: '100%',
-    overflow: 'hidden',
+    overflow: 'auto',
     backgroundColor: '#0f172a',
   },
   splitMainPanels: {

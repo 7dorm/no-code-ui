@@ -24,6 +24,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
         .mrpak-drop-label { position: fixed; z-index: 10000; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 8px; padding: 6px 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.25); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .mrpak-shift-badge { position: fixed; z-index: 10001; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #fff; border: 1px solid rgba(245, 158, 11, 0.65); border-radius: 6px; padding: 4px 6px; font: 11px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; box-shadow: 0 3px 8px rgba(0,0,0,0.22); }
         .mrpak-hint { position: fixed; z-index: 9999; bottom: 10px; right: 10px; background: rgba(15,23,42,0.85); color: #fff; padding: 8px 10px; border-radius: 8px; font: 12px/1.2 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; }
+        .mrpak-var-getter { outline: 2px solid #c084fc !important; outline-offset: 4px; box-shadow: 0 0 12px rgba(192, 132, 252, 0.6); z-index: 9990; position: relative; }
+        .mrpak-var-setter { outline: 2px solid #fb923c !important; outline-offset: 4px; box-shadow: 0 0 12px rgba(251, 146, 60, 0.6); z-index: 9990; position: relative; }
         ${isEditMode ? `
         /* Р‘Р»РѕРєРёСЂСѓРµРј РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹ С‚РѕР»СЊРєРѕ РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РѕСЂР° */
         [data-no-code-ui-id] button,
@@ -62,51 +64,61 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           window.__mrpak_mocks = window.__mrpak_mocks || {};
 
           window.__mrpakGetMock = function(comp, name, actualValue) {
-            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
-            window.__mrpak_live_vars[comp][name] = { type: typeof actualValue, value: actualValue, isState: false, componentName: comp, name };
+            // console.log('[__mrpakGetMock] Called for', comp, name, actualValue);
+            const liveComp = window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
+            const prev = liveComp[name];
             
-            clearTimeout(window.__mrpak_snap_timer);
-            window.__mrpak_snap_timer = setTimeout(() => {
-                const safeSnapshots = {};
-                const liveVars = window.__mrpak_live_vars || {};
-                for (const c of Object.keys(liveVars)) {
-                  safeSnapshots[c] = {};
-                  for (const k of Object.keys(liveVars[c])) {
-                    const { _setter, ...rest } = liveVars[c][k];
-                    safeSnapshots[c][k] = rest;
-                  }
-                }
-                post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
-            }, 300);
-
-            if (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) {
-              return window.__mrpak_mocks[comp][name];
+            let dropMock = false;
+            if (prev && 'baseValue' in prev) {
+               const isPrimitive = (v) => v === null || (typeof v !== 'object' && typeof v !== 'function');
+               if (isPrimitive(prev.baseValue) && isPrimitive(actualValue)) {
+                 if (prev.baseValue !== actualValue) dropMock = true;
+               } else if (!isPrimitive(prev.baseValue) && !isPrimitive(actualValue)) {
+                 try {
+                   if (JSON.stringify(prev.baseValue) !== JSON.stringify(actualValue)) dropMock = true;
+                 } catch(e) {}
+               } else {
+                 dropMock = true;
+               }
             }
-            return actualValue;
+
+            if (dropMock && window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) {
+               delete window.__mrpak_mocks[comp][name];
+               post('${MRPAK_MSG.CLEAR_MOCK}', { comp, name });
+               setTimeout(() => {
+                 const safeSnapshots = {};
+                 const liveVars = window.__mrpak_live_vars || {};
+                 for (const c of Object.keys(liveVars)) {
+                   safeSnapshots[c] = {};
+                   for (const k of Object.keys(liveVars[c])) {
+                     const { _setter, ...rest } = liveVars[c][k];
+                     safeSnapshots[c][k] = rest;
+                   }
+                 }
+                 post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
+               }, 10);
+            }
+
+            const mockValue = (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) 
+              ? window.__mrpak_mocks[comp][name] 
+              : undefined;
+            const effectiveValue = mockValue !== undefined ? mockValue : actualValue;
+
+            liveComp[name] = { type: typeof effectiveValue, value: effectiveValue, baseValue: actualValue, isState: false, componentName: comp, name };
+            
+            return effectiveValue;
           };
 
           window.__mrpakGetMockState = function(comp, name, stateTuple) {
             const actualValue = stateTuple[0];
             const setter = stateTuple[1];
-            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
-            window.__mrpak_live_vars[comp][name] = { type: typeof actualValue, value: actualValue, isState: true, componentName: comp, name, _setter: setter };
             const mockValue = (window.__mrpak_mocks && window.__mrpak_mocks[comp] && window.__mrpak_mocks[comp][name] !== undefined) 
                 ? window.__mrpak_mocks[comp][name] 
                 : undefined;
-                
-            clearTimeout(window.__mrpak_snap_timer);
-            window.__mrpak_snap_timer = setTimeout(() => {
-                const safeSnapshots = {};
-                const liveVars = window.__mrpak_live_vars || {};
-                for (const c of Object.keys(liveVars)) {
-                  safeSnapshots[c] = {};
-                  for (const k of Object.keys(liveVars[c])) {
-                    const { _setter, ...rest } = liveVars[c][k];
-                    safeSnapshots[c][k] = rest;
-                  }
-                }
-                post('${MRPAK_MSG.VAR_SNAPSHOT}', { snapshots: safeSnapshots });
-            }, 300);
+            const effectiveValue = mockValue !== undefined ? mockValue : actualValue;
+
+            window.__mrpak_live_vars[comp] = window.__mrpak_live_vars[comp] || {};
+            window.__mrpak_live_vars[comp][name] = { type: typeof effectiveValue, value: effectiveValue, isState: true, componentName: comp, name, _setter: setter };
 
             if (mockValue !== undefined) {
               return [mockValue, setter];
@@ -252,6 +264,7 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
           const CMD_SET_RESIZE_TARGET = '${MRPAK_CMD.SET_RESIZE_TARGET}';
           const CMD_REQ_VAR_SNAPSHOT = '${MRPAK_CMD.REQUEST_VAR_SNAPSHOT}';
           const CMD_UPDATE_MOCKS = '${MRPAK_CMD.UPDATE_MOCKS}';
+          const CMD_HIGHLIGHT_VAR_BLOCKS = '${MRPAK_CMD.HIGHLIGHT_VAR_BLOCKS}';
           let selected = null;
           let selectedGroup = [];
           let selectedIds = [];
@@ -662,6 +675,20 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 } catch (e) {}
               }
             }
+          };
+          let lastIntermediateApplyAt = 0;
+          let lastIntermediateApplyKey = '';
+          const postIntermediateApply = (id, patch) => {
+            try {
+              if (!id || !patch || typeof patch !== 'object') return;
+              const now = Date.now();
+              const key = String(id) + ':' + JSON.stringify(patch);
+              if (key === lastIntermediateApplyKey && (now - lastIntermediateApplyAt) < 80) return;
+              if ((now - lastIntermediateApplyAt) < 80) return;
+              lastIntermediateApplyAt = now;
+              lastIntermediateApplyKey = key;
+              post(MSG_APPLY, { id, patch, isIntermediate: true });
+            } catch (e) {}
           };
           const ensureOffsetParent = (el) => {
             const parent = el && el.parentElement;
@@ -1852,6 +1879,8 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
               return;
             }
             if (!drag || !selected) return;
+            const id = ensureId(selected);
+            if (!id) return;
             const dx = ev.clientX - drag.sx;
             const dy = ev.clientY - drag.sy;
             
@@ -1888,6 +1917,45 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 if (rect) {
                   setShiftBadge('offset left:' + Math.round(futureLeft) + ' top:' + Math.round(futureTop), rect.left - toNum(cs.marginLeft), rect.top - toNum(cs.marginTop) - 24);
                 }
+                const liveLeft = snap(futureLeft);
+                const liveTop = snap(futureTop);
+                const liveLeftValue = formatMoveValue(
+                  liveLeft,
+                  getMoveAxisReferenceSize('relative', 'x', contentRight - contentLeft, contentBottom - contentTop),
+                  'relative'
+                );
+                const liveTopValue = formatMoveValue(
+                  liveTop,
+                  getMoveAxisReferenceSize('relative', 'y', contentRight - contentLeft, contentBottom - contentTop),
+                  'relative'
+                );
+                const moveKeys = getMovePatchKeys('relative');
+                postIntermediateApply(id, {
+                  position: 'relative',
+                  left: '',
+                  top: '',
+                  [moveKeys.x]: liveLeftValue,
+                  [moveKeys.y]: liveTopValue,
+                });
+              } else {
+                const startLeft = drag.rect.left - parentRect.left - padLeft;
+                const startTop = drag.rect.top - parentRect.top - padTop;
+                const liveLeft = snap(startLeft + constrainedDx);
+                const liveTop = snap(startTop + constrainedDy);
+                const liveLeftValue = formatMoveValue(
+                  liveLeft,
+                  getMoveAxisReferenceSize('absolute', 'x', contentRight - contentLeft, contentBottom - contentTop),
+                  'absolute'
+                );
+                const liveTopValue = formatMoveValue(
+                  liveTop,
+                  getMoveAxisReferenceSize('absolute', 'y', contentRight - contentLeft, contentBottom - contentTop),
+                  'absolute'
+                );
+                drag.finalLeft = liveLeft;
+                drag.finalTop = liveTop;
+                drag.finalPosition = 'absolute';
+                postIntermediateApply(id, { position: 'absolute', left: liveLeftValue, top: liveTopValue });
               }
             } else {
               const resizeTarget = drag.resizeTarget || resizeTargetMode;
@@ -1927,6 +1995,21 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   node.style.marginRight = nextMr + 'px';
                   node.style.marginBottom = nextMb + 'px';
                 });
+                postIntermediateApply(id, '${type}' === 'html'
+                  ? {
+                    ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth + 'px', height: drag.startHeight + 'px' } : {}),
+                    marginLeft: nextMl + 'px',
+                    marginTop: nextMt + 'px',
+                    marginRight: nextMr + 'px',
+                    marginBottom: nextMb + 'px',
+                  }
+                  : {
+                    ...(drag.startWidth !== undefined && drag.startHeight !== undefined ? { width: drag.startWidth, height: drag.startHeight } : {}),
+                    marginLeft: nextMl,
+                    marginTop: nextMt,
+                    marginRight: nextMr,
+                    marginBottom: nextMb,
+                  });
                 updateBoxOverlay();
                 const baseRect = getElementVisualRect(selected);
                 if (baseRect) {
@@ -1957,6 +2040,19 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   node.style.paddingRight = nextPr + 'px';
                   node.style.paddingBottom = nextPb + 'px';
                 });
+                postIntermediateApply(id, '${type}' === 'html'
+                  ? {
+                    paddingLeft: nextPl + 'px',
+                    paddingTop: nextPt + 'px',
+                    paddingRight: nextPr + 'px',
+                    paddingBottom: nextPb + 'px',
+                  }
+                  : {
+                    paddingLeft: nextPl,
+                    paddingTop: nextPt,
+                    paddingRight: nextPr,
+                    paddingBottom: nextPb,
+                  });
               } else if (resizeTarget === 'content-lock') {
                 const handleStr = String(handle || 'se');
                 let nextPl = drag.startPaddingLeft || 0;
@@ -1995,6 +2091,23 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                   node.style.width = widthStyle + 'px';
                   node.style.height = heightStyle + 'px';
                 });
+                postIntermediateApply(id, '${type}' === 'html'
+                  ? {
+                    paddingLeft: nextPl + 'px',
+                    paddingTop: nextPt + 'px',
+                    paddingRight: nextPr + 'px',
+                    paddingBottom: nextPb + 'px',
+                    width: widthStyle + 'px',
+                    height: heightStyle + 'px',
+                  }
+                  : {
+                    paddingLeft: nextPl,
+                    paddingTop: nextPt,
+                    paddingRight: nextPr,
+                    paddingBottom: nextPb,
+                    width: widthStyle,
+                    height: heightStyle,
+                  });
                 drag.finalContentLock = {
                   paddingLeft: nextPl,
                   paddingTop: nextPt,
@@ -2016,6 +2129,29 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                     node.style.marginTop = snap((drag.startMarginTop || 0) + shiftY) + 'px';
                   }
                 });
+                const intermediatePatch = {};
+                if ('${type}' === 'html') {
+                  intermediatePatch.width = w + 'px';
+                  intermediatePatch.height = h + 'px';
+                  if ((drag.moveMode || getElementMoveMode(selected)) === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.left = snap((drag.startLeft || 0) + shiftX) + 'px';
+                    intermediatePatch.top = snap((drag.startTop || 0) + shiftY) + 'px';
+                  } else if ((drag.moveMode || getElementMoveMode(selected)) === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.marginLeft = snap((drag.startMarginLeft || 0) + shiftX) + 'px';
+                    intermediatePatch.marginTop = snap((drag.startMarginTop || 0) + shiftY) + 'px';
+                  }
+                } else {
+                  intermediatePatch.width = w;
+                  intermediatePatch.height = h;
+                  if ((drag.moveMode || getElementMoveMode(selected)) === 'absolute' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.left = snap((drag.startLeft || 0) + shiftX);
+                    intermediatePatch.top = snap((drag.startTop || 0) + shiftY);
+                  } else if ((drag.moveMode || getElementMoveMode(selected)) === 'relative' && (shiftX !== 0 || shiftY !== 0)) {
+                    intermediatePatch.marginLeft = snap((drag.startMarginLeft || 0) + shiftX);
+                    intermediatePatch.marginTop = snap((drag.startMarginTop || 0) + shiftY);
+                  }
+                }
+                postIntermediateApply(id, intermediatePatch);
               }
               if (resizeTarget !== 'margin') {
                 updateBoxOverlay();
@@ -2789,11 +2925,11 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
             dropTarget = null;
           }, true);
 
-          // РџРѕРґСЃРєР°Р·РєР°
+          // Подсказка
           try {
             const hint = document.createElement('div');
             hint.className = 'mrpak-hint';
-            hint.textContent = 'MRPAK Editor: РєР»РёРє = РІС‹Р±СЂР°С‚СЊ, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize, в†ђ/в†’ = resize mode (margin/size/padding/content-lock).';
+            hint.textContent = 'MRPAK Editor: клик = выбрать, Ctrl+Shift+Click = multi sibling, Shift+Drag = move, Alt+Drag = resize, ←/→ = resize mode (margin/size/padding/content-lock).';
             document.body.appendChild(hint);
           } catch(e) {}
 
@@ -2989,6 +3125,25 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                 });
                 return;
               }
+              if (data.type === CMD_HIGHLIGHT_VAR_BLOCKS) {
+                try {
+                  Array.from(document.querySelectorAll('.mrpak-var-getter, .mrpak-var-setter')).forEach((el) => {
+                    el.classList.remove('mrpak-var-getter');
+                    el.classList.remove('mrpak-var-setter');
+                  });
+                  if (data.getterIds && Array.isArray(data.getterIds)) {
+                    data.getterIds.forEach((id) => {
+                      getElementsById(String(id)).forEach(el => el.classList.add('mrpak-var-getter'));
+                    });
+                  }
+                  if (data.setterIds && Array.isArray(data.setterIds)) {
+                    data.setterIds.forEach((id) => {
+                      getElementsById(String(id)).forEach(el => el.classList.add('mrpak-var-setter'));
+                    });
+                  }
+                } catch(e) {}
+                return;
+              }
               if (data.type === CMD_UPDATE_MOCKS) {
                 if (data.mocks) {
                   window.__mrpak_mocks = data.mocks;
@@ -3004,9 +3159,12 @@ export function generateBlockEditorScript(type: string, mode: string = 'preview'
                               else if (typeof old === 'string') v._setter(old + ' ');
                               else if (typeof old === 'boolean') v._setter(!old);
                               else v._setter((prev) => Array.isArray(prev) ? [...prev] : typeof prev === 'object' && prev !== null ? {...prev} : prev);
-                              
                               if (typeof old === 'number' || typeof old === 'string' || typeof old === 'boolean') {
-                                setTimeout(() => v._setter(old), 0);
+                                requestAnimationFrame(() => {
+                                  requestAnimationFrame(() => {
+                                    v._setter(old);
+                                  });
+                                });
                               }
                            }
                         }

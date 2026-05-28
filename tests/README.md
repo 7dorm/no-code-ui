@@ -144,6 +144,61 @@
 3. **Внешние библиотеки**: Импорты из `node_modules` могут не работать
 4. **TypeScript**: preview рассчитан на компонентные `.ts`/`.tsx`; обычные utility/`d.ts` файлы открываются как код без рендера
 
+## 7. Simple TypeScript (`7-simple-typescript/`)
+**Цель**: Тестирование TypeScript/TSX сценария с typed-импортами
+
+**Структура**:
+```
+7-simple-typescript/
+├── App.tsx
+├── theme.ts
+└── utils/
+    └── task-helpers.ts
+```
+
+**Проверяет**:
+- обработку `.tsx` компонента;
+- импорт зависимостей из `.ts` файлов;
+- typed props / interfaces / union types;
+- редактирование JSX и inline-стилей в TypeScript-проекте.
+
+**Запуск**: Откройте `App.tsx` в приложении
+
+## 8. Multi Component JSX (`8-multi-component-jsx/`)
+**Цель**: Проверка выбора конкретного renderable-компонента внутри одного `.jsx` файла
+
+**Структура**:
+```
+8-multi-component-jsx/
+└── App.jsx
+```
+
+**Проверяет**:
+- наличие двух renderable-компонентов в одном файле;
+- сценарий, где `App` использует второй компонент `StatusBadge`;
+- раскрытие `.jsx` файла в дереве как списка компонентов;
+- открытие конкретного выбранного компонента вместо автоматического выбора первого.
+
+**Запуск**: Откройте `App.jsx` в приложении
+
+## 9. Interaction Blocking (`9-interaction-blocking/`)
+**Цель**: Проверить, что в режиме редактирования блокируются все пользовательские события (hover, click, input, key, touch).
+
+**Структура**:
+```
+9-interaction-blocking/
+└── App.jsx
+```
+
+**Проверяет**:
+- hover/enter/over/move;
+- click/dblclick/contextmenu/wheel;
+- input/change/focus/blur/keydown/keyup;
+- touchstart/touchmove/touchend;
+- contenteditable;
+
+**Запуск**: Откройте `App.jsx` в приложении
+
 ## Отладка
 
 Если что-то не работает:

@@ -27,7 +27,7 @@ export class Framework {
    * @param {Object} options - дополнительные опции (например, режим редактора)
    * @returns {Promise<Object>} { html: string, blockMapForEditor: Object, blockMapForFile: Object, dependencyPaths: string[] }
    */
-  async generateHTML(code:string, filePath:string, options = {}): Promise<{ html: string; blockMapForEditor: Object; blockMapForFile: Object; dependencyPaths: string[] }> {
+  async generateHTML(code:string, filePath:string, options = {}): Promise<{ html: string; blockMapForEditor: Object; blockMapForFile: Object; dependencyPaths: string[]; variableUsages?: Record<string, { getters: string[], setters: string[] }> }> {
     throw new Error('Framework.generateHTML() must be implemented');
   }
 

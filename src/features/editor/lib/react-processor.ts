@@ -1088,3 +1088,121 @@ export function createReactHTMLTemplate({
 `,
   };
 }
+
+export function extractVariableUsages(code: string): Record<string, { getters: string[], setters: string[] }> {
+  const usages: Record<string, { getters: string[], setters: string[] }> = {};
+
+  try {
+    const ast = parseModule(code);
+    
+    const getBlockId = (p: any): string | null => {
+      const jsxNode = p.findParent((parent: any) => parent.isJSXElement() || parent.isJSXOpeningElement());
+      if (!jsxNode) return null;
+      
+      const jsxOpening = jsxNode.isJSXElement() ? jsxNode.node.openingElement : jsxNode.node;
+      
+      let id = null;
+      for (const attr of jsxOpening.attributes) {
+        if (t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name, { name: 'data-no-code-ui-id' })) {
+          if (t.isStringLiteral(attr.value)) id = attr.value.value;
+          break;
+        }
+      }
+      return id;
+    };
+
+    traverse(ast, {
+      VariableDeclarator(path) {
+        const functionParent = path.getFunctionParent();
+        if (!functionParent) return;
+        
+        const fnNode = functionParent.node;
+        let compName = 'UnknownComponent';
+        if (t.isFunctionDeclaration(fnNode) && fnNode.id) {
+          compName = fnNode.id.name;
+        } else if (t.isVariableDeclarator(functionParent.parentPath?.node)) {
+          const id = (functionParent.parentPath.node as t.VariableDeclarator).id;
+          if (t.isIdentifier(id)) compName = id.name;
+        }
+
+        if (!/^[A-Z]/.test(compName)) return;
+
+        const id = path.node.id;
+        const init = path.node.init;
+        if (!init) return;
+
+        let isUseState = false;
+        
+        const checkIsUseStateCall = (expr: t.Expression | t.Node) => {
+          if (t.isCallExpression(expr)) {
+            const callee = expr.callee;
+            if (t.isIdentifier(callee) && callee.name === 'useState') return true;
+            if (t.isMemberExpression(callee) && t.isIdentifier(callee.object, { name: 'React' }) && t.isIdentifier(callee.property, { name: 'useState' })) return true;
+          }
+          return false;
+        };
+
+        if (checkIsUseStateCall(init)) {
+          isUseState = true;
+        } else if (t.isConditionalExpression(init) && checkIsUseStateCall(init.alternate)) {
+          isUseState = true;
+        } else if (t.isLogicalExpression(init) && checkIsUseStateCall(init.right)) {
+          isUseState = true;
+        }
+
+        if (isUseState && t.isArrayPattern(id)) {
+          const stateVar = id.elements[0];
+          const setterVar = id.elements[1];
+
+          if (t.isIdentifier(stateVar)) {
+            const varName = stateVar.name;
+            if (!usages[varName]) usages[varName] = { getters: [], setters: [] };
+            
+            const binding = path.scope.getBinding(varName);
+            if (binding) {
+              binding.referencePaths.forEach(ref => {
+                const blockId = getBlockId(ref);
+                if (blockId && !usages[varName].getters.includes(blockId)) {
+                  usages[varName].getters.push(blockId);
+                }
+              });
+            }
+          }
+
+          if (t.isIdentifier(stateVar) && t.isIdentifier(setterVar)) {
+            const varName = stateVar.name;
+            const setterName = setterVar.name;
+            
+            const binding = path.scope.getBinding(setterName);
+            if (binding) {
+              binding.referencePaths.forEach(ref => {
+                const blockId = getBlockId(ref);
+                if (blockId && !usages[varName].setters.includes(blockId)) {
+                  usages[varName].setters.push(blockId);
+                }
+              });
+            }
+          }
+        } else if (t.isIdentifier(id) && !isUseState) {
+          const varName = id.name;
+          if (!usages[varName]) usages[varName] = { getters: [], setters: [] };
+          
+          const binding = path.scope.getBinding(varName);
+          if (binding) {
+            binding.referencePaths.forEach(ref => {
+              const blockId = getBlockId(ref);
+              if (blockId && !usages[varName].getters.includes(blockId)) {
+                usages[varName].getters.push(blockId);
+              }
+            });
+          }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.warn('Failed to extract variable usages', err);
+  }
+  
+  return usages;
+}

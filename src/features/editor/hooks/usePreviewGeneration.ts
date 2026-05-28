@@ -60,6 +60,9 @@ export function usePreviewGeneration({
           setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths);
+          if (result.variableUsages) {
+            useEditorStore.getState().setVariableUsages(result.variableUsages);
+          }
           setPreviewOpenError(null);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
@@ -72,7 +75,8 @@ export function usePreviewGeneration({
         }
       };
       
-      // Debounce HTML generation to prevent excessive iframe reloads during visual editing
+      // Keep split-mode preview reactive while still avoiding constant iframe reloads.
+      const debounceMs = viewMode === 'split' ? 120 : 350;
       timer = setTimeout(() => {
         const state = useEditorStore.getState();
         if (state.skipPreviewGeneration) {
@@ -80,7 +84,7 @@ export function usePreviewGeneration({
           return;
         }
         void generateHTML();
-      }, 500);
+      }, debounceMs);
     } else {
       setReactHTML('');
       setIsProcessingReact(false);
@@ -108,6 +112,9 @@ export function usePreviewGeneration({
           setBlockMap(result.blockMapForEditor || {});
           setBlockMapForFile(result.blockMapForFile || {});
           setDependencyPaths(result.dependencyPaths);
+          if (result.variableUsages) {
+            useEditorStore.getState().setVariableUsages(result.variableUsages);
+          }
           setPreviewOpenError(null);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);

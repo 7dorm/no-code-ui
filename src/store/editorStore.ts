@@ -48,6 +48,8 @@ interface EditorState {
   setSelectedBlock: (block: { id: string; meta?: any } | null) => void;
   selectedBlockIds: string[];
   setSelectedBlockIds: (ids: string[]) => void;
+  selectedVariableName: string | null;
+  setSelectedVariableName: (name: string | null) => void;
 
   // Ast Data
   blockMap: BlockMap;
@@ -111,6 +113,8 @@ interface EditorState {
   // Variables and Mocks
   variableSnapshots: Record<string, ComponentVariables>;
   setVariableSnapshots: (snapshots: Record<string, ComponentVariables>) => void;
+  variableUsages: Record<string, { getters: string[], setters: string[] }>;
+  setVariableUsages: (usages: Record<string, { getters: string[], setters: string[] }>) => void;
   mockVariables: Record<string, Record<string, any>>;
   setMockVariables: (mocks: Record<string, Record<string, any>>) => void;
   updateMockVariables: (updater: ((prev: Record<string, Record<string, any>>) => Record<string, Record<string, any>>) | Record<string, Record<string, any>>) => void;
@@ -154,6 +158,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedBlock: (block) => set({ selectedBlock: block }),
   selectedBlockIds: [],
   setSelectedBlockIds: (ids) => set({ selectedBlockIds: ids }),
+  selectedVariableName: null,
+  setSelectedVariableName: (name) => set({ selectedVariableName: name }),
 
   // Ast Data
   blockMap: {},
@@ -223,6 +229,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   // Variables and Mocks
   variableSnapshots: {},
   setVariableSnapshots: (snapshots) => set({ variableSnapshots: snapshots }),
+  variableUsages: {},
+  setVariableUsages: (usages) => set({ variableUsages: usages }),
   mockVariables: {},
   setMockVariables: (mocks) => set({ mockVariables: mocks }),
   updateMockVariables: (updater) => set((state) => ({

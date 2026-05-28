@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 
 /**
  * Простой однофайловый React Native компонент для тестирования ReactNativeFramework
- */
+ */import ExtractedBlock from "./ExtractedBlock";
 export default function App() {
   const [count, setCount] = useState(0);
   const [pressed, setPressed] = useState(false);
@@ -14,48 +14,48 @@ export default function App() {
     setTimeout(() => setPressed(false), 300);
   };
 
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Простой React Native тест</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Активен</Text>
-        </View>
+  return <ExtractedBlock />;
 
-        <View style={styles.card}>
-          
-          <Text style={styles.text}>
-            Текущее значение: {count}
-          </Text>
-          <TouchableOpacity
-            style={[styles.button, pressed && styles.buttonPressed]}
-            onPress={handlePress}>
 
-            <Text style={styles.buttonText}>Увеличить счетчик</Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>О компоненте</Text>
-          <Text style={styles.text}>
-            Этот компонент тестирует ReactNativeFramework:
-          </Text>
-          <View style={styles.list}>
-            <Text style={styles.listItem}>• Инструментация JSX</Text>
-            <Text style={styles.listItem}>• Обработка зависимостей</Text>
-            <Text style={styles.listItem}>• Применение стилей</Text>
-            <Text style={styles.listItem}>• React Native Web рендеринг</Text>
-          </View>
-        </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Состояние</Text>
-          <Text style={styles.text}>
-            Кнопка была нажата: {pressed ? 'Да' : 'Нет'}
-          </Text>
-        </View>
-      </View>
-    </ScrollView>);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 }
 

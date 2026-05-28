@@ -171,8 +171,12 @@ export function useBlockOperations({
       const newContent = generateResult.code;
 
       if (isIntermediate) {
-        updateMonacoEditorWithScroll(newContent);
-        await manager.updateCodeASTFromCode(newContent || '', true);
+        // Prevent split preview iframe reinjection during high-frequency drag updates.
+        useEditorStore.getState().setSkipPreviewGeneration(true);
+        const currentEditorValue = monacoEditorRef?.current?.getValue?.();
+        if (typeof currentEditorValue !== 'string' || currentEditorValue !== newContent) {
+          updateMonacoEditorWithScroll(newContent);
+        }
         const previousValue = derivePreviousStylePatch(mappedBlockId, patch);
         if (!isUndoRedo) addToHistoryDebounced({ type: 'patch', blockId: mappedBlockId, patch, previousValue }, true);
         return;
